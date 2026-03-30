@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "title": "Colors",
+    "selectPlaceholder": "Select a color...",
+    "noSelection": "No color selected",
+    "ariaLabel": "Color selection",
+    "blue": "Blue",
+    "green": "Green",
+    "purple": "Purple",
+    "pink": "Pink",
+    "indigo": "Indigo",
+    "teal": "Teal",
+    "orange": "Orange",
+    "red": "Red",
+    "cyan": "Cyan",
+    "emerald": "Emerald",
+    "amber": "Amber",
+    "lime": "Lime",
+    "default": "Default"
+  }
+}

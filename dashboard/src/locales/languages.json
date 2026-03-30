@@ -1,0 +1,14 @@
+{
+  "languages": {
+    "en-US": {
+      "name": "English",
+      "nativeName": "English",
+      "flag": "🇺🇸"
+    },
+    "pt-BR": {
+      "name": "Portuguese (Brazil)",
+      "nativeName": "Português (Brasil)",
+      "flag": "🇧🇷"
+    }
+  }
+}

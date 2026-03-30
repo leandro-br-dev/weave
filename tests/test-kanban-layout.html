@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban Layout Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Simulate the grid layout from KanbanPage.tsx */
+        .kanban-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1rem;
+            padding: 0.75rem;
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+
+        @media (min-width: 640px) {
+            .kanban-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 768px) {
+            .kanban-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .kanban-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1280px) {
+            .kanban-grid {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1536px) {
+            .kanban-grid {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+        }
+
+        .column {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            min-height: 200px;
+        }
+
+        .column-header {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1f2937;
+        }
+
+        .task-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="w-full mx-auto py-8 px-6">
+        <h1 class="text-2xl font-bold mb-4">Kanban Layout Test</h1>
+        <p class="mb-4 text-gray-600">
+            Current viewport width: <span id="viewport-width" class="font-mono font-bold"></span>px<br>
+            Expected columns: <span id="expected-columns" class="font-mono font-bold"></span>
+        </p>
+
+        <div class="kanban-grid h-full">
+            <div class="column">
+                <div class="column-header">Templates</div>
+                <div class="task-card">Template 1</div>
+                <div class="task-card">Template 2</div>
+            </div>
+            <div class="column">
+                <div class="column-header">Backlog</div>
+                <div class="task-card">Task 1</div>
+                <div class="task-card">Task 2</div>
+                <div class="task-card">Task 3</div>
+            </div>
+            <div class="column">
+                <div class="column-header">Planning</div>
+                <div class="task-card">Task 4</div>
+                <div class="task-card">Task 5</div>
+            </div>
+            <div class="column">
+                <div class="column-header">In Progress</div>
+                <div class="task-card">Task 6</div>
+                <div class="task-card">Task 7</div>
+                <div class="task-card">Task 8</div>
+            </div>
+            <div class="column">
+                <div class="column-header">Done</div>
+                <div class="task-card">Task 9</div>
+                <div class="task-card">Task 10</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateViewportInfo() {
+            const width = window.innerWidth;
+            document.getElementById('viewport-width').textContent = width;
+
+            let columns;
+            if (width < 640) {
+                columns = '1 (mobile)';
+            } else if (width < 768) {
+                columns = '2 (sm)';
+            } else if (width < 1024) {
+                columns = '3 (md)';
+            } else if (width < 1280) {
+                columns = '4 (lg)';
+            } else {
+                columns = '5 (xl/2xl) - All columns visible!';
+            }
+
+            document.getElementById('expected-columns').textContent = columns;
+        }
+
+        window.addEventListener('resize', updateViewportInfo);
+        updateViewportInfo();
+    </script>
+</body>
+</html>

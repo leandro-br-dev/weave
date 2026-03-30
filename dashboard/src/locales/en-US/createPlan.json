@@ -1,0 +1,59 @@
+{
+  "validation": {
+    "planNameRequired": "Plan name is required",
+    "taskNameRequired": "Task name is required",
+    "taskPromptRequired": "Task prompt is required",
+    "workingDirectoryRequired": "Working directory is required",
+    "agentWorkspaceRequired": "Agent workspace is required"
+  },
+  "backToPlans": "Back to Plans",
+  "plans": "Plans",
+  "title": "Create Plan",
+  "project": {
+    "label": "Project",
+    "selectPlaceholder": "Select a project...",
+    "noProjects": "No projects available",
+    "createProjectLink": "Create a project"
+  },
+  "planName": {
+    "label": "Plan Name",
+    "placeholder": "Enter plan name"
+  },
+  "tasks": {
+    "label": "Tasks",
+    "addTask": "Add Task",
+    "remove": "Remove",
+    "taskNumber": "Task {{number}}",
+    "selectProjectHint": "Select a project first to load available agents",
+    "taskName": {
+      "label": "Task Name",
+      "placeholder": "Enter task name"
+    },
+    "prompt": {
+      "label": "Prompt",
+      "placeholder": "Describe the task..."
+    },
+    "agent": {
+      "label": "Agent",
+      "selectPlaceholder": "Select an agent...",
+      "selectProjectFirst": "Select a project first",
+      "noAgents": "No agents available",
+      "createWorkspaceLink": "Create a workspace"
+    },
+    "environment": {
+      "label": "Environment",
+      "defaultOption": "Default",
+      "noEnvironments": "No environments available",
+      "manageProjectsLink": "Manage projects"
+    },
+    "workingDirectory": {
+      "label": "Working Directory",
+      "placeholder": "/path/to/project"
+    }
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "creating": "Creating...",
+    "createPlan": "Create Plan"
+  }
+}

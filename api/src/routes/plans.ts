@@ -1,0 +1,1282 @@
+import { Router, Request, Response } from 'express'
+import { db } from '../db/index.js'
+import { authenticateToken } from '../middleware/auth.js'
+import { randomUUID } from 'crypto'
+
+const router = Router()
+
+// Helper function to parse tasks JSON string from SQLite
+function parsePlan(row: any) {
+  return {
+    ...row,
+    tasks: typeof row.tasks === 'string' ? JSON.parse(row.tasks) : row.tasks
+  }
+}
+
+// Types for request bodies
+interface CreatePlanBody {
+  name: string
+  tasks: any[] | string
+  project_id?: string
+}
+
+interface StartPlanBody {
+  client_id: string
+}
+
+interface CompletePlanBody {
+  status: 'success' | 'failed'
+  result: string
+  result_status?: 'success' | 'partial' | 'needs_rework'
+  result_notes?: string
+  structured_output?: any
+  daemon_completed_at?: string // ISO timestamp from daemon when completing
+}
+
+interface LogEntry {
+  task_id: string
+  level: 'info' | 'warn' | 'error' | 'debug'
+  message: string
+}
+
+// GET /api/plans - List all plans
+router.get('/', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { project_id, status } = req.query
+
+    // Build WHERE clause and parameters based on provided filters
+    let whereClause = ''
+    const params: any[] = []
+
+    if (project_id && status) {
+      whereClause += whereClause ? ' AND project_id = ? AND status = ?' : 'WHERE project_id = ? AND status = ?'
+      params.push(project_id, status)
+    } else if (project_id) {
+      whereClause += whereClause ? ' AND project_id = ?' : 'WHERE project_id = ?'
+      params.push(project_id)
+    } else if (status) {
+      whereClause += whereClause ? ' AND status = ?' : 'WHERE status = ?'
+      params.push(status)
+    }
+
+    const query = `
+      SELECT
+        id,
+        name,
+        tasks,
+        status,
+        client_id,
+        result,
+        started_at,
+        completed_at,
+        created_at,
+        project_id,
+        parent_plan_id,
+        rework_prompt
+      FROM plans
+      ${whereClause}
+      ORDER BY created_at DESC
+    `
+
+    const plans = params.length > 0
+      ? db.prepare(query).all(...params)
+      : db.prepare(query).all()
+
+    res.json({ data: plans.map(parsePlan), error: null })
+  } catch (error) {
+    console.error('Error fetching plans:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch plans' })
+  }
+})
+
+// POST /api/plans - Create a new plan
+router.post('/', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { name, tasks, project_id, status: requestedStatus }: CreatePlanBody & { status?: string } = req.body
+
+    console.log(`[plans] Creating plan: name="${name}", project_id=${project_id}, tasks_count=${Array.isArray(tasks) ? tasks.length : 'parsed'}`)
+
+    if (!name || !tasks) {
+      console.error(`[plans] Missing required fields: name=${!!name}, tasks=${!!tasks}`)
+      return res.status(400).json({ data: null, error: 'name and tasks are required' })
+    }
+
+    // Parse tasks if it's a string
+    let parsedTasks: any[]
+    try {
+      parsedTasks = typeof tasks === 'string' ? JSON.parse(tasks) : tasks
+    } catch (parseError) {
+      console.error(`[plans] Failed to parse tasks JSON: ${parseError}`)
+      return res.status(400).json({ data: null, error: 'Invalid tasks JSON format' })
+    }
+
+    // Sanitize tasks to ensure each task has an id
+    const sanitizedTasks = (parsedTasks || []).map((task: any, index: number) => ({
+      ...task,
+      id: task.id || `task-${index + 1}`,
+    }))
+
+    // Validate and set status (default to 'pending')
+    const allowedStatuses = ['pending', 'awaiting_approval']
+    const status = requestedStatus && allowedStatuses.includes(requestedStatus) ? requestedStatus : 'pending'
+
+    const id = randomUUID()
+    const now = new Date().toISOString()
+
+    console.log(`[plans] Inserting plan: id=${id}, status=${status}`)
+
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, now)
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      console.error(`[plans] Failed to retrieve created plan ${id}`)
+      return res.status(500).json({ data: null, error: 'Failed to retrieve created plan' })
+    }
+
+    console.log(`[plans] Plan created successfully: id=${id}`)
+    res.status(201).json({ data: parsePlan(plan), error: null })
+  } catch (error) {
+    console.error('Error creating plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to create plan' })
+  }
+})
+
+// GET /api/plans/pending - Get pending plans (for client polling)
+router.get('/pending', authenticateToken, (req: Request, res: Response) => {
+  try {
+    // All pending plans (DB is isolated per OS user)
+    const plans = db
+      .prepare(`
+        SELECT
+          id,
+          name,
+          tasks,
+          status,
+          client_id,
+          result,
+          started_at,
+          completed_at,
+          created_at
+        FROM plans
+        WHERE status = 'pending'
+        ORDER BY created_at DESC
+      `)
+      .all()
+
+    res.json({ data: plans.map(parsePlan), error: null })
+  } catch (error) {
+    console.error('Error fetching pending plans:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch pending plans' })
+  }
+})
+
+// GET /api/plans/metrics - Get global plan statistics
+router.get('/metrics', authenticateToken, (req: Request, res: Response) => {
+  try {
+    // Total plans
+    const totalResult = db
+      .prepare(`SELECT COUNT(*) as n FROM plans`)
+      .get() as { n: number }
+    const total = totalResult.n
+
+    // Plans grouped by status
+    const byStatusRows = db
+      .prepare(`SELECT status, COUNT(*) as count FROM plans GROUP BY status`)
+      .all() as { status: string; count: number }[]
+
+    const by_status: Record<string, number> = {
+      pending: 0,
+      running: 0,
+      success: 0,
+      failed: 0,
+    }
+
+    for (const row of byStatusRows) {
+      by_status[row.status] = row.count
+    }
+
+    // Success rate (successful / completed plans)
+    const completedCount = (by_status.success || 0) + (by_status.failed || 0)
+    const success_rate = completedCount > 0
+      ? ((by_status.success || 0) / completedCount) * 100
+      : 0
+
+    // Average execution duration in seconds
+    const avgDurationResult = db
+      .prepare(`
+        SELECT AVG((julianday(completed_at) - julianday(started_at)) * 86400) as avg_seconds
+        FROM plans
+        WHERE completed_at IS NOT NULL AND started_at IS NOT NULL
+      `)
+      .get() as { avg_seconds: number | null }
+    const avg_duration_seconds = avgDurationResult.avg_seconds || 0
+
+    // Last 7 days metrics
+    const last7DaysSuccess = db
+      .prepare(`SELECT COUNT(*) as n FROM plans WHERE status = ? AND created_at > datetime('now', '-7 days')`)
+      .get('success') as { n: number }
+    const last7DaysFailed = db
+      .prepare(`SELECT COUNT(*) as n FROM plans WHERE status = ? AND created_at > datetime('now', '-7 days')`)
+      .get('failed') as { n: number }
+
+    // Recovery metrics - plans recovered from timeout in last 24 hours
+    const recoveredPlansResult = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM plans
+      WHERE result LIKE '%Plan timed out%' AND completed_at > datetime('now', '-24 hours')
+    `).get() as { count: number }
+
+    res.json({
+      data: {
+        total,
+        by_status,
+        success_rate: Math.round(success_rate * 100) / 100,
+        avg_duration_seconds: Math.round(avg_duration_seconds * 100) / 100,
+        last_7_days: {
+          success: last7DaysSuccess.n,
+          failed: last7DaysFailed.n,
+        },
+        recovered_last_24h: recoveredPlansResult.count,
+      },
+      error: null,
+    })
+  } catch (error) {
+    console.error('Error fetching metrics:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch metrics' })
+  }
+})
+
+// GET /api/plans/approaching-timeout - Get plans nearing timeout
+router.get('/approaching-timeout', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const timeoutMinutes = Number(process.env.PLAN_TIMEOUT_MINUTES ?? 120)
+    const warningThreshold = timeoutMinutes * 0.8 // 80% of timeout
+    const warningCutoff = new Date(Date.now() - warningThreshold * 60 * 1000).toISOString()
+
+    const plans = db.prepare(`
+      SELECT id, name, status, started_at, last_heartbeat_at,
+             (julianday('now') - julianday(started_at)) * 1440 as minutes_running
+      FROM plans
+      WHERE status = 'running'
+      AND started_at < ?
+      ORDER BY started_at ASC
+    `).all(warningCutoff) as any[]
+
+    res.json({
+      data: {
+        count: plans.length,
+        plans: plans.map(p => ({
+          ...p,
+          timeout_in_minutes: Math.round(timeoutMinutes - p.minutes_running)
+        }))
+      },
+      error: null
+    })
+  } catch (error) {
+    console.error('Error fetching approaching timeout plans:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch plans' })
+  }
+})
+
+// POST /api/plans/reconcile - Reconcile orphaned plans on daemon startup
+router.post('/reconcile', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { active_plan_ids = [], grace_period_seconds = 120 } = req.body
+
+    // Calculate cutoff time for grace period
+    const graceCutoff = new Date(Date.now() - grace_period_seconds * 1000).toISOString()
+
+    // Find all running plans with their started_at timestamp
+    const running = db.prepare(
+      "SELECT id, name, started_at FROM plans WHERE status = 'running'"
+    ).all() as any[]
+
+    // Separate plans into orphaned (no active daemon) and recently-started (within grace period)
+    const orphaned: any[] = []
+    const skipped: any[] = []
+
+    for (const plan of running) {
+      if (active_plan_ids.includes(plan.id)) {
+        // Daemon confirmed it's processing this plan
+        continue
+      }
+
+      // Check if plan was started within grace period
+      if (plan.started_at) {
+        const startedAt = new Date(plan.started_at)
+        if (startedAt > new Date(graceCutoff)) {
+          // Plan was recently started, skip it
+          skipped.push(plan)
+          console.log(`[reconcile] Skipping recently-started plan ${plan.id} (started: ${plan.started_at})`)
+          continue
+        }
+      }
+
+      // Plan is orphaned and outside grace period
+      orphaned.push(plan)
+    }
+
+    // Reset orphaned plans to failed
+    for (const plan of orphaned) {
+      console.log(`[reconcile] Marking orphaned plan ${plan.id} as failed`)
+      db.prepare(`
+        UPDATE plans SET
+          status = 'failed',
+          completed_at = datetime('now'),
+          result = 'Marked as failed: daemon restarted while plan was running'
+        WHERE id = ?
+      `).run(plan.id)
+    }
+
+    res.json({
+      data: {
+        running_count: running.length,
+        orphaned_count: orphaned.length,
+        orphaned_ids: orphaned.map(p => p.id),
+        skipped_count: skipped.length,
+        skipped_ids: skipped.map(p => p.id),
+      },
+      error: null,
+    })
+  } catch (err: any) {
+    console.error('Error reconciling plans:', err)
+    res.status(500).json({ data: null, error: err.message })
+  }
+})
+
+// PUT /api/plans/:id - Edit a plan (only pending or awaiting_approval)
+router.put('/:id', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id) as any
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' })
+    }
+
+    // Permite editar planos de qualquer status exceto 'running'
+    // Planos com sucesso podem ser reeditados e reexecutados
+    if (plan.status === 'running') {
+      return res.status(400).json({
+        error: `Cannot edit plan with status '${plan.status}'. Please wait for the plan to complete.`
+      })
+    }
+
+    const { name, tasks } = req.body
+
+    db.prepare(`
+      UPDATE plans SET
+        name = COALESCE(?, name),
+        tasks = COALESCE(?, tasks)
+      WHERE id = ?
+    `).run(
+      name || null,
+      tasks ? JSON.stringify(tasks) : null,
+      req.params.id
+    )
+
+    const updated = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id) as any
+    if (updated.tasks && typeof updated.tasks === 'string') {
+      try { updated.tasks = JSON.parse(updated.tasks) } catch {}
+    }
+    res.json({ data: updated, error: null })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/plans/:id/approve - Approve a plan (awaiting_approval → pending)
+router.post('/:id/approve', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id) as any
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' })
+    }
+    if (plan.status !== 'awaiting_approval') {
+      return res.status(400).json({ error: `Plan status is '${plan.status}', not 'awaiting_approval'` })
+    }
+    db.prepare("UPDATE plans SET status = 'pending' WHERE id = ?").run(req.params.id)
+
+    // Atualiza kanban task vinculada para in_progress
+    db.prepare(`
+      UPDATE kanban_tasks
+      SET "column" = 'in_progress',
+          pipeline_status = 'running',
+          updated_at = datetime('now')
+      WHERE workflow_id = ?
+    `).run(req.params.id)
+
+    const updated = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id)
+    res.json({ data: updated, error: null })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/plans/:id - Get plan detail with log count
+router.get('/:id', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      console.log(`[plans] GET /plans/${id} - Plan not found`)
+      return res.status(404).json({
+        data: null,
+        error: `Plan not found: ${id}. The plan may have been deleted or never created.`
+      })
+    }
+
+    // Get log count
+    const logCount = db
+      .prepare('SELECT COUNT(*) as count FROM plan_logs WHERE plan_id = ?')
+      .get(id) as { count: number }
+
+    const planWithLogCount = {
+      ...parsePlan(plan),
+      log_count: logCount.count,
+    }
+
+    // Parse structured_output if present
+    if (plan.structured_output) {
+      try {
+        planWithLogCount.structured_output = JSON.parse(plan.structured_output)
+      } catch (e) {
+        // Invalid JSON, leave as is
+        console.warn('Failed to parse structured_output for plan', id)
+      }
+    }
+
+    res.json({ data: planWithLogCount, error: null })
+  } catch (error) {
+    console.error('Error fetching plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch plan' })
+  }
+})
+
+// POST /api/plans/:id/start - Start a plan
+router.post('/:id/start', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { client_id }: StartPlanBody = req.body
+
+    if (!client_id) {
+      return res.status(400).json({ data: null, error: 'client_id is required' })
+    }
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    if (plan.status !== 'pending') {
+      return res.status(400).json({ data: null, error: 'Plan is not in pending status' })
+    }
+
+    const now = new Date().toISOString()
+
+    db.prepare(`
+      UPDATE plans
+      SET status = 'running',
+          client_id = ?,
+          started_at = ?
+      WHERE id = ?
+    `).run(client_id, now, id)
+
+    const updatedPlan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    res.json({ data: parsePlan(updatedPlan), error: null })
+  } catch (error) {
+    console.error('Error starting plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to start plan' })
+  }
+})
+
+// POST /api/plans/:id/heartbeat - Update heartbeat timestamp for a running plan
+router.post('/:id/heartbeat', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    if (plan.status !== 'running') {
+      return res.status(400).json({ data: null, error: 'Plan is not running' })
+    }
+
+    const now = new Date().toISOString()
+    db.prepare('UPDATE plans SET last_heartbeat_at = ? WHERE id = ?').run(now, id)
+
+    res.json({ data: { heartbeat_at: now }, error: null })
+  } catch (error) {
+    console.error('Error updating heartbeat:', error)
+    res.status(500).json({ data: null, error: 'Failed to update heartbeat' })
+  }
+})
+
+// POST /api/plans/:id/complete - Complete a plan
+router.post('/:id/complete', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { status, result, result_status, result_notes, structured_output, daemon_completed_at }: CompletePlanBody = req.body
+
+    console.log(`[complete] Attempting to complete plan ${id}: status=${status}${daemon_completed_at ? `, daemon_completed_at=${daemon_completed_at}` : ''}`)
+
+    if (!status || !result) {
+      console.error(`[complete] Missing required fields for plan ${id}: status=${!!status}, result=${!!result}`)
+      return res.status(400).json({ data: null, error: 'status and result are required' })
+    }
+
+    if (status !== 'success' && status !== 'failed') {
+      console.error(`[complete] Invalid status for plan ${id}: ${status}`)
+      return res.status(400).json({ data: null, error: 'status must be success or failed' })
+    }
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      console.error(`[complete] Plan not found: ${id}`)
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    console.log(`[complete] Plan ${id} found: current status=${plan.status}`)
+
+    // Allow completion if status is 'running', 'failed', or 'completing'
+    // This handles the race condition where recoverStuckPlans marked a plan as failed
+    // due to timeout, but the daemon is actually completing it successfully
+    if (plan.status !== 'running' && plan.status !== 'failed' && plan.status !== 'completing') {
+      console.error(`[complete] Plan ${id} is not in a completable status (current: ${plan.status})`)
+      return res.status(400).json({
+        data: null,
+        error: `Plan is not in a completable status (current: ${plan.status})`
+      })
+    }
+
+    // Log when a plan transitions from failed to a terminal state
+    // This indicates the daemon recovered after a timeout
+    if (plan.status === 'failed') {
+      console.log(`[complete] Plan ${id} transitioning from failed to ${status} - daemon recovered after timeout`)
+    }
+
+    // Log when a plan transitions from completing to a terminal state
+    if (plan.status === 'completing') {
+      console.log(`[complete] Plan ${id} transitioning from completing to ${status}`)
+    }
+
+    const now = new Date().toISOString()
+
+    db.prepare(`
+      UPDATE plans
+      SET status = ?,
+          result = ?,
+          completed_at = ?,
+          result_status = COALESCE(?, result_status),
+          result_notes = COALESCE(?, result_notes),
+          structured_output = COALESCE(?, structured_output)
+      WHERE id = ?
+    `).run(
+      status,
+      result,
+      now,
+      result_status || null,
+      result_notes || null,
+      structured_output ? JSON.stringify(structured_output) : null,
+      id
+    )
+
+    console.log(`[complete] Plan ${id} marked as ${status} successfully`)
+
+    const updatedPlan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    res.json({ data: parsePlan(updatedPlan), error: null })
+  } catch (error) {
+    console.error('Error completing plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to complete plan' })
+  }
+})
+
+// POST /api/plans/:id/logs - Append log entries
+router.post('/:id/logs', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const logs: LogEntry[] = req.body
+
+    if (!Array.isArray(logs) || logs.length === 0) {
+      return res.status(400).json({ data: null, error: 'logs must be a non-empty array' })
+    }
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    const now = new Date().toISOString()
+    const insertLog = db.prepare(`
+      INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `)
+
+    const insertMany = db.transaction((logs: LogEntry[]) => {
+      for (const log of logs) {
+        insertLog.run(id, log.task_id, log.level, log.message, now)
+      }
+    })
+
+    insertMany(logs)
+
+    res.json({ data: { inserted: logs.length }, error: null })
+  } catch (error) {
+    console.error('Error appending logs:', error)
+    res.status(500).json({ data: null, error: 'Failed to append logs' })
+  }
+})
+
+// GET /api/plans/:id/logs - Get all log entries for a plan
+router.get('/:id/logs', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    const logs = db
+      .prepare(`
+        SELECT
+          id,
+          plan_id,
+          task_id,
+          level,
+          message,
+          created_at
+        FROM plan_logs
+        WHERE plan_id = ?
+        ORDER BY created_at ASC
+      `)
+      .all(id)
+
+    res.json({ data: logs, error: null })
+  } catch (error) {
+    console.error('Error fetching logs:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch logs' })
+  }
+})
+
+// POST /api/plans/:id/execute - Re-queue any completed or failed plan for execution
+router.post('/:id/execute', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    if (plan.status === 'running') {
+      return res.status(409).json({ data: null, error: 'Plan is already running' })
+    }
+
+    // Add log indicating re-execution
+    const logMessage = plan.status === 'success'
+      ? '↻ Plan re-executed - was previously successful'
+      : '↻ Plan re-executed'
+
+    // Delete old logs so tasks run from scratch (not skip completed ones)
+    db.prepare(`
+      DELETE FROM plan_logs
+      WHERE plan_id = ?
+    `).run(id)
+
+    db.prepare(`
+      UPDATE plans
+      SET status = 'pending',
+          client_id = NULL,
+          started_at = NULL,
+          completed_at = NULL,
+          result = NULL
+      WHERE id = ?
+    `).run(id)
+
+    // Add log entry
+    db.prepare(`
+      INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(id, 'system', 'info', logMessage)
+
+    const updated = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    res.json({ data: parsePlan(updated), error: null })
+  } catch (error) {
+    console.error('Error executing plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to execute plan' })
+  }
+})
+
+// POST /api/plans/:id/force-stop — força plano para 'failed' independente do status atual
+router.post('/:id/force-stop', authenticateToken, (req, res) => {
+  try {
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id) as any
+    if (!plan) return res.status(404).json({ data: null, error: 'Plan not found' })
+    if (plan.status !== 'running' && plan.status !== 'pending') {
+      return res.status(409).json({ data: null, error: `Plan is not running or pending (status: ${plan.status})` })
+    }
+
+    db.prepare(`
+      UPDATE plans
+      SET status = 'failed',
+          completed_at = datetime('now'),
+          result = 'Manually stopped by user'
+      WHERE id = ?
+    `).run(req.params.id)
+
+    // Atualiza kanban task vinculada se existir
+    db.prepare(`
+      UPDATE kanban_tasks
+      SET pipeline_status = 'failed',
+          error_message = 'Force stopped by user',
+          updated_at = datetime('now')
+      WHERE workflow_id = ?
+    `).run(req.params.id)
+
+    // Adicionar log de parada manual
+    db.prepare(`
+      INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(req.params.id, 'system', 'warn', '⛔ Plan manually stopped by user')
+
+    return res.json({ data: { stopped: true }, error: null })
+  } catch (err: any) {
+    console.error('Error force stopping plan:', err)
+    return res.status(500).json({ data: null, error: err.message || 'Failed to force stop plan' })
+  }
+})
+
+// POST /api/plans/:id/resume — Resume any completed plan from where it left off
+router.post('/:id/resume', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    if (plan.status === 'running') {
+      return res.status(400).json({ data: null, error: 'Plan is already running' })
+    }
+
+    // Set status back to pending so daemon picks it up
+    // Keep started_at to maintain execution history
+    // Clear completed_at and result to allow re-execution
+    const logMessage = plan.status === 'success'
+      ? '↻ Plan resumed - re-executing successful plan'
+      : '↻ Plan resumed - will skip completed tasks'
+
+    db.prepare(`
+      UPDATE plans
+      SET status = 'pending',
+          completed_at = NULL,
+          result = NULL
+      WHERE id = ?
+    `).run(id)
+
+    // Add log indicating resume
+    db.prepare(`
+      INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(id, 'system', 'info', logMessage)
+
+    const updated = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    res.json({ data: parsePlan(updated), error: null })
+  } catch (error) {
+    console.error('Error resuming plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to resume plan' })
+  }
+})
+
+// POST /api/plans/:id/reset — Reset a running plan back to pending (for daemon recovery)
+router.post('/:id/reset', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(req.params.id) as any
+    if (!plan) return res.status(404).json({ data: null, error: 'Plan not found' })
+
+    // Only reset running plans that are stuck
+    if (plan.status !== 'running') {
+      return res.status(400).json({ data: null, error: `Plan is not running (status: ${plan.status})` })
+    }
+
+    // Reset to pending state and clear started_at
+    db.prepare(`
+      UPDATE plans
+      SET status = 'pending',
+          started_at = NULL,
+          client_id = NULL
+      WHERE id = ?
+    `).run(req.params.id)
+
+    // Add log indicating reset
+    db.prepare(`
+      INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(req.params.id, 'system', 'warn', '↺ Plan reset to pending - daemon recovery')
+
+    return res.json({ data: { reset: true }, error: null })
+  } catch (err: any) {
+    console.error('Error resetting plan:', err)
+    return res.status(500).json({ data: null, error: err.message || 'Failed to reset plan' })
+  }
+})
+
+// POST /api/plans/:id/rework - Create a rework plan from a completed/failed plan
+router.post('/:id/rework', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id: sourceId } = req.params
+    const { rework_prompt } = req.body
+
+    // Validate rework_prompt
+    if (!rework_prompt || typeof rework_prompt !== 'string') {
+      return res.status(400).json({ data: null, error: 'rework_prompt is required' })
+    }
+
+    // Fetch source plan
+    const sourcePlan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(sourceId) as any
+
+    if (!sourcePlan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Only allow rework from terminal statuses
+    if (sourcePlan.status !== 'success' && sourcePlan.status !== 'failed') {
+      return res.status(400).json({ data: null, error: 'Plan must have a terminal status (success or failed) to rework' })
+    }
+
+    // Parse source tasks
+    const sourceTasks = typeof sourcePlan.tasks === 'string'
+      ? JSON.parse(sourcePlan.tasks) as any[]
+      : sourcePlan.tasks
+
+    // Fetch execution logs, excluding debug level
+    const logs = db
+      .prepare('SELECT task_id, level, message FROM plan_logs WHERE plan_id = ? AND level != ? ORDER BY id ASC')
+      .all(sourceId, 'debug') as any[]
+
+    // Group logs by task_id, take last 5 per task, truncate each message to 500 chars
+    const groupedByTask = new Map<string, any[]>()
+    for (const log of logs) {
+      if (!groupedByTask.has(log.task_id)) {
+        groupedByTask.set(log.task_id, [])
+      }
+      const group = groupedByTask.get(log.task_id)!
+      if (group.length < 5) {
+        group.push(log)
+      } else {
+        // Keep only last 5: shift first, push new
+        group.shift()
+        group.push(log)
+      }
+    }
+
+    // Build log summary string
+    let logSummary = ''
+    const taskIds = Array.from(groupedByTask.keys())
+    for (let i = 0; i < taskIds.length; i++) {
+      const taskId = taskIds[i]
+      const group = groupedByTask.get(taskId)!
+      const entry = `[Task: ${taskId}]\n${group.map(l => l.message.substring(0, 500)).join('\n')}\n`
+
+      if (logSummary.length + entry.length > 8000 && i > 0) {
+        logSummary += entry.substring(0, 8000 - logSummary.length)
+        logSummary += '\n... [truncated]'
+        break
+      }
+      logSummary += entry
+    }
+
+    // Truncate log summary to 8000 chars
+    if (logSummary.length > 8000) {
+      logSummary = logSummary.substring(0, 8000) + '\n... [truncated]'
+    }
+
+    // Truncate result to 2000 chars
+    const resultText = (sourcePlan.result || '').substring(0, 2000)
+
+    // Build the context-enhanced prompt for the first task
+    const originalPrompt = sourceTasks[0]?.prompt || ''
+    let contextPrompt = `## Context from Previous Workflow\n\nThis is a rework of a previous workflow. Below is the context you need:\n\n### Original Request\n${originalPrompt}\n\n### Execution Summary\n${logSummary}\n\n### Previous Result Status\nStatus: ${sourcePlan.status}\nResult: ${resultText}`
+
+    if (sourcePlan.result_status) {
+      contextPrompt += `\nResult Evaluation: ${sourcePlan.result_status} - ${sourcePlan.result_notes || ''}`
+    }
+
+    contextPrompt += `\n\n### New Modification Request\n${rework_prompt}\n\n---\n\nIMPORTANT: Use the context above to understand what was previously attempted and what needs to change. The "New Modification Request" section describes the specific changes needed.`
+
+    // Deep-clone tasks, replace first task's prompt with context-enhanced prompt
+    const newTasks = JSON.parse(JSON.stringify(sourceTasks)) as any[]
+    if (newTasks.length > 0) {
+      newTasks[0].prompt = contextPrompt
+    }
+
+    const newId = randomUUID()
+    const now = new Date().toISOString()
+
+    // Create the rework plan
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, workspace_id, parent_plan_id, rework_prompt, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      newId,
+      `Rework: ${sourcePlan.name}`,
+      JSON.stringify(newTasks),
+      'pending',
+      sourcePlan.project_id,
+      sourcePlan.workspace_id || null,
+      sourceId,
+      rework_prompt,
+      now
+    )
+
+    console.log('[rework] Creating rework plan from', sourceId, '- new plan:', newId)
+
+    // Fetch and return the newly created plan
+    const newPlan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(newId) as any
+
+    res.json({ data: parsePlan(newPlan), error: null })
+  } catch (error) {
+    console.error('Error creating rework plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to create rework plan' })
+  }
+})
+
+// DELETE /api/plans/:id - Delete a plan
+router.delete('/:id', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Don't allow deleting running plans
+    if (plan.status === 'running') {
+      return res.status(409).json({ data: null, error: 'Cannot delete a running plan' })
+    }
+
+    // Delete associated logs and then the plan
+    db.prepare('DELETE FROM plan_logs WHERE plan_id = ?').run(id)
+    db.prepare('DELETE FROM plans WHERE id = ?').run(id)
+
+    res.json({ data: { deleted: true }, error: null })
+  } catch (error) {
+    console.error('Error deleting plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to delete plan' })
+  }
+})
+
+// GET /api/plans/:id/logs/stream - SSE endpoint for real-time log streaming
+router.get('/:id/logs/stream', authenticateToken, (req: Request, res: Response) => {
+  const { id } = req.params
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no') // disable nginx buffering
+  res.flushHeaders()
+
+  // Send initial batch of existing logs
+  const existing = db
+    .prepare('SELECT * FROM plan_logs WHERE plan_id = ? ORDER BY created_at ASC')
+    .all(id) as any[]
+
+  let lastId = 0
+  for (const log of existing) {
+    res.write(`data: ${JSON.stringify(log)}\n\n`)
+    if (log.id > lastId) lastId = log.id
+  }
+
+  // Poll for new logs every 500ms
+  const interval = setInterval(() => {
+    // Check if plan still exists
+    const plan = db.prepare('SELECT status FROM plans WHERE id = ?').get(id) as any
+    if (!plan) {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: 'Plan not found' })}\n\n`)
+      clearInterval(interval)
+      res.end()
+      return
+    }
+
+    // Fetch new logs since lastId
+    const newLogs = db
+      .prepare('SELECT * FROM plan_logs WHERE plan_id = ? AND id > ? ORDER BY id ASC')
+      .all(id, lastId) as any[]
+
+    for (const log of newLogs) {
+      res.write(`data: ${JSON.stringify(log)}\n\n`)
+      if (log.id > lastId) lastId = log.id
+    }
+
+    // Send plan status update
+    res.write(`event: status\ndata: ${JSON.stringify({ status: plan.status })}\n\n`)
+
+    // Close stream when plan is terminal
+    if (plan.status === 'success' || plan.status === 'failed') {
+      res.write(`event: done\ndata: ${JSON.stringify({ status: plan.status })}\n\n`)
+      clearInterval(interval)
+      res.end()
+    }
+  }, 500)
+
+  // Cleanup on client disconnect
+  req.on('close', () => {
+    clearInterval(interval)
+  })
+})
+
+// Recover stuck plans on startup (running → failed if older than timeout)
+// IMPORTANT: This timeout MUST match the client's PLAN_TIMEOUT_SECONDS to avoid
+// marking long-running plans as failed before they actually complete.
+export function recoverStuckPlans(db: any) {
+  const timeoutMinutes = Number(process.env.PLAN_TIMEOUT_MINUTES ?? 120)  // Default: 2 hours
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString()
+
+  // Get plans before updating for logging
+  const stuckPlans = db.prepare(`
+    SELECT id, name, started_at,
+           (julianday('now') - julianday(started_at)) * 1440 as minutes_running
+    FROM plans
+    WHERE status = 'running'
+    AND (
+      (last_heartbeat_at IS NOT NULL AND last_heartbeat_at < ?) OR
+      (last_heartbeat_at IS NULL AND started_at < ?)
+    )
+  `).all(cutoff, cutoff) as any[]
+
+  // Use last_heartbeat_at if available, otherwise fall back to started_at
+  // Only mark as failed if no heartbeat for timeout period
+  const result = db.prepare(`
+    UPDATE plans
+    SET status = 'failed',
+        result = 'Plan timed out - daemon may have crashed',
+        completed_at = datetime('now')
+    WHERE status = 'running'
+    AND (
+      (last_heartbeat_at IS NOT NULL AND last_heartbeat_at < ?) OR
+      (last_heartbeat_at IS NULL AND started_at < ?)
+    )
+  `).run(cutoff, cutoff)
+
+  if (result.changes > 0) {
+    console.log(`[recovery] Marked ${result.changes} stuck plan(s) as failed`)
+    // Log details for monitoring
+    for (const plan of stuckPlans) {
+      const shortId = plan.id.substring(0, 8)
+      console.log(`[recovery] - Plan ${shortId} (${plan.name}): running for ${plan.minutes_running.toFixed(1)} minutes`)
+    }
+  }
+
+  return { recovered: result.changes, plans: stuckPlans }
+}
+
+// POST /api/plans/:id/structured-output - Save structured output from quick actions
+router.post('/:id/structured-output', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { output } = req.body
+
+    if (!output) {
+      return res.status(400).json({ data: null, error: 'output is required' })
+    }
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Normalize structured output format
+    // For improvement type, extract content directly to match frontend expectations
+    let normalizedOutput = output
+    if (output.type === 'improvement' && output.content) {
+      // For improvement, save content directly so frontend can access improvedContent
+      normalizedOutput = output.content
+    }
+
+    db.prepare(
+      'UPDATE plans SET structured_output = ? WHERE id = ?'
+    ).run(JSON.stringify(normalizedOutput), id)
+
+    console.log(`[structured-output] Saved structured output for plan ${id}:`, {
+      type: output.type,
+      hasImprovedContent: !!normalizedOutput.improvedContent
+    })
+
+    return res.json({ data: { saved: true }, error: null })
+  } catch (error) {
+    console.error('Error saving structured output:', error)
+    res.status(500).json({ data: null, error: 'Failed to save structured output' })
+  }
+})
+
+// POST /api/plans/:id/check-completion - Check if all tasks in a plan have completed
+router.post('/:id/check-completion', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    console.log(`[check-completion] Checking completion status for plan ${id}`)
+
+    // Get the plan
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      console.log(`[check-completion] Plan not found: ${id}`)
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Parse tasks to get all task IDs
+    const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : plan.tasks
+    const taskIds = tasks.map((t: any) => t.id).filter(Boolean)
+
+    if (taskIds.length === 0) {
+      console.log(`[check-completion] Plan ${id} has no tasks`)
+      return res.json({
+        data: {
+          completed: false,
+          total_tasks: 0,
+          completed_tasks: 0,
+          message: 'Plan has no tasks'
+        },
+        error: null
+      })
+    }
+
+    console.log(`[check-completion] Plan ${id} has ${taskIds.length} tasks:`, taskIds)
+
+    // Query logs for completion indicators
+    // Look for logs where message starts with '✔ finished' or 'Task completed' or level is 'success'
+    const logs = db.prepare(`
+      SELECT task_id, level, message
+      FROM plan_logs
+      WHERE plan_id = ?
+      AND (message LIKE '✔ finished%' OR message LIKE 'Task completed%' OR level = 'success')
+      ORDER BY created_at DESC
+    `).all(id) as { task_id: string; level: string; message: string }[]
+
+    // Track which tasks have completion logs
+    const completedTaskIds = new Set<string>()
+
+    for (const log of logs) {
+      if (taskIds.includes(log.task_id)) {
+        completedTaskIds.add(log.task_id)
+      }
+    }
+
+    const completedTasks = completedTaskIds.size
+    const totalTasks = taskIds.length
+    const allCompleted = completedTasks === totalTasks
+
+    console.log(`[check-completion] Plan ${id} completion status:`, {
+      total_tasks: totalTasks,
+      completed_tasks: completedTasks,
+      all_completed: allCompleted,
+      current_status: plan.status
+    })
+
+    // If all tasks completed and plan is still running, mark as success
+    let updatedPlan = plan
+    if (allCompleted && plan.status === 'running') {
+      console.log(`[check-completion] All tasks completed for plan ${id}, marking as success`)
+
+      const now = new Date().toISOString()
+
+      db.prepare(`
+        UPDATE plans
+        SET status = 'success',
+            result = 'All tasks completed successfully',
+            completed_at = ?
+        WHERE id = ?
+      `).run(now, id)
+
+      // Add a log entry for auto-completion
+      db.prepare(`
+        INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(id, 'system', 'info', '✓ All tasks completed - automatically marked as success', now)
+
+      // Fetch the updated plan
+      updatedPlan = db
+        .prepare('SELECT * FROM plans WHERE id = ?')
+        .get(id) as any
+
+      console.log(`[check-completion] Plan ${id} marked as success`)
+    }
+
+    return res.json({
+      data: {
+        completed: allCompleted,
+        total_tasks: totalTasks,
+        completed_tasks: completedTasks,
+        pending_tasks: totalTasks - completedTasks,
+        plan_status: updatedPlan.status,
+        auto_completed: allCompleted && plan.status === 'running',
+        completed_task_ids: Array.from(completedTaskIds)
+      },
+      error: null
+    })
+  } catch (error) {
+    console.error('Error checking plan completion:', error)
+    res.status(500).json({ data: null, error: 'Failed to check plan completion' })
+  }
+})
+
+export default router

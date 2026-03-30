@@ -1,0 +1,21 @@
+{
+  "title": "Dashboard",
+  "welcome": "Welcome to Agents Manager. Your workflow automation platform.",
+  "overview": {
+    "title": "Overview",
+    "statistics": "Statistics",
+    "recentActivity": "Recent Activity",
+    "quickActions": "Quick Actions"
+  },
+  "metrics": {
+    "totalAgents": "Total Agents",
+    "activeWorkflows": "Active Workflows",
+    "pendingApprovals": "Pending Approvals",
+    "completedTasks": "Completed Tasks"
+  },
+  "activity": {
+    "title": "Activity",
+    "noRecentActivity": "No recent activity",
+    "viewAll": "View All"
+  }
+}

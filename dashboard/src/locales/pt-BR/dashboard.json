@@ -1,0 +1,21 @@
+{
+  "title": "Painel",
+  "welcome": "Bem-vindo ao Gerenciador de Agentes. Sua plataforma de automação de fluxos de trabalho.",
+  "overview": {
+    "title": "Visão Geral",
+    "statistics": "Estatísticas",
+    "recentActivity": "Atividade Recente",
+    "quickActions": "Ações Rápidas"
+  },
+  "metrics": {
+    "totalAgents": "Total de Agentes",
+    "activeWorkflows": "Fluxos Ativos",
+    "pendingApprovals": "Aprovações Pendentes",
+    "completedTasks": "Tarefas Concluídas"
+  },
+  "activity": {
+    "title": "Atividade",
+    "noRecentActivity": "Nenhuma atividade recente",
+    "viewAll": "Ver Tudo"
+  }
+}

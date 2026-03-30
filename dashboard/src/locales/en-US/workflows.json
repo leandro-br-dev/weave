@@ -1,0 +1,85 @@
+{
+      "title": "Workflows",
+      "description": "Manage and automate your workflows",
+      "filters": {
+        "all": "All",
+        "pending": "Pending",
+        "running": "Running",
+        "success": "Success",
+        "failed": "Failed",
+        "allProjects": "All Projects"
+      },
+      "empty": {
+        "noWorkflows": "No workflows yet",
+        "noStatusWorkflows": "No {{status}} workflows",
+        "tryClearingFilter": "Try clearing the filter",
+        "createFirst": "Create your first workflow to get started"
+      },
+      "list": {
+        "title": "Workflows",
+        "empty": "No workflows found",
+        "createNew": "Create New Workflow",
+        "searchPlaceholder": "Search workflows...",
+        "filter": {
+          "status": "Filter by Status",
+          "type": "Filter by Type"
+        },
+        "table": {
+          "name": "Workflow Name",
+          "status": "Status",
+          "lastRun": "Last Run",
+          "nextRun": "Next Run",
+          "actions": "Actions",
+          "trigger": "Trigger",
+          "schedule": "Schedule"
+        }
+      },
+      "header": {
+        "import": "Import",
+        "importing": "Importing...",
+        "newWorkflow": "New Workflow",
+        "new": "New"
+      },
+      "create": {
+        "title": "Create Workflow",
+        "name": "Workflow Name",
+        "description": "Description",
+        "trigger": "Trigger",
+        "schedule": "Schedule",
+        "actions": "Actions",
+        "addAction": "Add Action",
+        "save": "Create Workflow",
+        "cancel": "Cancel"
+      },
+      "edit": {
+        "title": "Edit Workflow",
+        "save": "Update Workflow",
+        "cancel": "Cancel"
+      },
+      "delete": {
+        "title": "Delete Workflow",
+        "confirm": "Are you sure you want to delete workflow \"{{name}}\"? This action cannot be undone.",
+        "success": "Workflow deleted successfully"
+      },
+      "execute": {
+        "title": "Execute Workflow",
+        "manual": "Run Now",
+        "schedule": "Schedule Run",
+        "success": "Workflow executed successfully",
+        "failed": "Workflow execution failed"
+      },
+      "history": {
+        "title": "Execution History",
+        "date": "Date",
+        "status": "Status",
+        "duration": "Duration",
+        "logs": "View Logs"
+      },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "paused": "Paused",
+        "completed": "Completed",
+        "failed": "Failed"
+  }
+}

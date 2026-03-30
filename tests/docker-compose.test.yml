@@ -1,0 +1,77 @@
+# Docker Compose for Test Environment
+# This file defines test dependencies for integration and E2E tests
+
+version: '3.8'
+
+services:
+  # Test Database Service
+  test-db:
+    image: sqlite:latest
+    container_name: weave-test-db
+    volumes:
+      - test-db-data:/data
+    environment:
+      - SQLITE_DATABASE=test-database.db
+    ports:
+      - "5432:5432"
+
+  # Mock Agent Service
+  mock-agent:
+    image: node:18-alpine
+    container_name: weave-mock-agent
+    working_dir: /app
+    volumes:
+      - ./tests/mocks/agent-service:/app
+    command: npm start
+    environment:
+      - NODE_ENV=test
+      - PORT=3002
+      - MOCK_DELAY_MS=100
+    ports:
+      - "3002:3002"
+
+  # Test API Server
+  test-api:
+    image: node:18-alpine
+    container_name: weave-test-api
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    command: npm run test:server
+    environment:
+      - NODE_ENV=test
+      - PORT=3001
+      - DATABASE_URL=/data/test-database.db
+      - API_BEARER_TOKEN=test-token-for-testing-only
+      - AGENT_CLIENT_PATH=/tmp/test-agent-client
+    ports:
+      - "3001:3001"
+    depends_on:
+      - test-db
+      - mock-agent
+
+  # Test Dashboard
+  test-dashboard:
+    image: node:18-alpine
+    container_name: weave-test-dashboard
+    working_dir: /app/dashboard
+    volumes:
+      - ./dashboard:/app/dashboard
+      - /app/dashboard/node_modules
+    command: npm run test:server
+    environment:
+      - NODE_ENV=test
+      - VITE_API_URL=http://test-api:3001
+      - VITE_API_TOKEN=test-token-for-testing-only
+    ports:
+      - "5174:5174"
+    depends_on:
+      - test-api
+
+volumes:
+  test-db-data:
+
+networks:
+  default:
+    name: weave-test-network

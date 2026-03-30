@@ -1,0 +1,806 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
+import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, type Environment } from '@/api/projects'
+import { useGetWorkspaces } from '@/api/workspaces'
+import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree } from 'lucide-react'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
+
+export default function ProjectsPage() {
+  const { t } = useTranslation()
+  const { data: projects, isLoading, error } = useGetProjects()
+  const { data: allWorkspaces } = useGetWorkspaces()
+  const createProjectMutation = useCreateProject()
+  const deleteProjectMutation = useDeleteProject()
+  const updateProjectMutation = useUpdateProject()
+  const createEnvironmentMutation = useCreateEnvironment()
+  const updateEnvironmentMutation = useUpdateEnvironment()
+  const deleteEnvironmentMutation = useDeleteEnvironment()
+  const unlinkAgentMutation = useUnlinkAgent()
+  const generateContextMutation = useGenerateContext()
+
+  const [showNewProjectForm, setShowNewProjectForm] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDescription, setNewProjectDescription] = useState('')
+  const [newProjectColor, setNewProjectColor] = useState('#3b82f6')
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
+  const [showSettings, setShowSettings] = useState<Set<string>>(new Set())
+  const [showEnvForm, setShowEnvForm] = useState<Set<string>>(new Set())
+  const [editingEnv, setEditingEnv] = useState<{ projectId: string; envId: string } | null>(null)
+  const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [deleteEnvConfirm, setDeleteEnvConfirm] = useState<{ projectId: string; envId: string; envName: string } | null>(null)
+
+  // Context modal state
+  const [contextModal, setContextModal] = useState<{
+    isOpen: boolean
+    projectId: string
+    projectName: string
+    envId: string
+    envName: string
+    context: any
+    error: string | null
+  }>({
+    isOpen: false,
+    projectId: '',
+    projectName: '',
+    envId: '',
+    envName: '',
+    context: null,
+    error: null,
+  })
+
+  // Default agents modal state
+  const [defaultAgentsModal, setDefaultAgentsModal] = useState<{
+    isOpen: boolean
+    projectId: string
+    projectName: string
+    environmentId: string
+    environmentName: string
+  }>({
+    isOpen: false,
+    projectId: '',
+    projectName: '',
+    environmentId: '',
+    environmentName: '',
+  })
+
+  // New environment form state
+  const [newEnvData, setNewEnvData] = useState<Partial<Environment>>({
+    name: '',
+    type: 'local-wsl',
+    project_path: '',
+  })
+
+  // Edit environment form state
+  const [editEnvData, setEditEnvData] = useState<Partial<Environment>>({})
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-6">
+        <Card className="bg-red-50 border-red-200">
+          <p className="text-red-700">Error loading projects: {(error as Error).message}</p>
+        </Card>
+      </div>
+    )
+  }
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newProjectName.trim()) return
+
+    try {
+      await createProjectMutation.mutateAsync({
+        name: newProjectName,
+        description: newProjectDescription || undefined,
+        color: newProjectColor,
+      })
+      setNewProjectName('')
+      setNewProjectDescription('')
+      setNewProjectColor('#3b82f6')
+      setShowNewProjectForm(false)
+    } catch (error) {
+      alert(`Failed to create project: ${(error as Error).message}`)
+    }
+  }
+
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    setDeleteProjectConfirm({ id: projectId, name: projectName })
+  }
+
+  const confirmDeleteProject = async () => {
+    if (!deleteProjectConfirm) return
+
+    try {
+      await deleteProjectMutation.mutateAsync(deleteProjectConfirm.id)
+      setDeleteProjectConfirm(null)
+    } catch (error) {
+      alert(`Failed to delete project: ${(error as Error).message}`)
+    }
+  }
+
+  const handleCreateEnvironment = async (projectId: string, e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newEnvData.name?.trim() || !newEnvData.project_path?.trim()) {
+      return
+    }
+
+    try {
+      const result = await createEnvironmentMutation.mutateAsync({
+        projectId,
+        data: newEnvData,
+      })
+      const envName = newEnvData.name!
+      const projectName = projects?.find(p => p.id === projectId)?.name || ''
+
+      setNewEnvData({
+        name: '',
+        type: 'local-wsl',
+        project_path: '',
+      })
+      setShowEnvForm(prev => {
+        const next = new Set(prev)
+        next.delete(projectId)
+        return next
+      })
+
+      // Show default agents modal after environment creation
+      if (result?.id) {
+        setDefaultAgentsModal({
+          isOpen: true,
+          projectId,
+          projectName,
+          environmentId: result.id,
+          environmentName: envName,
+        })
+      }
+    } catch (error) {
+      alert(`Failed to create environment: ${(error as Error).message}`)
+    }
+  }
+
+  const handleUpdateEnvironment = async (projectId: string, envId: string, e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editEnvData.name?.trim()) {
+      return
+    }
+
+    try {
+      await updateEnvironmentMutation.mutateAsync({
+        projectId,
+        envId,
+        data: editEnvData,
+      })
+      setEditingEnv(null)
+      setEditEnvData({})
+    } catch (error) {
+      alert(`Failed to update environment: ${(error as Error).message}`)
+    }
+  }
+
+  const handleDeleteEnvironment = async (projectId: string, envId: string, envName: string) => {
+    setDeleteEnvConfirm({ projectId, envId, envName })
+  }
+
+  const confirmDeleteEnvironment = async () => {
+    if (!deleteEnvConfirm) return
+
+    try {
+      await deleteEnvironmentMutation.mutateAsync({ projectId: deleteEnvConfirm.projectId, envId: deleteEnvConfirm.envId })
+      setDeleteEnvConfirm(null)
+    } catch (error) {
+      alert(`Failed to delete environment: ${(error as Error).message}`)
+    }
+  }
+
+  const toggleProjectExpanded = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev)
+      if (next.has(projectId)) {
+        next.delete(projectId)
+      } else {
+        next.add(projectId)
+      }
+      return next
+    })
+  }
+
+  const getEnvironmentBadgeColor = (type: string) => {
+    switch (type) {
+      case 'local-wsl':
+        return 'bg-green-100 text-green-800'
+      case 'local-windows':
+        return 'bg-blue-100 text-blue-800'
+      case 'ssh':
+        return 'bg-yellow-100 text-yellow-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const startEditingEnv = (projectId: string, env: Environment) => {
+    setEditingEnv({ projectId, envId: env.id })
+    setEditEnvData({ ...env })
+  }
+
+  const handleUnlinkAgent = async (projectId: string, workspacePath: string) => {
+    try {
+      await unlinkAgentMutation.mutateAsync({
+        projectId,
+        workspace_path: workspacePath
+      })
+    } catch (error) {
+      alert(`Failed to unlink agent: ${(error as Error).message}`)
+    }
+  }
+
+  const handleGenerateContext = async (projectId: string, projectName: string, envId: string, envName: string) => {
+    setContextModal({
+      isOpen: true,
+      projectId,
+      projectName,
+      envId,
+      envName,
+      context: null,
+      error: null,
+    })
+
+    try {
+      const result = await generateContextMutation.mutateAsync({ projectId, envId })
+      setContextModal(prev => ({
+        ...prev,
+        context: result,
+        error: null,
+      }))
+    } catch (error) {
+      setContextModal(prev => ({
+        ...prev,
+        error: (error as Error).message,
+        context: null,
+      }))
+    }
+  }
+
+  const handleCloseContextModal = () => {
+    setContextModal({
+      isOpen: false,
+      projectId: '',
+      projectName: '',
+      envId: '',
+      envName: '',
+      context: null,
+      error: null,
+    })
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto py-4 sm:py-8 px-4 sm:px-6">
+      <PageHeader
+        title={t('pages.projects.title')}
+        description={t('pages.projects.description')}
+        actions={
+          <Button variant="primary" onClick={() => setShowNewProjectForm(!showNewProjectForm)} className="text-xs sm:text-sm">
+            <Plus size={16} /> <span className="hidden sm:inline">{t('pages.projects.header.newProject')}</span><span className="sm:hidden">{t('pages.projects.header.new')}</span>
+          </Button>
+        }
+      />
+
+      {/* New Project Form */}
+      {showNewProjectForm && (
+        <Card className="mb-4 sm:mb-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-4">{t('pages.projects.form.createTitle')}</h2>
+          <form onSubmit={handleCreateProject}>
+            <div className="space-y-4">
+              <Input
+                label={t('pages.projects.form.projectName')}
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder={t('pages.projects.form.projectNamePlaceholder')}
+                required
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('pages.projects.form.description')}</label>
+                <textarea
+                  value={newProjectDescription}
+                  onChange={(e) => setNewProjectDescription(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  rows={3}
+                  placeholder="Brief description of the project..."
+                />
+              </div>
+              <ColorPicker
+                label={t('pages.projects.form.projectColor')}
+                value={newProjectColor}
+                onChange={setNewProjectColor}
+                hint={t('pages.projects.form.projectColorHint')}
+                compact
+              />
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button type="submit" variant="primary" disabled={createProjectMutation.isPending} loading={createProjectMutation.isPending} className="w-full sm:w-auto">
+                  {createProjectMutation.isPending ? t('pages.projects.form.creating') : t('pages.projects.form.createProject')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowNewProjectForm(false)
+                    setNewProjectName('')
+                    setNewProjectDescription('')
+                    setNewProjectColor('#3b82f6')
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* Projects List */}
+      <div className="space-y-4">
+        {projects && projects.length > 0 ? (
+          projects.map((project) => {
+            // Filter agents for this project
+            const projectAgents = allWorkspaces?.filter(ws => ws.project_id === project.id) || []
+
+            return (
+              <div key={project.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+              {/* Project Header */}
+              <div
+                className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => toggleProjectExpanded(project.id)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  {/* Left side: Project icon, name and description */}
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <ProjectIcon project={project} size={20} className="flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">{project.name}</h3>
+                      {project.description && (
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">{project.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right side: Settings */}
+                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                    <ColorPicker
+                      label=""
+                      value={project.color || '#3b82f6'}
+                      onChange={(color) => updateProjectMutation.mutate({
+                        id: project.id,
+                        color,
+                      })}
+                      compact
+                    />
+                    <span className="text-xs sm:text-sm text-gray-500">
+                      {project.environments.length} env{project.environments.length !== 1 ? 's' : ''}
+                    </span>
+                    {expandedProjects.has(project.id) ? (
+                      <ChevronUp size={18} className="text-gray-500" />
+                    ) : (
+                      <ChevronDown size={18} className="text-gray-500" />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteProject(project.id, project.name)
+                      }}
+                      className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete project"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Environments and Agents */}
+              {expandedProjects.has(project.id) && (
+                <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4">
+                  {/* Environments Section */}
+                  <div className="mb-4 sm:mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('pages.projects.environments.title')}</h4>
+                      <button
+                        onClick={() => {
+                          setShowEnvForm(prev => new Set(prev).add(project.id))
+                          setNewEnvData({
+                            name: '',
+                            type: 'local-wsl',
+                            project_path: '',
+                          })
+                        }}
+                        className="flex items-center gap-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus size={14} />
+                        <span className="hidden sm:inline">{t('pages.projects.environments.add')}</span>
+                        <span className="sm:hidden">Add</span>
+                      </button>
+                    </div>
+
+                  {/* New Environment Form */}
+                  {showEnvForm.has(project.id) && (
+                    <Card className="mb-4">
+                      <h5 className="text-sm font-semibold mb-3">Create New Environment</h5>
+                      <form onSubmit={(e) => handleCreateEnvironment(project.id, e)}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                          <Input
+                            label="Name"
+                            value={newEnvData.name || ''}
+                            onChange={(e) => setNewEnvData({ ...newEnvData, name: e.target.value })}
+                            placeholder="e.g., Development"
+                            required
+                          />
+                          <Select
+                            label="Type"
+                            value={newEnvData.type || 'local-wsl'}
+                            onChange={(e) => setNewEnvData({ ...newEnvData, type: e.target.value as Environment['type'] })}
+                          >
+                            <option value="local-wsl">Local WSL</option>
+                            <option value="local-windows">Local Windows</option>
+                            <option value="ssh">SSH</option>
+                          </Select>
+                          <Input
+                            label="Project Path"
+                            value={newEnvData.project_path || ''}
+                            onChange={(e) => setNewEnvData({ ...newEnvData, project_path: e.target.value })}
+                            placeholder="/root/projects/my-project"
+                            hint="Where your project files are located"
+                            className="sm:col-span-2"
+                            required
+                          />
+                          <Input
+                            label="Git Repository"
+                            value={newEnvData.git_repository || ''}
+                            onChange={(e) => setNewEnvData({ ...newEnvData, git_repository: e.target.value })}
+                            placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
+                            hint="Optional: Link to your git repository"
+                          />
+                          {newEnvData.type === 'ssh' && (
+                            <>
+                              <Input
+                                label="SSH Host"
+                                value={newEnvData.ssh_config ? JSON.parse(newEnvData.ssh_config).host || '' : ''}
+                                onChange={(e) => {
+                                  const current = newEnvData.ssh_config ? JSON.parse(newEnvData.ssh_config) : {}
+                                  setNewEnvData({
+                                    ...newEnvData,
+                                    ssh_config: JSON.stringify({ ...current, host: e.target.value })
+                                  })
+                                }}
+                                placeholder="server.example.com"
+                              />
+                              <Input
+                                label="SSH User"
+                                value={newEnvData.ssh_config ? JSON.parse(newEnvData.ssh_config).user || '' : ''}
+                                onChange={(e) => {
+                                  const current = newEnvData.ssh_config ? JSON.parse(newEnvData.ssh_config) : {}
+                                  setNewEnvData({
+                                    ...newEnvData,
+                                    ssh_config: JSON.stringify({ ...current, user: e.target.value })
+                                  })
+                                }}
+                                placeholder="ubuntu"
+                              />
+                            </>
+                          )}
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <Button type="submit" variant="primary" size="sm" disabled={createEnvironmentMutation.isPending} loading={createEnvironmentMutation.isPending}>
+                            {createEnvironmentMutation.isPending ? 'Creating...' : 'Create'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setShowEnvForm(prev => {
+                                const next = new Set(prev)
+                                next.delete(project.id)
+                                return next
+                              })
+                              setNewEnvData({
+                                name: '',
+                                type: 'local-wsl',
+                                project_path: '',
+                              })
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Card>
+                  )}
+
+                  {/* Environments List */}
+                  {project.environments.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">{t('pages.projects.environments.empty')}</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {project.environments.map((env) => (
+                        <div key={env.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                          {editingEnv?.projectId === project.id && editingEnv?.envId === env.id ? (
+                            // Edit Form
+                            <form onSubmit={(e) => handleUpdateEnvironment(project.id, env.id, e)}>
+                              <div className="grid grid-cols-2 gap-3 mb-3">
+                                <Input
+                                  label="Name"
+                                  value={editEnvData.name || ''}
+                                  onChange={(e) => setEditEnvData({ ...editEnvData, name: e.target.value })}
+                                  required
+                                />
+                                <Select
+                                  label="Type"
+                                  value={editEnvData.type || 'local-wsl'}
+                                  onChange={(e) => setEditEnvData({ ...editEnvData, type: e.target.value as Environment['type'] })}
+                                >
+                                  <option value="local-wsl">Local WSL</option>
+                                  <option value="local-windows">Local Windows</option>
+                                  <option value="ssh">SSH</option>
+                                </Select>
+                                <Input
+                                  label="Project Path"
+                                  value={editEnvData.project_path || ''}
+                                  onChange={(e) => setEditEnvData({ ...editEnvData, project_path: e.target.value })}
+                                  placeholder="/root/projects/my-project"
+                                  hint="Where your project files are located"
+                                  required
+                                />
+                                <Input
+                                  label="Git Repository"
+                                  value={editEnvData.git_repository || ''}
+                                  onChange={(e) => setEditEnvData({ ...editEnvData, git_repository: e.target.value })}
+                                  placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
+                                  hint="Optional: Link to your git repository"
+                                />
+                              </div>
+                              <p className="text-xs text-gray-400 mt-2">
+                                Agent workspace is auto-generated and cannot be edited
+                              </p>
+                              <div className="flex gap-2">
+                                <Button type="submit" variant="primary" size="sm" disabled={updateEnvironmentMutation.isPending} loading={updateEnvironmentMutation.isPending}>
+                                  {updateEnvironmentMutation.isPending ? 'Saving...' : 'Save'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingEnv(null)
+                                    setEditEnvData({})
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </form>
+                          ) : (
+                            // Display Mode
+                            <>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h5 className="font-medium text-gray-900 dark:text-white">{env.name}</h5>
+                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getEnvironmentBadgeColor(env.type)}`}>
+                                      {env.type}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                                    <div>
+                                      <span className="font-medium">Project path:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{env.project_path}</code>
+                                    </div>
+                                    {env.git_repository && (
+                                      <div>
+                                        <span className="font-medium">Git repository:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs break-all">{env.git_repository}</code>
+                                      </div>
+                                    )}
+                                    {env.agent_workspace && (
+                                    <details className="mt-2">
+                                      <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Agent workspace path</summary>
+                                      <code className="text-xs text-gray-500 block mt-1 break-all">{env.agent_workspace}</code>
+                                    </details>
+                                    )}
+                                    {env.type === 'ssh' && env.ssh_config && (
+                                      <div>
+                                        <span className="font-medium">SSH:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+                                          {(() => {
+                                            const config = JSON.parse(env.ssh_config)
+                                            return `${config.user}@${config.host}`
+                                          })()}
+                                        </code>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleGenerateContext(project.id, project.name, env.id, env.name)}
+                                    title="Generate context"
+                                  >
+                                    <FolderTree size={14} />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => startEditingEnv(project.id, env)} title="Edit environment">
+                                    <Edit2 size={14} />
+                                  </Button>
+                                  <Button variant="danger" size="sm" onClick={() => handleDeleteEnvironment(project.id, env.id, env.name)} title="Delete environment">
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  </div>
+
+                  {/* Agents Section */}
+                  <div className="mt-4">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('pages.projects.agents.title')}</h4>
+                    {projectAgents.length === 0 ? (
+                      <p className="text-xs text-gray-400">
+                        {t('pages.projects.agents.empty')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {projectAgents.map(agent => (
+                          <div key={agent.id || agent.path}
+                            className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-100 dark:border-gray-600">
+                            <div>
+                              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
+                              {agent.role && (
+                                <span className="ml-2 text-xs text-gray-400">{agent.role}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Link
+                                to="/agents"
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                {t('pages.projects.agents.view')} →
+                              </Link>
+                              <button
+                                onClick={() => handleUnlinkAgent(project.id, agent.path)}
+                                className="text-gray-400 hover:text-red-500"
+                                title="Unlink agent"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pipeline Settings Section */}
+                  <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4">
+                    <button
+                      onClick={() => {
+                        setShowSettings(prev => {
+                          const next = new Set(prev)
+                          if (next.has(project.id)) {
+                            next.delete(project.id)
+                          } else {
+                            next.add(project.id)
+                          }
+                          return next
+                        })
+                      }}
+                      className="flex items-center justify-between w-full text-left"
+                    >
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('pages.projects.pipelineSettings.title')}</h4>
+                      <Settings size={14} className="text-gray-400" />
+                    </button>
+
+                    {showSettings.has(project.id) && (
+                      <div className="mt-3 space-y-4">
+                        {/* Auto-approve toggle */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{t('pages.projects.pipelineSettings.autoApprove')}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{t('pages.projects.pipelineSettings.autoApproveDesc')}</p>
+                          </div>
+                          <button
+                            onClick={() => updateProjectMutation.mutate({
+                              id: project.id,
+                              settings: {
+                                ...project.settings,
+                                auto_approve_workflows: !project.settings?.auto_approve_workflows
+                              }
+                            })}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                              project.settings?.auto_approve_workflows ? 'bg-gray-900' : 'bg-gray-200'
+                            }`}
+                          >
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                              project.settings?.auto_approve_workflows ? 'translate-x-4' : 'translate-x-0.5'
+                            }`} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              </div>
+            )
+          })
+        ) : (
+          <EmptyState
+            icon={<FolderOpen size={48} className="text-gray-300" />}
+            title={t('pages.projects.empty.title')}
+            description={t('pages.projects.empty.description')}
+            action={
+              <Button variant="primary" onClick={() => setShowNewProjectForm(true)}>
+                <Plus size={18} /> {t('pages.projects.empty.createProject')}
+              </Button>
+            }
+          />
+        )}
+      </div>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={deleteProjectConfirm !== null}
+        title="Delete Project"
+        description={`Are you sure you want to delete "${deleteProjectConfirm?.name}"? This will also delete all its environments.`}
+        variant="danger"
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setDeleteProjectConfirm(null)}
+        loading={deleteProjectMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteEnvConfirm !== null}
+        title="Delete Environment"
+        description={`Are you sure you want to delete environment "${deleteEnvConfirm?.envName}"?`}
+        variant="danger"
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteEnvironment}
+        onCancel={() => setDeleteEnvConfirm(null)}
+        loading={deleteEnvironmentMutation.isPending}
+      />
+
+      {/* Context Modal */}
+      <ContextModal
+        isOpen={contextModal.isOpen}
+        onClose={handleCloseContextModal}
+        context={contextModal.context}
+        isLoading={generateContextMutation.isPending}
+        error={contextModal.error}
+        environmentName={contextModal.envName}
+        projectName={contextModal.projectName}
+      />
+
+      {/* Default Agents Modal */}
+      <DefaultAgentsModal
+        isOpen={defaultAgentsModal.isOpen}
+        onClose={() => setDefaultAgentsModal(prev => ({ ...prev, isOpen: false }))}
+        projectId={defaultAgentsModal.projectId}
+        environmentId={defaultAgentsModal.environmentId}
+        projectName={defaultAgentsModal.projectName}
+        environmentName={defaultAgentsModal.environmentName}
+      />
+    </div>
+  )
+}

@@ -1,0 +1,8 @@
+claude-agent-sdk>=0.0.14
+anyio>=4.0.0
+httpx>=0.24.0
+pytest>=7.0.0
+pytest-mock>=3.10.0
+pytest-cov>=4.1.0
+pytest-timeout>=2.1.0
+pytest-asyncio>=0.21.0

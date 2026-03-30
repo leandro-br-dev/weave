@@ -1,0 +1,110 @@
+{
+  "version": "1.0.0",
+  "project": "weave",
+  "overall_threshold": 70,
+  "modules": {
+    "python": {
+      "name": "Python Client",
+      "thresholds": {
+        "lines": 70,
+        "functions": 70,
+        "branches": 65,
+        "statements": 70
+      },
+      "critical_paths": [
+        "client/agents.py",
+        "client/approval.py",
+        "client/kanban.py"
+      ],
+      "critical_threshold": 80
+    },
+    "api": {
+      "name": "API Server",
+      "thresholds": {
+        "lines": 70,
+        "functions": 70,
+        "branches": 70,
+        "statements": 70
+      },
+      "critical_paths": [
+        "api/src/routes/",
+        "api/src/middleware/",
+        "api/src/services/"
+      ],
+      "critical_threshold": 80
+    },
+    "dashboard": {
+      "name": "Dashboard UI",
+      "thresholds": {
+        "lines": 70,
+        "functions": 70,
+        "branches": 65,
+        "statements": 70
+      },
+      "critical_paths": [
+        "dashboard/src/components/",
+        "dashboard/src/services/",
+        "dashboard/src/hooks/"
+      ],
+      "critical_threshold": 75
+    },
+    "integration": {
+      "name": "Integration Tests",
+      "thresholds": {
+        "lines": 60,
+        "functions": 60,
+        "branches": 55,
+        "statements": 60
+      },
+      "critical_paths": [
+        "tests/integration/api/",
+        "tests/integration/kanban/",
+        "tests/integration/approval/"
+      ],
+      "critical_threshold": 70
+    }
+  },
+  "exclusions": {
+    "python": [
+      "*/tests/*",
+      "*/conftest.py",
+      "*/fixtures.py",
+      "*/__pycache__/*",
+      "*/site-packages/*"
+    ],
+    "typescript": [
+      "*/node_modules/*",
+      "*/dist/*",
+      "*/build/*",
+      "*.config.ts",
+      "*.config.js",
+      "*.test.ts",
+      "*.test.tsx",
+      "*.spec.ts",
+      "*.spec.tsx",
+      "*/types/*",
+      "*/interfaces/*"
+    ]
+  },
+  "reporting": {
+    "formats": ["html", "json", "xml", "lcov"],
+    "output_directory": "coverage-reports",
+    "include_branch_coverage": true,
+    "include_uncovered_lines": true
+  },
+  "badges": {
+    "enabled": true,
+    "thresholds": {
+      "excellent": 90,
+      "good": 75,
+      "satisfactory": 60,
+      "poor": 40
+    }
+  },
+  "ci": {
+    "fail_on_decrease": true,
+    "fail_on_threshold_miss": true,
+    "comment_on_pr": true,
+    "upload_to_codecov": true
+  }
+}

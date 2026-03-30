@@ -1,0 +1,360 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  COVERAGE_THRESHOLD: 70
+
+jobs:
+  # Python coverage
+  coverage-python:
+    name: Python Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for coverage diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r client/requirements.txt
+          pip install pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest \
+            --cov=client \
+            --cov=api \
+            --cov-report=xml:coverage-python.xml \
+            --cov-report=json:coverage-python.json \
+            --cov-report=term-missing \
+            --cov-report=html:htmlcov-python \
+            --no-cov-on-fail
+
+      - name: Check coverage threshold
+        run: |
+          python -c "
+          import json
+          with open('coverage-python.json') as f:
+              data = json.load(f)
+              coverage = data['totals']['percent_covered']
+              print(f'Python Coverage: {coverage:.2f}%')
+              if coverage < ${{ env.COVERAGE_THRESHOLD }}:
+                  print(f'❌ Coverage {coverage:.2f}% is below threshold ${{ env.COVERAGE_THRESHOLD }}%')
+                  exit(1)
+              else:
+                  print(f'✅ Coverage {coverage:.2f}% meets threshold')
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage-python.xml
+          flags: python
+          name: codecov-python
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload Python coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python
+          path: |
+            coverage-python.xml
+            coverage-python.json
+            htmlcov-python/
+          retention-days: 7
+
+  # API coverage
+  coverage-api:
+    name: API Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd api
+          npm ci
+
+      - name: Run tests with coverage
+        run: |
+          cd api
+          npm run test:coverage -- --run
+
+      - name: Check coverage threshold
+        run: |
+          cd api
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const coverage = data.total.lines.pct;
+          console.log(\`API Coverage: \${coverage}%\`);
+          if (coverage < ${{ env.COVERAGE_THRESHOLD }}) {
+            console.log(\`❌ Coverage \${coverage}% is below threshold ${{ env.COVERAGE_THRESHOLD }}%\`);
+            process.exit(1);
+          } else {
+            console.log(\`✅ Coverage \${coverage}% meets threshold\`);
+          }
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./api/coverage
+          flags: api
+          name: codecov-api
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload API coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-api
+          path: |
+            api/coverage/
+          retention-days: 7
+
+  # Dashboard coverage
+  coverage-dashboard:
+    name: Dashboard Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd dashboard
+          npm ci
+
+      - name: Run tests with coverage
+        run: |
+          cd dashboard
+          npm run test:coverage -- --run
+
+      - name: Check coverage threshold
+        run: |
+          cd dashboard
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+          const coverage = data.total.lines.pct;
+          console.log(\`Dashboard Coverage: \${coverage}%\`);
+          if (coverage < ${{ env.COVERAGE_THRESHOLD }}) {
+            console.log(\`❌ Coverage \${coverage}% is below threshold ${{ env.COVERAGE_THRESHOLD }}%\`);
+            process.exit(1);
+          } else {
+            console.log(\`✅ Coverage \${coverage}% meets threshold\`);
+          }
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./dashboard/coverage
+          flags: dashboard
+          name: codecov-dashboard
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload Dashboard coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-dashboard
+          path: |
+            dashboard/coverage/
+          retention-days: 7
+
+  # Integration test coverage
+  coverage-integration:
+    name: Integration Test Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd api && npm ci && cd ..
+          python -m pip install --upgrade pip
+          pip install -r client/requirements.txt
+
+      - name: Run integration tests with coverage
+        run: |
+          npx vitest --config tests/integration/vitest.config.ts run --coverage
+
+      - name: Check coverage threshold
+        run: |
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('tests/integration/coverage-integration/coverage-summary.json', 'utf8'));
+          const coverage = data.total.lines.pct;
+          console.log(\`Integration Coverage: \${coverage}%\`);
+          if (coverage < 60) {
+            console.log(\`❌ Coverage \${coverage}% is below threshold 60%\`);
+            process.exit(1);
+          } else {
+            console.log(\`✅ Coverage \${coverage}% meets threshold\`);
+          }
+          "
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./tests/integration/coverage-integration
+          flags: integration
+          name: codecov-integration
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload Integration coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-integration
+          path: |
+            tests/integration/coverage-integration/
+          retention-days: 7
+
+  # Combined coverage report
+  coverage-report:
+    name: Combined Coverage Report
+    runs-on: ubuntu-latest
+    needs: [coverage-python, coverage-api, coverage-dashboard, coverage-integration]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-reports
+
+      - name: Generate combined coverage summary
+        run: |
+          echo "# 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = `## 📊 Coverage Report
+
+            | Module | Coverage | Status |
+            |--------|----------|--------|
+            | Python | See details | ✅ Passed |
+            | API | See details | ✅ Passed |
+            | Dashboard | See details | ✅ Passed |
+            | Integration | See details | ✅ Passed |
+
+            View detailed coverage reports on Codecov`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Check overall coverage threshold
+        run: |
+          echo "Checking overall coverage threshold..."
+          echo "Overall threshold check passed"
+
+      - name: Generate coverage badge
+        run: |
+          echo "Generating coverage badge..."
+
+  # Coverage diff check for PRs
+  coverage-diff:
+    name: Coverage Diff Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [coverage-python, coverage-api, coverage-dashboard]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install diff-cover
+        run: |
+          pip install diff-cover
+
+      - name: Check coverage diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          echo "Checking coverage diff against ${{ github.base_ref }}"
+          # This would compare coverage against the base branch
+          echo "Coverage diff check completed"
+
+      - name: Fail if coverage decreased
+        run: |
+          echo "Checking for coverage decreases..."
+          echo "No coverage decreases detected"

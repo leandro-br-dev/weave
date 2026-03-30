@@ -1,0 +1,26 @@
+{
+  "status": {
+    "pending": "Pendente",
+    "running": "Em Execução",
+    "success": "Sucesso",
+    "failed": "Falhou",
+    "timeout": "Tempo Esgotado",
+    "approved": "Aprovado",
+    "denied": "Negado",
+    "awaitingApproval": "Aguardando Aprovação",
+    "loading": "Carregando...",
+    "saving": "Salvando...",
+    "processing": "Processando...",
+    "error": "Erro",
+    "warning": "Aviso",
+    "info": "Informação",
+    "completed": "Concluído",
+    "cancelled": "Cancelado",
+    "inProgress": "Em Andamento",
+    "draft": "Rascunho",
+    "published": "Publicado",
+    "archived": "Arquivado",
+    "active": "Ativo",
+    "inactive": "Inativo"
+  }
+}

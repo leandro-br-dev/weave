@@ -1,0 +1,187 @@
+{
+  "title": "Configurações",
+  "description": "Configure sua conexão com API, daemon de agentes e variáveis de ambiente",
+  "tabs": {
+    "general": {
+      "label": "Geral",
+      "icon": "settings"
+    },
+    "connections": {
+      "label": "Conexões",
+      "icon": "link"
+    },
+    "system": {
+      "label": "Sistema",
+      "icon": "server"
+    }
+  },
+  "groups": {
+    "general": {
+      "label": "Geral",
+      "description": "Configurações básicas e preferências",
+      "sections": ["language", "appearance", "workspaces"]
+    },
+    "connections": {
+      "label": "Conexões",
+      "description": "Configurações de API e rede",
+      "sections": ["apiConnection", "cloudflare", "envVars"]
+    },
+    "system": {
+      "label": "Sistema",
+      "description": "Gerenciamento de daemon e cliente de agentes",
+      "sections": ["daemon", "client"]
+    }
+  },
+  "language": {
+    "title": "Idioma / Language",
+    "description": "Selecione seu idioma preferido / Select your preferred language"
+  },
+  "appearance": {
+    "title": "Aparência",
+    "description": "Personalize a aparência do seu painel",
+    "theme": "Tema"
+  },
+  "cloudflare": {
+    "title": "Túnel Cloudflare",
+    "loading": "Carregando configuração do túnel...",
+    "status": {
+      "enabled": "Túnel Ativado",
+      "notConfigured": "Túnel Não Configurado"
+    },
+    "urls": {
+      "public": "URL Pública",
+      "api": "URL da API"
+    },
+    "actions": {
+      "disable": "Desativar Túnel",
+      "learnMore": "Saiba Mais"
+    },
+    "messages": {
+      "notConfigured": {
+        "title": "Túnel Não Configurado",
+        "description": "Para expor seu weave via internet, execute o script de configuração:",
+        "script": "bash scripts/cloudflare-tunnel.sh"
+      },
+      "benefits": {
+        "title": "Benefícios:",
+        "accessAnywhere": "Acesse de qualquer lugar sem redirecionamento de porta",
+        "encryption": "Criptografia SSL/TLS automaticamente",
+        "noRouterConfig": "Não precisa configurar roteador",
+        "anyDomain": "Funciona com qualquer domínio Cloudflare"
+      }
+    }
+  },
+  "apiConnection": {
+    "title": "Conexão com API",
+    "apiUrl": "URL da API",
+    "status": "Status",
+    "statusValues": {
+      "checking": "Verificando...",
+      "connected": "Conectado",
+      "unreachable": "Inacessível"
+    }
+  },
+  "envVars": {
+    "title": "Variáveis de Ambiente",
+    "loading": "Carregando variáveis de ambiente...",
+    "error": "Erro ao carregar variáveis de ambiente",
+    "noResults": {
+      "filtered": "Nenhuma variável de ambiente encontrada com seus filtros.",
+      "empty": "Nenhuma variável de ambiente configurada. Clique em \"Nova Variável\" ou use adição rápida acima."
+    },
+    "actions": {
+      "newVariable": "Nova Variável",
+      "initializeDefaults": "Inicializar Padrões"
+    },
+    "filters": {
+      "search": "Buscar",
+      "searchPlaceholder": "Buscar variáveis...",
+      "category": "Categoria",
+      "categories": {
+        "all": "Todas as Categorias",
+        "general": "Geral",
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "custom": "Personalizado"
+      }
+    },
+    "quickAdd": {
+      "title": "Adição Rápida - Variáveis Comuns",
+      "added": "Adicionado"
+    },
+    "form": {
+      "new": "Nova Variável de Ambiente",
+      "edit": "Editar Variável de Ambiente",
+      "fields": {
+        "key": "Chave",
+        "keyPlaceholder": "ANTHROPIC_BASE_URL",
+        "value": "Valor",
+        "valuePlaceholder": "http://localhost:8083",
+        "description": "Descrição",
+        "descriptionPlaceholder": "URL base para API Anthropic",
+        "category": "Categoria",
+        "markAsSecret": "Marcar como segredo (ocultar valor)"
+      },
+      "actions": {
+        "create": "Criar",
+        "update": "Atualizar",
+        "cancel": "Cancelar"
+      },
+      "errors": {
+        "createFailed": "Falha ao criar variável de ambiente",
+        "updateFailed": "Falha ao atualizar variável de ambiente"
+      }
+    },
+    "badges": {
+      "secret": "Segredo",
+      "variable": "variável",
+      "variables": "variáveis"
+    },
+    "confirmDelete": "Tem certeza de que deseja excluir esta variável de ambiente?",
+    "suggestions": {
+      "ANTHROPIC_BASE_URL": "URL base para API Anthropic",
+      "ANTHROPIC_API_KEY": "Chave de API para Anthropic",
+      "ANTHROPIC_MODEL": "Modelo padrão para Anthropic",
+      "OPENAI_API_KEY": "Chave de API para OpenAI",
+      "OPENAI_BASE_URL": "URL base para API OpenAI",
+      "TAVILY_API_KEY": "Chave de API para Tavily search",
+      "SERPER_API_KEY": "Chave de API para Serper search"
+    }
+  },
+  "daemon": {
+    "title": "Daemon de Agentes",
+    "status": {
+      "running": "Em execução (PID {pid})",
+      "stopped": "Parado"
+    },
+    "actions": {
+      "start": "Iniciar",
+      "stop": "Parar"
+    }
+  },
+  "client": {
+    "title": "Cliente de Agentes",
+    "managed": "✓ Gerenciado via API",
+    "managedDescription": "O daemon agora é controlado através da interface acima.",
+    "manualStart": "Se precisar iniciar manualmente para debug, o script está em: {scriptPath}"
+  },
+  "workspaces": {
+    "title": "Espaços de Trabalho",
+    "basePath": "Caminho base",
+    "basePathValue": "Variável de ambiente AGENT_CLIENT_PATH",
+    "description": "Defina AGENT_CLIENT_PATH no .env da API para apontar para o diretório de projetos. Padrão: /root/projects/agent-client/projects"
+  },
+  "workflowLimits": {
+    "title": "Limites de Workflows",
+    "description": "Configure o número máximo de workflows que podem executar simultaneamente. Estes limites se aplicam por projeto.",
+    "maxConcurrentWorkflows": "Máx. de workflows simultâneos",
+    "maxConcurrentWorkflowsDescription": "Máximo de workflows executando ao mesmo tempo. Defina 0 para ilimitado.",
+    "maxPlanningTasks": "Máx. de tarefas em Planning",
+    "maxPlanningTasksDescription": "Máximo de tarefas permitidas na coluna Planning. Padrão é 1.",
+    "maxInProgressTasks": "Máx. de tarefas em In Progress",
+    "maxInProgressTasksDescription": "Máximo de tarefas permitidas na coluna In Progress. Padrão é 1.",
+    "save": "Salvar limites",
+    "saved": "Limites atualizados com sucesso",
+    "selectProject": "Selecione um projeto"
+  }
+}

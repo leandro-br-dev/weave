@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🧪 Templates Column Visibility - Visual Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-scenario {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            background: #fafafa;
+            transition: all 0.3s ease;
+        }
+        .test-scenario:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .scenario-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .scenario-number {
+            background: #667eea;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .scenario-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            flex: 1;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-pass {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-fail {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status-fixed {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .scenario-desc {
+            color: #555;
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .test-details {
+            background: white;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .test-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .test-details td {
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .test-details td:last-child {
+            text-align: right;
+            font-weight: bold;
+            color: #333;
+        }
+        .test-details tr:last-child td {
+            border-bottom: none;
+        }
+        .expected-behavior {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .expected-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .dashboard-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .dashboard-link:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .instructions {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .fix-section {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .fix-section h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .fix-section code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Templates Column Visibility Test</h1>
+        <p class="subtitle">Comprehensive testing of the templates column visibility logic</p>
+
+        <div class="instructions">
+            <h3>📋 How to Test</h3>
+            <ol>
+                <li><strong>Open the Kanban Dashboard:</strong> <a href="http://localhost:5175/kanban" target="_blank" style="color: #0056b3;">http://localhost:5175/kanban</a></li>
+                <li>For each scenario below, verify the Templates column visibility matches the expected behavior</li>
+                <li>Use the database setup commands to create test data for each scenario</li>
+                <li>Check the status badges - Green means PASS, Red means FAIL, Blue means FIXED</li>
+            </ol>
+        </div>
+
+        <div class="test-grid">
+            <div class="test-scenario">
+                <div class="scenario-header">
+                    <div class="scenario-number">1</div>
+                    <div class="scenario-title">No tasks, no templates</div>
+                    <span class="status-badge status-pass">✅ PASS</span>
+                </div>
+                <div class="scenario-desc">
+                    When there are no tasks and no templates, the Templates column should be hidden and the EmptyState should be shown.
+                </div>
+                <div class="test-details">
+                    <table>
+                        <tr><td>Tasks</td><td>0</td></tr>
+                        <tr><td>Templates</td><td>0</td></tr>
+                        <tr><td>Public Templates</td><td>0</td></tr>
+                    </table>
+                </div>
+                <div class="expected-behavior">
+                    <div class="expected-label">Expected:</div>
+                    EmptyState VISIBLE, Templates column HIDDEN
+                </div>
+            </div>
+
+            <div class="test-scenario">
+                <div class="scenario-header">
+                    <div class="scenario-number">2</div>
+                    <div class="scenario-title">No tasks, has public templates</div>
+                    <span class="status-badge status-pass">✅ PASS</span>
+                </div>
+                <div class="scenario-desc">
+                    When there are public templates available, the Templates column should be visible even without tasks.
+                </div>
+                <div class="test-details">
+                    <table>
+                        <tr><td>Tasks</td><td>0</td></tr>
+                        <tr><td>Templates</td><td>1</td></tr>
+                        <tr><td>Public Templates</td><td>1</td></tr>
+                    </table>
+                </div>
+                <div class="expected-behavior">
+                    <div class="expected-label">Expected:</div>
+                    EmptyState HIDDEN, Templates column VISIBLE
+                </div>
+            </div>
+
+            <div class="test-scenario">
+                <div class="scenario-header">
+                    <div class="scenario-number">3</div>
+                    <div class="scenario-title">No tasks, has project-specific templates</div>
+                    <span class="status-badge status-fixed">✅ FIXED</span>
+                </div>
+                <div class="scenario-desc">
+                    Project-specific templates should only be shown when a project is selected. This was a BUG that has been FIXED.
+                </div>
+                <div class="test-details">
+                    <table>
+                        <tr><td>Tasks</td><td>0</td></tr>
+                        <tr><td>Templates</td><td>1 (project-specific)</td></tr>
+                        <tr><td>Public Templates</td><td>0</td></tr>
+                    </table>
+                </div>
+                <div class="expected-behavior">
+                    <div class="expected-label">Expected (no project selected):</div>
+                    EmptyState VISIBLE, Templates column HIDDEN<br><br>
+                    <div class="expected-label">Expected (project selected):</div>
+                    EmptyState HIDDEN, Templates column VISIBLE
+                </div>
+            </div>
+
+            <div class="test-scenario">
+                <div class="scenario-header">
+                    <div class="scenario-number">4</div>
+                    <div class="scenario-title">Has tasks, has public templates</div>
+                    <span class="status-badge status-pass">✅ PASS</span>
+                </div>
+                <div class="scenario-desc">
+                    When both tasks and public templates exist, the Templates column should be visible.
+                </div>
+                <div class="test-details">
+                    <table>
+                        <tr><td>Tasks</td><td>1</td></tr>
+                        <tr><td>Templates</td><td>1 (public)</td></tr>
+                        <tr><td>Public Templates</td><td>1</td></tr>
+                    </table>
+                </div>
+                <div class="expected-behavior">
+                    <div class="expected-label">Expected:</div>
+                    EmptyState HIDDEN, Templates column VISIBLE
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center;">
+            <a href="http://localhost:5175/kanban" target="_blank" class="dashboard-link">🚀 Open Kanban Dashboard</a>
+        </div>
+
+        <div class="fix-section">
+            <h3>🔧 Bug Fix Applied</h3>
+            <p><strong>Scenario 3 Bug:</strong> Project-specific templates were shown even when no project was selected.</p>
+            <p><strong>Location:</strong> <code>/root/projects/weave/dashboard/src/pages/KanbanPage.tsx</code> (line 553)</p>
+            <p><strong>Change:</strong></p>
+            <p style="font-family: 'Courier New', monospace; font-size: 13px; background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                <span style="color: #dc3545;">- : templates.some(t => !t.is_public)<br>
+                <span style="color: #28a745;">+ : false  // Don't show project-specific templates when no project is selected</span>
+            </p>
+            <p><strong>Impact:</strong> Templates column now correctly hides when no project is selected, even if project-specific templates exist.</p>
+        </div>
+
+        <div class="footer">
+            <p><strong>Test Status:</strong> 4/4 PASS ✅ (All scenarios passing after fix)</p>
+            <p><strong>Test Date:</strong> 2026-03-25 | <strong>Report:</strong> <a href="TEMPLATES_COLUMN_TEST_REPORT.md" style="color: #667eea;">TEMPLATES_COLUMN_TEST_REPORT.md</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+{
+  "button": {
+    "defaultLabel": "Button"
+  },
+  "card": {
+    "noTitle": "Untitled Card"
+  },
+  "confirmDialog": {
+    "defaultTitle": "Confirm Action",
+    "defaultMessage": "Are you sure you want to proceed?",
+    "confirmButton": "Confirm",
+    "cancelButton": "Cancel",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "success": "Success",
+    "failed": "Failed",
+    "timeout": "Timeout",
+    "approved": "Approved",
+    "denied": "Denied",
+    "awaitingApproval": "Awaiting Approval"
+  },
+  "emptyState": {
+    "defaultTitle": "No Data",
+    "defaultMessage": "There is no data to display"
+  },
+  "input": {
+    "defaultPlaceholder": "Enter value...",
+    "requiredError": "This field is required"
+  },
+  "pageHeader": {
+    "defaultTitle": "Page"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "first": "First",
+    "last": "Last",
+    "page": "Page",
+    "of": "of",
+    "showing": "Showing {{from}}–{{to}} of {{total}}",
+    "to": "to",
+    "results": "results",
+    "perPage": "per page",
+    "goToPage": "Go to page {{page}}"
+  },
+  "select": {
+    "defaultPlaceholder": "Select an option...",
+    "noOptions": "No options available",
+    "searchPlaceholder": "Search..."
+  },
+  "switch": {
+    "onLabel": "On",
+    "offLabel": "Off"
+  },
+  "toast": {
+    "defaultTitle": "Notification",
+    "close": "Close"
+  },
+  "quickAction": {
+    "title": "Quick Action",
+    "running": "Running",
+    "outputReady": "Output Ready",
+    "project": "Project",
+    "allProjects": "All Projects",
+    "agentRequired": "Agent *",
+    "selectAgent": "Select an agent...",
+    "environment": "Environment",
+    "noSpecificEnvironment": "No specific environment",
+    "mode": "Mode",
+    "generalMode": "General Mode",
+    "planningMode": "Planning Mode",
+    "reviewMode": "Review Mode",
+    "debugMode": "Debug Mode",
+    "requestRequired": "Request *",
+    "planningPlaceholder": "Describe what you want to plan (e.g., 'Add user authentication to the app')",
+    "reviewPlaceholder": "Describe what you want to review (e.g., 'Review the authentication flow for security issues')",
+    "debugPlaceholder": "Describe the issue you're facing (e.g., 'Fix the login bug that prevents users from signing in')",
+    "waitingForOutput": "Waiting for output...",
+    "typeReady": "{{type}} ready",
+    "planInfo": "{{count}} tasks • {{name}}",
+    "reviewInfo": "Status: {{status}} • {{issues}} issues found",
+    "actionFailed": "The action failed. Please check the logs above for details.",
+    "reviewAndCreate": "Review & Create",
+    "close": "Close",
+    "run": "Run"
+  },
+  "contextModal": {
+    "title": "Project Context",
+    "generating": "Generating",
+    "generatingContext": "Generating project context...",
+    "fileStructure": "File Structure",
+    "gitInformation": "Git Information",
+    "statistics": "Statistics",
+    "branch": "Branch",
+    "lastCommit": "Last Commit",
+    "remote": "Remote",
+    "totalFiles": "Total Files",
+    "totalDirectories": "Total Directories",
+    "languages": "Languages",
+    "filesCount": "{{count}} files",
+    "close": "Close"
+  }
+}

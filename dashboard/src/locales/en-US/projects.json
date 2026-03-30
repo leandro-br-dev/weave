@@ -1,0 +1,117 @@
+{
+      "title": "Projects",
+      "description": "Manage your projects and their execution environments",
+      "filters": {
+        "allProjects": "All Projects"
+      },
+      "list": {
+        "title": "Projects",
+        "empty": "No projects found",
+        "createNew": "Create New Project",
+        "searchPlaceholder": "Search projects...",
+        "filter": {
+          "status": "Filter by Status",
+          "priority": "Filter by Priority"
+        },
+        "view": {
+          "grid": "Grid View",
+          "list": "List View"
+        }
+      },
+      "header": {
+        "newProject": "New Project",
+        "new": "New"
+      },
+      "empty": {
+        "title": "No projects yet",
+        "description": "Create your first project to start managing your workspaces",
+        "createProject": "Create Project"
+      },
+      "form": {
+        "createTitle": "Create New Project",
+        "projectName": "Project Name",
+        "projectNamePlaceholder": "e.g., CharHub",
+        "description": "Description",
+        "projectColor": "Project Color",
+        "projectColorHint": "Choose a color to visually identify this project",
+        "creating": "Creating...",
+        "createProject": "Create Project"
+      },
+      "create": {
+        "title": "Create Project",
+        "name": "Project Name",
+        "description": "Description",
+        "status": "Status",
+        "priority": "Priority",
+        "startDate": "Start Date",
+        "endDate": "End Date",
+        "team": "Team Members",
+        "tags": "Tags",
+        "save": "Create Project",
+        "cancel": "Cancel"
+      },
+      "edit": {
+        "title": "Edit Project",
+        "save": "Update Project",
+        "cancel": "Cancel"
+      },
+      "delete": {
+        "title": "Delete Project",
+        "confirm": "Are you sure you want to delete project \"{{name}}\"? This action cannot be undone.",
+        "success": "Project deleted successfully"
+      },
+      "details": {
+        "title": "Project Details",
+        "overview": "Overview",
+        "tasks": "Tasks",
+        "team": "Team",
+        "activity": "Activity",
+        "settings": "Settings"
+      },
+      "defaultAgents": {
+        "title": "Create Default Agents",
+        "description": "You can create default agents to get started quickly. The planner agent is essential for the pipeline workflow to function correctly.",
+        "coder": {
+          "label": "Coder Agent",
+          "description": "Implements features and fixes following project patterns"
+        },
+        "planner": {
+          "label": "Planner Agent",
+          "description": "Plans and breaks down tasks into executable workflows. Required for pipeline operations."
+        },
+        "requiredBadge": "Recommended",
+        "create": "Create Selected",
+        "skip": "Skip",
+        "creating": "Creating agents...",
+        "success": "Agents created successfully!",
+        "error": "Failed to create agents"
+      },
+      "status": {
+        "planning": "Planning",
+        "active": "Active",
+        "onHold": "On Hold",
+        "completed": "Completed",
+        "archived": "Archived"
+      },
+      "priority": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "urgent": "Urgent"
+      },
+      "environments": {
+        "title": "Environments",
+        "add": "Add Environment",
+        "empty": "No environments yet. Create one to get started."
+      },
+      "agents": {
+        "title": "Agents",
+        "empty": "No agents yet. Use the Agents page to create agents for this project.",
+        "view": "View"
+      },
+      "pipelineSettings": {
+        "title": "Pipeline Settings",
+        "autoApprove": "Auto-approve workflows",
+        "autoApproveDesc": "Generated plans start automatically"
+      }
+}

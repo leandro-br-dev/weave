@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme System Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 2rem;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        body {
+            background-color: #ffffff;
+            color: #111827;
+        }
+        body.dark {
+            background-color: #1f2937;
+            color: #f9fafb;
+        }
+        .test-section {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        body.dark .test-section {
+            border-color: #374151;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            margin: 0.25rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #f9fafb;
+            cursor: pointer;
+        }
+        body.dark button {
+            background: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+        button.active {
+            background: #111827;
+            color: white;
+        }
+        body.dark button.active {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            background: #2563eb;
+            color: white;
+            border-radius: 4px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Theme System Test</h1>
+
+    <div class="test-section">
+        <h2>Current State</h2>
+        <p><strong>Theme Preference:</strong> <span id="themePref">system</span></p>
+        <p><strong>Resolved Theme:</strong> <span id="resolvedTheme">light</span></p>
+        <p><strong>System Prefers Dark:</strong> <span id="systemPrefers">false</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>Theme Selector</h2>
+        <button id="btn-light" onclick="setTheme('light')">
+            ☀️ Light
+        </button>
+        <button id="btn-dark" onclick="setTheme('dark')">
+            🌙 Dark
+        </button>
+        <button id="btn-system" onclick="setTheme('system')">
+            🖥️ System <span id="system-badge" class="badge" style="display:none">Light</span>
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Click "System" button to enable system theme</li>
+            <li>Change your OS/theme preference (dark/light)</li>
+            <li>This page should immediately update to match</li>
+            <li>The badge on the System button shows what it resolved to</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Quick Test (Simulate System Change)</h2>
+        <button onclick="simulateSystemChange()">Toggle System Preference</button>
+        <p><em>Note: This simulates a system change for testing purposes</em></p>
+    </div>
+
+    <script>
+        let currentTheme = 'system';
+        let mockSystemPrefersDark = false;
+
+        // Get actual system preference
+        function getSystemTheme() {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        // Resolve theme to actual light/dark
+        function resolveTheme(theme) {
+            if (theme === 'system') {
+                return mockSystemPrefersDark ? 'dark' : getSystemTheme();
+            }
+            return theme;
+        }
+
+        // Apply theme to DOM
+        function applyTheme(theme) {
+            const resolved = resolveTheme(theme);
+            if (resolved === 'dark') {
+                document.body.classList.add('dark');
+            } else {
+                document.body.classList.remove('dark');
+            }
+            updateUI(theme, resolved);
+        }
+
+        // Update UI elements
+        function updateUI(theme, resolved) {
+            document.getElementById('themePref').textContent = theme;
+            document.getElementById('resolvedTheme').textContent = resolved;
+            document.getElementById('systemPrefers').textContent =
+                mockSystemPrefersDark ? 'true (simulated)' : getSystemTheme() === 'dark';
+
+            // Update button states
+            ['light', 'dark', 'system'].forEach(t => {
+                const btn = document.getElementById(`btn-${t}`);
+                btn.classList.toggle('active', t === theme);
+            });
+
+            // Update system badge
+            const badge = document.getElementById('system-badge');
+            if (theme === 'system') {
+                badge.style.display = 'inline-block';
+                badge.textContent = resolved === 'dark' ? 'Dark' : 'Light';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Set theme
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('theme', theme);
+            applyTheme(theme);
+        }
+
+        // Simulate system change (for testing)
+        function simulateSystemChange() {
+            mockSystemPrefersDark = !mockSystemPrefersDark;
+            if (currentTheme === 'system') {
+                applyTheme('system');
+            }
+        }
+
+        // Listen to actual system changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (currentTheme === 'system') {
+                applyTheme('system');
+            }
+        });
+
+        // Initialize
+        const savedTheme = localStorage.getItem('theme') || 'system';
+        setTheme(savedTheme);
+    </script>
+</body>
+</html>

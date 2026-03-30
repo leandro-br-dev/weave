@@ -1,0 +1,82 @@
+{
+      "title": "Approvals",
+      "description": "Review and approve pending requests",
+      "pendingApproval": "{{count}} pending approval",
+      "pendingApprovals": "{{count}} pending approvals",
+      "noPending": "No pending approvals",
+      "noPendingDesc": "There are no pending approvals at this time",
+      "agentPauseDescription": "The agent will pause here when it needs permission",
+      "pendingCount": "{{count}} pending",
+      "loading": "Loading approvals...",
+      "workflowApprovals": "Workflow Approvals",
+      "tasks": "Tasks",
+      "created": "Created",
+      "approvals": "Approvals",
+      "review": "Review",
+      "approve": "Approve",
+      "deny": "Deny",
+      "toolUseApprovals": "Tool Use Approvals",
+      "ago": "ago",
+      "plan": "Plan",
+      "task": "Task",
+      "list": {
+        "title": "Pending Approvals",
+        "empty": "No pending approvals",
+        "filter": {
+          "type": "Filter by Type",
+          "priority": "Filter by Priority",
+          "status": "Filter by Status"
+        },
+        "count": "{{count}} pending items"
+      },
+      "workflowSection": "Workflow Approvals",
+      "toolUseSection": "Tool Use Approvals",
+      "request": {
+        "title": "Approval Request",
+        "type": "Request Type",
+        "requestedBy": "Requested By",
+        "requestedAt": "Requested At",
+        "description": "Description",
+        "details": "Details",
+        "approve": "Approve",
+        "reject": "Reject",
+        "requestChanges": "Request Changes",
+        "comment": "Comment"
+      },
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "deny": "Deny",
+        "review": "Review",
+        "approveAll": "Approve All",
+        "rejectAll": "Reject All",
+        "viewDetails": "View Details",
+        "addComment": "Add Comment"
+      },
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "changesRequested": "Changes Requested"
+      },
+      "type": {
+        "workflow": "Workflow Execution",
+        "agent": "Agent Action",
+        "project": "Project Change",
+        "deployment": "Deployment",
+        "access": "Access Request"
+      },
+      "priority": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "urgent": "Urgent"
+      },
+      "history": {
+        "title": "Approval History",
+        "all": "All Approvals",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "dateRange": "Date Range"
+  }
+}

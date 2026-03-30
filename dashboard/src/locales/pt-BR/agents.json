@@ -1,0 +1,157 @@
+{
+      "title": "Agentes",
+      "description": "Gerencie seus espaços de trabalho e configurações de agentes de IA",
+      "filters": {
+        "allProjects": "Todos os Projetos"
+      },
+      "form": {
+        "title": "Título",
+        "description": "Descrição"
+      },
+      "list": {
+        "title": "Agentes",
+        "empty": "Nenhum agente encontrado",
+        "createNew": "Criar Novo Agente",
+        "searchPlaceholder": "Buscar agentes...",
+        "filter": {
+          "status": "Filtrar por Status",
+          "type": "Filtrar por Tipo"
+        }
+      },
+      "create": {
+        "title": "Criar Agente",
+        "name": "Nome do Agente",
+        "description": "Descrição",
+        "type": "Tipo de Agente",
+        "model": "Modelo de IA",
+        "systemPrompt": "Prompt do Sistema",
+        "temperature": "Temperatura",
+        "maxTokens": "Tokens Máximos",
+        "tools": "Ferramentas",
+        "capabilities": "Capacidades",
+        "save": "Criar Agente",
+        "cancel": "Cancelar"
+      },
+      "edit": {
+        "title": "Editar Agente",
+        "save": "Atualizar Agente",
+        "cancel": "Cancelar"
+      },
+      "delete": {
+        "title": "Excluir Agente",
+        "confirm": "Tem certeza de que deseja excluir o agente \"{{name}}\"? Esta ação não pode ser desfeita.",
+        "success": "Agente excluído com sucesso"
+      },
+      "configure": {
+        "title": "Configurar Agente",
+        "general": "Configurações Gerais",
+        "behavior": "Configurações de Comportamento",
+        "tools": "Ferramentas e Integrações",
+        "advanced": "Configurações Avançadas"
+      },
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "busy": "Ocupado",
+        "maintenance": "Manutenção"
+      },
+      "type": {
+        "assistant": "Assistente",
+        "analyst": "Analista",
+        "automation": "Automação",
+        "custom": "Personalizado"
+      },
+      "header": {
+        "generateAgent": "Gerar Agente",
+        "generate": "Gerar",
+        "generating": "Gerando...",
+        "newAgent": "Novo Agente",
+        "new": "Novo"
+      },
+      "table": {
+        "agentName": "Nome do Agente",
+        "project": "Projeto",
+        "role": "Função",
+        "model": "Modelo",
+        "noProject": "Nenhum projeto",
+        "view": "Visualizar"
+      },
+      "showing": {
+        "fromProject": "Exibindo {{count}} agente{{plural}} de {{project}}",
+        "fromAll": "Exibindo {{count}} agente{{plural}} de todos os projetos"
+      },
+      "tabs": {
+        "claudeMd": "CLAUDE.md",
+        "settings": "Configurações",
+        "skills": "Skills",
+        "agents": "Agentes",
+        "environments": "Ambientes"
+      },
+      "claudeMd": {
+        "improveWithAi": "Melhorar com IA",
+        "improving": "Melhorando..."
+      },
+      "settingsTab": {
+        "environmentVariables": "Variáveis de Ambiente",
+        "addEnvVar": "Adicionar Var",
+        "permissions": "Permissões",
+        "allow": "Permitir",
+        "denyRules": "Regras de Negação",
+        "denyPlaceholder": "Regras de negação (uma por linha)",
+        "additionalDirectories": "Diretórios Adicionais",
+        "addDirectory": "Adicionar Diretório",
+        "saveSettings": "Salvar Configurações"
+      },
+      "skillsTab": {
+        "title": "Skills ({{count}})",
+        "importMd": "Importar .md / .txt",
+        "newSkill": "Nova Skill",
+        "nativeSkills": "Skills Nativas",
+        "installed": "Instalada",
+        "installing": "Instalando...",
+        "add": "Adicionar",
+        "noNativeSkills": "Nenhuma skill nativa disponível",
+        "customSkills": "Skills Personalizadas",
+        "noCustomSkills": "Nenhuma skill personalizada instalada",
+        "deleteTitle": "Excluir Skill",
+        "deleteConfirm": "Tem certeza de que deseja excluir \"{{name}}\"? Esta ação não pode ser desfeita."
+      },
+      "agentsTab": {
+        "title": "Sub-Agentes ({{count}})",
+        "newAgent": "Novo Agente",
+        "nativeAgents": "Agentes Nativos",
+        "installed": "Instalado",
+        "installing": "Instalando...",
+        "add": "Adicionar",
+        "noNativeAgents": "Nenhum agente nativo disponível",
+        "customSubAgents": "Sub-Agentes Personalizados",
+        "noSubAgents": "Nenhum sub-agente configurado",
+        "saving": "Salvando...",
+        "save": "Salvar",
+        "cancel": "Cancelar",
+        "name": "Nome",
+        "content": "Conteúdo",
+        "editAgent": "Editar agente",
+        "deleteAgent": "Excluir agente"
+      },
+      "environmentsTab": {
+        "loading": "Carregando ambientes...",
+        "linkedEnvironments": "Ambientes Vinculados",
+        "linkDescription": "Vincule ambientes para preencher automaticamente additionalDirectories em settings.local.json",
+        "linkEnvironment": "Vincular Ambiente",
+        "noEnvironmentsLinked": "Nenhum ambiente vinculado",
+        "noEnvironmentsLinkedDesc": "Vincule um ambiente para adicionar automaticamente seu project_path às permissões de additionalDirectories do agente.",
+        "unlinkEnvironment": "Desvincular ambiente",
+        "linkModalTitle": "Vincular Ambiente",
+        "linkModalProjectDesc": "Selecione um ambiente do projeto deste agente. Seu project_path será adicionado automaticamente a additionalDirectories.",
+        "linkModalAllDesc": "Selecione um ambiente para vincular a este agente. Seu project_path será adicionado automaticamente a additionalDirectories.",
+        "noEnvironmentsForProject": "Nenhum ambiente encontrado para este projeto.",
+        "createInProjects": "Crie um em Projetos",
+        "noAvailableEnvironments": "Nenhum ambiente disponível para vincular. Todos os ambientes já estão vinculados a este agente.",
+        "environmentLabel": "Ambiente",
+        "environmentAllLabel": "Ambiente (todos os projetos)",
+        "selectEnvironment": "Selecione um ambiente...",
+        "cancel": "Cancelar",
+        "link": "Vincular"
+      }
+}

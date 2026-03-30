@@ -1,0 +1,51 @@
+{
+  "title": "Project Select Demo",
+  "description": "Demonstration of the ProjectSelect component features",
+  "basicUsage": {
+    "title": "Basic Usage",
+    "description": "Simple project selection",
+    "label": "Project",
+    "placeholder": "Select a project..."
+  },
+  "selected": "Selected",
+  "filterMode": {
+    "title": "Filter Mode",
+    "description": "Filter projects by environment",
+    "label": "Project",
+    "placeholder": "Select a project...",
+    "allOptionLabel": "All Projects"
+  },
+  "filteringBy": "Filtering by {{filter}}",
+  "requiredField": {
+    "title": "Required Field",
+    "description": "Project selection is required",
+    "label": "Project *",
+    "placeholder": "Select a project..."
+  },
+  "errorState": {
+    "title": "Error State",
+    "description": "Handling errors gracefully",
+    "label": "Project",
+    "placeholder": "Select a project...",
+    "errorMessage": "Failed to load projects"
+  },
+  "disabledState": {
+    "title": "Disabled State",
+    "description": "Component when disabled",
+    "label": "Project"
+  },
+  "features": {
+    "title": "Features",
+    "icon": "Icon",
+    "description": "Description",
+    "checkmark": "Checkmark",
+    "keyboard": "Keyboard Navigation",
+    "accessible": "Accessible",
+    "allOption": "All Option",
+    "validation": "Validation",
+    "states": "Multiple States"
+  },
+  "usageExample": {
+    "title": "Usage Example"
+  }
+}

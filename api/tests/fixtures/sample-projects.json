@@ -1,0 +1,27 @@
+[
+  {
+    "id": "project-1",
+    "name": "E-commerce Platform",
+    "description": "A full-featured e-commerce platform with product catalog, shopping cart, and payment processing"
+  },
+  {
+    "id": "project-2",
+    "name": "Task Management App",
+    "description": "A collaborative task management application with real-time updates"
+  },
+  {
+    "id": "project-3",
+    "name": "API Gateway Service",
+    "description": "Microservices API gateway with authentication, rate limiting, and caching"
+  },
+  {
+    "id": "sample-web-project",
+    "name": "Sample Web Project",
+    "description": "A sample web application for testing purposes"
+  },
+  {
+    "id": "mobile-app-project",
+    "name": "Mobile App Backend",
+    "description": "Backend services for a cross-platform mobile application"
+  }
+]

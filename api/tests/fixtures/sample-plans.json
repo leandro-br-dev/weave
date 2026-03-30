@@ -1,0 +1,42 @@
+[
+  {
+    "id": "plan-1",
+    "name": "Setup Development Environment",
+    "tasks": "Install Node.js\nSetup database\nConfigure environment variables\nRun initial migration",
+    "status": "pending",
+    "type": "workflow",
+    "project_id": "project-1"
+  },
+  {
+    "id": "plan-2",
+    "name": "Implement User Authentication",
+    "tasks": "Design database schema\nCreate user model\nImplement login endpoint\nAdd JWT validation\nWrite unit tests",
+    "status": "pending",
+    "type": "workflow",
+    "project_id": "project-1"
+  },
+  {
+    "id": "plan-3",
+    "name": "Build Product Catalog",
+    "tasks": "Create product model\nImplement CRUD endpoints\nAdd search functionality\nImplement pagination",
+    "status": "pending",
+    "type": "workflow",
+    "project_id": "project-1"
+  },
+  {
+    "id": "plan-4",
+    "name": "Setup CI/CD Pipeline",
+    "tasks": "Configure GitHub Actions\nSetup automated tests\nDeploy to staging\nConfigure monitoring",
+    "status": "pending",
+    "type": "workflow",
+    "project_id": "project-2"
+  },
+  {
+    "id": "plan-5",
+    "name": "Database Optimization",
+    "tasks": "Analyze slow queries\nAdd database indexes\nOptimize joins\nSetup query caching",
+    "status": "pending",
+    "type": "workflow",
+    "project_id": "project-3"
+  }
+]

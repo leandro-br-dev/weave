@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Python
+client/venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+coverage-python.json
+coverage-python.xml
+
+# Builds
+api/dist/
+dashboard/dist/
+
+# Database (dados locais, não versionar)
+api/data/*.db
+api/data/*.db-shm
+api/data/*.db-wal
+api/database.sqlite
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Env files (segredos locais)
+.env
+.env.local
+api/.env
+dashboard/.env
+
+# Agent workspaces e projetos locais (específicos da máquina)
+projects/
+
+# Logs
+*.log
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

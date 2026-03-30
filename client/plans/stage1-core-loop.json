@@ -1,0 +1,50 @@
+{
+  "name": "weave — Stage 1: Core loop",
+  "tasks": [
+    {
+      "id": "scaffold",
+      "name": "Project scaffold",
+      "prompt": "Initialize the weave project at /root/projects/weave.\n\nCreate two sub-projects:\n\n1. `dashboard/` — Vite + React 19 + TypeScript project using the following package.json as reference:\n```json\n{\n  \"name\": \"dashboard\",\n  \"private\": true,\n  \"version\": \"0.0.0\",\n  \"type\": \"module\",\n  \"scripts\": { \"dev\": \"vite\", \"build\": \"tsc -b && vite build\", \"lint\": \"eslint .\", \"preview\": \"vite preview\", \"test\": \"vitest\", \"test:ui\": \"vitest --ui\", \"test:coverage\": \"vitest --coverage\" },\n  \"dependencies\": { \"@dnd-kit/core\": \"^6.3.1\", \"@dnd-kit/sortable\": \"^10.0.0\", \"@dnd-kit/utilities\": \"^3.2.2\", \"@radix-ui/react-dialog\": \"^1.1.15\", \"@radix-ui/react-select\": \"^2.2.6\", \"@tanstack/react-query\": \"^5.90.21\", \"@tanstack/react-query-devtools\": \"^5.91.3\", \"clsx\": \"^2.1.1\", \"date-fns\": \"^4.1.0\", \"i18next\": \"^25.8.11\", \"i18next-browser-languagedetector\": \"^8.2.1\", \"lucide-react\": \"^0.575.0\", \"react\": \"^19.2.0\", \"react-dom\": \"^19.2.0\", \"react-i18next\": \"^16.5.4\", \"react-router-dom\": \"^7.13.0\", \"socket.io-client\": \"^4.8.3\", \"tailwind-merge\": \"^3.5.0\" },\n  \"devDependencies\": { \"@eslint/js\": \"^9.39.1\", \"@tailwindcss/forms\": \"^0.5.11\", \"@testing-library/jest-dom\": \"^6.6.8\", \"@testing-library/react\": \"^16.3.1\", \"@testing-library/user-event\": \"^14.5.2\", \"@types/node\": \"^24.10.13\", \"@types/react\": \"^19.2.7\", \"@types/react-dom\": \"^19.2.3\", \"@vitejs/plugin-react\": \"^5.1.1\", \"@vitest/coverage-v8\": \"^3.1.2\", \"@vitest/ui\": \"^3.1.2\", \"autoprefixer\": \"^10.4.24\", \"eslint\": \"^9.39.1\", \"eslint-plugin-react-hooks\": \"^7.0.1\", \"eslint-plugin-react-refresh\": \"^0.4.24\", \"globals\": \"^16.5.0\", \"jsdom\": \"^25.0.1\", \"postcss\": \"^8.5.6\", \"tailwindcss\": \"^3.4.4\", \"typescript\": \"~5.9.3\", \"typescript-eslint\": \"^8.48.0\", \"vite\": \"^7.3.1\", \"vitest\": \"^3.1.2\" }\n}\n```\n\nConfigure: Tailwind CSS, TypeScript strict mode, React Router v7, React Query v5, base layout with sidebar.\n\n2. `api/` — Lightweight Node.js/Express server with:\n- TypeScript\n- SQLite (via `better-sqlite3`)\n- Static bearer token auth\n- CORS configured for `http://localhost:5173`\n\nCreate a root `README.md` and initialize git with an initial commit.",
+      "cwd": "/root/projects/agent-client/projects/weave/agent-coder",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Skill"],
+      "permission_mode": "acceptEdits",
+      "depends_on": []
+    },
+    {
+      "id": "api-plans",
+      "name": "Backend: plans API",
+      "prompt": "Implement the plans API in `/root/projects/weave/api/`.\n\nDatabase schema (SQLite):\n```sql\nCREATE TABLE plans (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL,\n  tasks TEXT NOT NULL,\n  status TEXT NOT NULL DEFAULT 'pending',\n  client_id TEXT,\n  result TEXT,\n  started_at TEXT,\n  completed_at TEXT,\n  created_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE plan_logs (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  plan_id TEXT NOT NULL REFERENCES plans(id),\n  task_id TEXT NOT NULL,\n  level TEXT NOT NULL DEFAULT 'info',\n  message TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n```\n\nEndpoints to implement:\n- GET /api/plans — list all plans ordered by created_at DESC\n- POST /api/plans — create plan (body: {name, tasks})\n- GET /api/plans/pending — plans with status=pending (for client polling)\n- GET /api/plans/:id — plan detail with log count\n- POST /api/plans/:id/start — set status=running, record started_at and client_id from body\n- POST /api/plans/:id/complete — set status=success|failed, record result and completed_at\n- POST /api/plans/:id/logs — append log lines (body: {task_id, level, message}[])\n- GET /api/plans/:id/logs — return all log lines for a plan\n\nAll endpoints require Authorization: Bearer header matching WEAVE_TOKEN env var.\nAll responses use envelope: {data, error}.\n\nWrite integration tests using supertest.",
+      "cwd": "/root/projects/agent-client/projects/weave/agent-coder",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Skill"],
+      "permission_mode": "acceptEdits",
+      "depends_on": ["scaffold"]
+    },
+    {
+      "id": "dashboard-plans",
+      "name": "Frontend: plans UI",
+      "prompt": "Implement the plans feature in `/root/projects/weave/dashboard/src/`.\n\nCreate:\n1. `src/api/plans.ts` — React Query hooks: useGetPlans, useCreatePlan, useGetPlan, useGetPlanLogs\n2. `src/api/client.ts` — base fetch wrapper with auth header and error handling\n3. `src/features/plans/components/PlansList.tsx` — table with columns: name, status badge, created_at, actions (view button)\n4. `src/features/plans/components/PlanDetail.tsx` — shows tasks, status, and log viewer (polls every 2s while running)\n5. `src/features/plans/components/CreatePlanForm.tsx` — form with name field and tasks (at least one task with: id, name, prompt, cwd, workspace path)\n6. `src/pages/PlansPage.tsx` and `src/pages/PlanDetailPage.tsx`\n7. Wire up routes in `src/router.tsx`: `/` → PlansList, `/plans/:id` → PlanDetail, `/plans/new` → CreatePlanForm\n\nStatus badge colors: pending=yellow, running=blue, success=green, failed=red.\n\nLog viewer: scrollable container, auto-scrolls to bottom while running, shows task_id prefix and message.\n\nWrite component tests for PlansList and CreatePlanForm.",
+      "cwd": "/root/projects/agent-client/projects/weave/agent-coder",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Skill"],
+      "permission_mode": "acceptEdits",
+      "depends_on": ["scaffold"]
+    },
+    {
+      "id": "client-daemon",
+      "name": "agent-client: daemon mode",
+      "prompt": "Add daemon mode to the agent-client at `/root/projects/weave/agent-client/`.\n\nThis is the Python orchestrator already built. Add to `main.py`:\n\n```\npython main.py --daemon --server http://localhost:3001 --token YOUR_TOKEN\n```\n\nDaemon behavior:\n1. Poll `GET /api/plans/pending` every 5 seconds\n2. When a plan arrives: POST /api/plans/:id/start with {client_id: hostname}\n3. Execute the plan using the existing runner (runner.py)\n4. During execution, stream log lines to POST /api/plans/:id/logs after each task message\n5. On completion: POST /api/plans/:id/complete with {status, result}\n6. Graceful shutdown on SIGINT/SIGTERM — finish current plan before stopping\n7. Config via env vars WEAVE_URL and WEAVE_TOKEN (CLI flags override env vars)\n\nAdd a `DaemonClient` class in `orchestrator/daemon_client.py` that handles all HTTP communication with the dashboard API.\n\nThe existing runner.py must not be modified — daemon mode wraps around it.\n\nWrite tests for DaemonClient (mock the HTTP calls).",
+      "cwd": "/root/projects/agent-client/projects/weave/agent-coder",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Skill"],
+      "permission_mode": "acceptEdits",
+      "depends_on": ["api-plans"]
+    },
+    {
+      "id": "integration-test",
+      "name": "End-to-end smoke test",
+      "prompt": "Verify that the full Stage 1 loop works end-to-end in `/root/projects/weave/`.\n\nSteps:\n1. Start the API server: `cd api && npm run dev`\n2. Start the dashboard: `cd dashboard && npm run dev`\n3. Start the agent-client daemon: `cd agent-client && python main.py --daemon --server http://localhost:3001 --token test-token`\n4. Create a test plan via curl:\n```bash\ncurl -X POST http://localhost:3001/api/plans \\\n  -H 'Authorization: Bearer test-token' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\": \"smoke-test\", \"tasks\": [{\"id\": \"t1\", \"name\": \"Hello\", \"prompt\": \"Write a file hello.txt with content Hello World in /tmp\", \"cwd\": \"/tmp\", \"tools\": [\"Write\"], \"permission_mode\": \"acceptEdits\", \"depends_on\": []}]}'\n```\n5. Verify the plan transitions: pending → running → success\n6. Verify logs were stored: `GET /api/plans/:id/logs`\n\nDocument the result. If anything fails, fix it before marking this task complete.\n\nCommit all changes with: `git commit -m 'feat: stage1 complete — core loop working'`",
+      "cwd": "/root/projects/agent-client/projects/weave/agent-coder",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Skill"],
+      "permission_mode": "acceptEdits",
+      "depends_on": ["api-plans", "dashboard-plans", "client-daemon"]
+    }
+  ]
+}

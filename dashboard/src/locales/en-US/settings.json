@@ -1,0 +1,187 @@
+{
+  "title": "Settings",
+  "description": "Configure your API connection, agent daemon, and environment variables",
+  "tabs": {
+    "general": {
+      "label": "General",
+      "icon": "settings"
+    },
+    "connections": {
+      "label": "Connections",
+      "icon": "link"
+    },
+    "system": {
+      "label": "System",
+      "icon": "server"
+    }
+  },
+  "groups": {
+    "general": {
+      "label": "General",
+      "description": "Basic settings and preferences",
+      "sections": ["language", "appearance", "workspaces"]
+    },
+    "connections": {
+      "label": "Connections",
+      "description": "API and network configurations",
+      "sections": ["apiConnection", "cloudflare", "envVars"]
+    },
+    "system": {
+      "label": "System",
+      "description": "Agent daemon and client management",
+      "sections": ["daemon", "client"]
+    }
+  },
+  "language": {
+    "title": "Language",
+    "description": "Select your preferred language"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize the look and feel of your dashboard",
+    "theme": "Theme"
+  },
+  "cloudflare": {
+    "title": "Cloudflare Tunnel",
+    "loading": "Loading tunnel configuration...",
+    "status": {
+      "enabled": "Tunnel Enabled",
+      "notConfigured": "Tunnel Not Configured"
+    },
+    "urls": {
+      "public": "Public URL",
+      "api": "API URL"
+    },
+    "actions": {
+      "disable": "Disable Tunnel",
+      "learnMore": "Learn More"
+    },
+    "messages": {
+      "notConfigured": {
+        "title": "Tunnel Not Configured",
+        "description": "To expose your weave via internet, run the setup script:",
+        "script": "bash scripts/cloudflare-tunnel.sh"
+      },
+      "benefits": {
+        "title": "Benefits:",
+        "accessAnywhere": "Access from anywhere without port forwarding",
+        "encryption": "SSL/TLS encryption automatically",
+        "noRouterConfig": "No router configuration needed",
+        "anyDomain": "Works with any Cloudflare domain"
+      }
+    }
+  },
+  "apiConnection": {
+    "title": "API Connection",
+    "apiUrl": "API URL",
+    "status": "Status",
+    "statusValues": {
+      "checking": "Checking...",
+      "connected": "Connected",
+      "unreachable": "Unreachable"
+    }
+  },
+  "envVars": {
+    "title": "Environment Variables",
+    "loading": "Loading environment variables...",
+    "error": "Error loading environment variables",
+    "noResults": {
+      "filtered": "No environment variables found matching your filters.",
+      "empty": "No environment variables configured. Click \"New Variable\" or use quick add above."
+    },
+    "actions": {
+      "newVariable": "New Variable",
+      "initializeDefaults": "Initialize Defaults"
+    },
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Search variables...",
+      "category": "Category",
+      "categories": {
+        "all": "All Categories",
+        "general": "General",
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "custom": "Custom"
+      }
+    },
+    "quickAdd": {
+      "title": "Quick Add - Common Variables",
+      "added": "Added"
+    },
+    "form": {
+      "new": "New Environment Variable",
+      "edit": "Edit Environment Variable",
+      "fields": {
+        "key": "Key",
+        "keyPlaceholder": "ANTHROPIC_BASE_URL",
+        "value": "Value",
+        "valuePlaceholder": "http://localhost:8083",
+        "description": "Description",
+        "descriptionPlaceholder": "Base URL for Anthropic API",
+        "category": "Category",
+        "markAsSecret": "Mark as secret (hide value)"
+      },
+      "actions": {
+        "create": "Create",
+        "update": "Update",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "createFailed": "Failed to create environment variable",
+        "updateFailed": "Failed to update environment variable"
+      }
+    },
+    "badges": {
+      "secret": "Secret",
+      "variable": "variable",
+      "variables": "variables"
+    },
+    "confirmDelete": "Are you sure you want to delete this environment variable?",
+    "suggestions": {
+      "ANTHROPIC_BASE_URL": "Base URL for Anthropic API",
+      "ANTHROPIC_API_KEY": "API key for Anthropic",
+      "ANTHROPIC_MODEL": "Default model for Anthropic",
+      "OPENAI_API_KEY": "API key for OpenAI",
+      "OPENAI_BASE_URL": "Base URL for OpenAI API",
+      "TAVILY_API_KEY": "API key for Tavily search",
+      "SERPER_API_KEY": "API key for Serper search"
+    }
+  },
+  "daemon": {
+    "title": "Agent Daemon",
+    "status": {
+      "running": "Running (PID {pid})",
+      "stopped": "Stopped"
+    },
+    "actions": {
+      "start": "Start",
+      "stop": "Stop"
+    }
+  },
+  "client": {
+    "title": "Agent Client",
+    "managed": "✓ Managed via API",
+    "managedDescription": "The daemon is now controlled through the interface above.",
+    "manualStart": "If you need to start manually for debugging, the script is at: {scriptPath}"
+  },
+  "workspaces": {
+    "title": "Workspaces",
+    "basePath": "Base path",
+    "basePathValue": "AGENT_CLIENT_PATH environment variable",
+    "description": "Set AGENT_CLIENT_PATH in the API .env to point to the projects directory. Default: /root/projects/agent-client/projects"
+  },
+  "workflowLimits": {
+    "title": "Workflow Limits",
+    "description": "Configure the maximum number of workflows that can run simultaneously. These limits apply per project.",
+    "maxConcurrentWorkflows": "Max concurrent workflows",
+    "maxConcurrentWorkflowsDescription": "Maximum workflows running at the same time. Set to 0 for unlimited.",
+    "maxPlanningTasks": "Max tasks in Planning",
+    "maxPlanningTasksDescription": "Maximum tasks allowed in the Planning column. Default is 1.",
+    "maxInProgressTasks": "Max tasks in In Progress",
+    "maxInProgressTasksDescription": "Maximum tasks allowed in the In Progress column. Default is 1.",
+    "save": "Save limits",
+    "saved": "Limits updated successfully",
+    "selectProject": "Select a project"
+  }
+}

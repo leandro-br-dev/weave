@@ -1,0 +1,132 @@
+{
+      "title": "Kanban Board",
+      "description": "Gerencie suas tarefas de projeto",
+      "empty": {
+        "title": "Nenhum projeto encontrado",
+        "description": "Crie um projeto primeiro para usar o quadro kanban"
+      },
+      "board": {
+        "title": "Quadro Kanban",
+        "createBoard": "Criar Quadro",
+        "selectBoard": "Selecionar Quadro",
+        "settings": "Configurações do Quadro",
+        "share": "Compartilhar Quadro",
+        "export": "Exportar Quadro"
+      },
+      "column": {
+        "title": "Título da Coluna",
+        "addColumn": "Adicionar Coluna",
+        "editColumn": "Editar Coluna",
+        "deleteColumn": "Excluir Coluna",
+        "moveLeft": "Mover para a Esquerda",
+        "moveRight": "Mover para a Direita",
+        "setWIP": "Definir Limite WIP"
+      },
+      "task": {
+        "title": "Título da Tarefa",
+        "description": "Descrição",
+        "assignee": "Responsável",
+        "priority": "Prioridade",
+        "dueDate": "Data de Vencimento",
+        "tags": "Tags",
+        "attachments": "Anexos",
+        "comments": "Comentários",
+        "addTask": "Adicionar Tarefa",
+        "add": "Adicionar",
+        "editTask": "Editar Tarefa",
+        "deleteTask": "Excluir Tarefa",
+        "moveTask": "Mover Tarefa",
+        "copyTask": "Copiar Tarefa",
+        "deleteConfirmTitle": "Excluir tarefa?",
+        "deleteConfirmDescription": "Esta ação não pode ser desfeita."
+      },
+      "noTasks": {
+        "title": "Nenhuma tarefa ainda",
+        "description": "Crie sua primeira tarefa para começar",
+        "addTask": "Adicionar Tarefa"
+      },
+      "autoMove": "Mover automaticamente",
+      "autoApprove": "Aprovar automaticamente",
+      "autoMoveFailed": "Falha ao mover automaticamente",
+      "autoMovedTasks": "Movida {{count}} tarefa automaticamente",
+      "autoMovedTasks_other": "Movidas {{count}} tarefas automaticamente",
+      "autoMovedTasksDescription": "As tarefas foram movidas com base em seu status",
+      "allProjectsPlaceholder": "Todos os projetos",
+      "actions": {
+        "save": "Salvar",
+        "cancel": "Cancelar",
+        "delete": "Excluir",
+        "archive": "Arquivar",
+        "restore": "Restaurar",
+        "duplicate": "Duplicar",
+        "bulkActions": "Ações em Lote",
+        "selectMultiple": "Selecionar Vários"
+      },
+      "filters": {
+        "allProjects": "Todos os Projetos",
+        "assignee": "Filtrar por Responsável",
+        "priority": "Filtrar por Prioridade",
+        "dueDate": "Filtrar por Data de Vencimento",
+        "tags": "Filtrar por Tags",
+        "search": "Buscar tarefas...",
+        "clearFilters": "Limpar Filtros"
+      },
+      "views": {
+        "board": "Visão de Quadro",
+        "list": "Visão de Lista",
+        "timeline": "Visão de Linha do Tempo",
+        "calendar": "Visão de Calendário"
+      },
+      "priority": {
+        "low": "Baixa",
+        "medium": "Média",
+        "high": "Alta",
+        "urgent": "Urgente",
+        "critical": "Crítica",
+        "minimal": "Mínima"
+      },
+      "columns": {
+        "templates": "Templates",
+        "backlog": "Backlog",
+        "planning": "Planejamento",
+        "in_progress": "Em Progresso",
+        "done": "Concluído"
+      },
+      "modal": {
+        "createTask": "Criar Tarefa",
+        "editTask": "Editar Tarefa",
+        "title": "Título *",
+        "titlePlaceholder": "Título da tarefa",
+        "description": "Descrição",
+        "descriptionPlaceholder": "Descrição da tarefa",
+        "column": "Coluna",
+        "save": "Salvar",
+        "create": "Criar"
+      },
+      "wip": {
+        "limit": "Limite WIP",
+        "exceeded": "Limite WIP Excedido",
+        "setLimit": "Definir Limite WIP",
+        "removeLimit": "Remover Limite WIP"
+      },
+      "activity": {
+        "title": "Atividade",
+        "history": "Histórico da Tarefa",
+        "comments": "Comentários",
+        "attachments": "Anexos",
+        "timeSpent": "Tempo Gasto"
+      },
+      "limits": {
+        "title": "Limites da Coluna",
+        "planningLimit": "Limite de Planning",
+        "inProgressLimit": "Limite de In Progress",
+        "setLimit": "Definir limite",
+        "current": "Atual",
+        "max": "Máximo",
+        "unlimited": "Ilimitado",
+        "limitReached": "Limite da coluna atingido",
+        "limitReachedMessage": "Esta coluna atingiu o máximo de {limit} tarefas.",
+        "save": "Salvar",
+        "cancel": "Cancelar"
+      }
+}

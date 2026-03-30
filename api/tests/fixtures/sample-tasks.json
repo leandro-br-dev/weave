@@ -1,0 +1,74 @@
+[
+  {
+    "id": "task-1",
+    "project_id": "project-1",
+    "title": "Design database schema",
+    "description": "Create normalized database schema with proper relationships and indexes",
+    "column": "planning",
+    "priority": 5,
+    "order_index": 0
+  },
+  {
+    "id": "task-2",
+    "project_id": "project-1",
+    "title": "Implement user registration",
+    "description": "Build user registration endpoint with validation and email verification",
+    "column": "backlog",
+    "priority": 4,
+    "order_index": 1
+  },
+  {
+    "id": "task-3",
+    "project_id": "project-1",
+    "title": "Setup authentication middleware",
+    "description": "Create JWT-based authentication middleware for protected routes",
+    "column": "in_progress",
+    "priority": 5,
+    "order_index": 2
+  },
+  {
+    "id": "task-4",
+    "project_id": "project-1",
+    "title": "Build shopping cart API",
+    "description": "Implement shopping cart CRUD operations with session management",
+    "column": "backlog",
+    "priority": 3,
+    "order_index": 3
+  },
+  {
+    "id": "task-5",
+    "project_id": "project-2",
+    "title": "Setup project structure",
+    "description": "Initialize project with proper folder structure and configuration",
+    "column": "done",
+    "priority": 5,
+    "order_index": 0
+  },
+  {
+    "id": "task-6",
+    "project_id": "project-2",
+    "title": "Implement real-time updates",
+    "description": "Add WebSocket support for real-time task updates",
+    "column": "backlog",
+    "priority": 4,
+    "order_index": 1
+  },
+  {
+    "id": "task-7",
+    "project_id": "project-3",
+    "title": "Setup API gateway",
+    "description": "Configure API gateway with routing and load balancing",
+    "column": "in_progress",
+    "priority": 5,
+    "order_index": 0
+  },
+  {
+    "id": "task-8",
+    "project_id": "project-3",
+    "title": "Implement rate limiting",
+    "description": "Add rate limiting middleware to prevent API abuse",
+    "column": "backlog",
+    "priority": 4,
+    "order_index": 1
+  }
+]

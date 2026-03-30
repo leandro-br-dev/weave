@@ -1,0 +1,85 @@
+{
+      "title": "Fluxos de Trabalho",
+      "description": "Gerencie e automatize seus fluxos de trabalho",
+      "filters": {
+        "all": "Todos",
+        "pending": "Pendente",
+        "running": "Em Execução",
+        "success": "Sucesso",
+        "failed": "Falhou",
+        "allProjects": "Todos os Projetos"
+      },
+      "empty": {
+        "noWorkflows": "Nenhum fluxo de trabalho ainda",
+        "noStatusWorkflows": "Nenhum fluxo de trabalho {{status}}",
+        "tryClearingFilter": "Tente limpar o filtro",
+        "createFirst": "Crie seu primeiro fluxo de trabalho para começar"
+      },
+      "list": {
+        "title": "Fluxos de Trabalho",
+        "empty": "Nenhum fluxo de trabalho encontrado",
+        "createNew": "Criar Novo Fluxo de Trabalho",
+        "searchPlaceholder": "Buscar fluxos de trabalho...",
+        "filter": {
+          "status": "Filtrar por Status",
+          "type": "Filtrar por Tipo"
+        },
+        "table": {
+          "name": "Nome do Fluxo",
+          "status": "Status",
+          "lastRun": "Última Execução",
+          "nextRun": "Próxima Execução",
+          "actions": "Ações",
+          "trigger": "Gatilho",
+          "schedule": "Agendamento"
+        }
+      },
+      "header": {
+        "import": "Importar",
+        "importing": "Importando...",
+        "newWorkflow": "Novo Fluxo",
+        "new": "Novo"
+      },
+      "create": {
+        "title": "Criar Fluxo de Trabalho",
+        "name": "Nome do Fluxo",
+        "description": "Descrição",
+        "trigger": "Gatilho",
+        "schedule": "Agendamento",
+        "actions": "Ações",
+        "addAction": "Adicionar Ação",
+        "save": "Criar Fluxo",
+        "cancel": "Cancelar"
+      },
+      "edit": {
+        "title": "Editar Fluxo de Trabalho",
+        "save": "Atualizar Fluxo",
+        "cancel": "Cancelar"
+      },
+      "delete": {
+        "title": "Excluir Fluxo de Trabalho",
+        "confirm": "Tem certeza de que deseja excluir o fluxo \"{{name}}\"? Esta ação não pode ser desfeita.",
+        "success": "Fluxo de trabalho excluído com sucesso"
+      },
+      "execute": {
+        "title": "Executar Fluxo de Trabalho",
+        "manual": "Executar Agora",
+        "schedule": "Agendar Execução",
+        "success": "Fluxo de trabalho executado com sucesso",
+        "failed": "Falha na execução do fluxo de trabalho"
+      },
+      "history": {
+        "title": "Histórico de Execuções",
+        "date": "Data",
+        "status": "Status",
+        "duration": "Duração",
+        "logs": "Ver Logs"
+      },
+      "status": {
+        "active": "Ativo",
+        "inactive": "Inativo",
+        "paused": "Pausado",
+        "completed": "Concluído",
+        "failed": "Falhou"
+  }
+}

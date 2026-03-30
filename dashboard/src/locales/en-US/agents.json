@@ -1,0 +1,157 @@
+{
+      "title": "Agents",
+      "description": "Manage your AI agent workspaces and configurations",
+      "filters": {
+        "allProjects": "All Projects"
+      },
+      "form": {
+        "title": "Title",
+        "description": "Description"
+      },
+      "list": {
+        "title": "Agents",
+        "empty": "No agents found",
+        "createNew": "Create New Agent",
+        "searchPlaceholder": "Search agents...",
+        "filter": {
+          "status": "Filter by Status",
+          "type": "Filter by Type"
+        }
+      },
+      "create": {
+        "title": "Create Agent",
+        "name": "Agent Name",
+        "description": "Description",
+        "type": "Agent Type",
+        "model": "AI Model",
+        "systemPrompt": "System Prompt",
+        "temperature": "Temperature",
+        "maxTokens": "Max Tokens",
+        "tools": "Tools",
+        "capabilities": "Capabilities",
+        "save": "Create Agent",
+        "cancel": "Cancel"
+      },
+      "edit": {
+        "title": "Edit Agent",
+        "save": "Update Agent",
+        "cancel": "Cancel"
+      },
+      "delete": {
+        "title": "Delete Agent",
+        "confirm": "Are you sure you want to delete agent \"{{name}}\"? This action cannot be undone.",
+        "success": "Agent deleted successfully"
+      },
+      "configure": {
+        "title": "Configure Agent",
+        "general": "General Settings",
+        "behavior": "Behavior Settings",
+        "tools": "Tools & Integrations",
+        "advanced": "Advanced Settings"
+      },
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "busy": "Busy",
+        "maintenance": "Maintenance"
+      },
+      "type": {
+        "assistant": "Assistant",
+        "analyst": "Analyst",
+        "automation": "Automation",
+        "custom": "Custom"
+      },
+      "header": {
+        "generateAgent": "Generate Agent",
+        "generate": "Generate",
+        "generating": "Generating...",
+        "newAgent": "New Agent",
+        "new": "New"
+      },
+      "table": {
+        "agentName": "Agent Name",
+        "project": "Project",
+        "role": "Role",
+        "model": "Model",
+        "noProject": "No project",
+        "view": "View"
+      },
+      "showing": {
+        "fromProject": "Showing {{count}} agent{{plural}} from {{project}}",
+        "fromAll": "Showing {{count}} agent{{plural}} from all projects"
+      },
+      "tabs": {
+        "claudeMd": "CLAUDE.md",
+        "settings": "Settings",
+        "skills": "Skills",
+        "agents": "Agents",
+        "environments": "Environments"
+      },
+      "claudeMd": {
+        "improveWithAi": "Improve with AI",
+        "improving": "Improving..."
+      },
+      "settingsTab": {
+        "environmentVariables": "Environment Variables",
+        "addEnvVar": "Add Env Var",
+        "permissions": "Permissions",
+        "allow": "Allow",
+        "denyRules": "Deny Rules",
+        "denyPlaceholder": "Deny rules (one per line)",
+        "additionalDirectories": "Additional Directories",
+        "addDirectory": "Add Directory",
+        "saveSettings": "Save Settings"
+      },
+      "skillsTab": {
+        "title": "Skills ({{count}})",
+        "importMd": "Import .md / .txt",
+        "newSkill": "New Skill",
+        "nativeSkills": "Native Skills",
+        "installed": "Installed",
+        "installing": "Installing...",
+        "add": "Add",
+        "noNativeSkills": "No native skills available",
+        "customSkills": "Custom Skills",
+        "noCustomSkills": "No custom skills installed",
+        "deleteTitle": "Delete Skill",
+        "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+      },
+      "agentsTab": {
+        "title": "Sub-Agents ({{count}})",
+        "newAgent": "New Agent",
+        "nativeAgents": "Native Agents",
+        "installed": "Installed",
+        "installing": "Installing...",
+        "add": "Add",
+        "noNativeAgents": "No native agents available",
+        "customSubAgents": "Custom Sub-Agents",
+        "noSubAgents": "No sub-agents configured",
+        "saving": "Saving...",
+        "save": "Save",
+        "cancel": "Cancel",
+        "name": "Name",
+        "content": "Content",
+        "editAgent": "Edit agent",
+        "deleteAgent": "Delete agent"
+      },
+      "environmentsTab": {
+        "loading": "Loading environments...",
+        "linkedEnvironments": "Linked Environments",
+        "linkDescription": "Link environments to auto-populate additionalDirectories in settings.local.json",
+        "linkEnvironment": "Link Environment",
+        "noEnvironmentsLinked": "No environments linked",
+        "noEnvironmentsLinkedDesc": "Link an environment to automatically add its project_path to the agent's additionalDirectories permissions.",
+        "unlinkEnvironment": "Unlink environment",
+        "linkModalTitle": "Link Environment",
+        "linkModalProjectDesc": "Select an environment from this agent's project. Its project_path will be automatically added to additionalDirectories.",
+        "linkModalAllDesc": "Select an environment to link to this agent. Its project_path will be automatically added to additionalDirectories.",
+        "noEnvironmentsForProject": "No environments found for this project.",
+        "createInProjects": "Create one in Projects",
+        "noAvailableEnvironments": "No available environments to link. All environments are already linked to this agent.",
+        "environmentLabel": "Environment",
+        "environmentAllLabel": "Environment (all projects)",
+        "selectEnvironment": "Select an environment...",
+        "cancel": "Cancel",
+        "link": "Link"
+      }
+}

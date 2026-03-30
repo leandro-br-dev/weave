@@ -1,0 +1,132 @@
+{
+      "title": "Kanban Board",
+      "description": "Manage your project tasks",
+      "empty": {
+        "title": "No projects found",
+        "description": "Create a project first to use the kanban board"
+      },
+      "board": {
+        "title": "Kanban Board",
+        "createBoard": "Create Board",
+        "selectBoard": "Select Board",
+        "settings": "Board Settings",
+        "share": "Share Board",
+        "export": "Export Board"
+      },
+      "column": {
+        "title": "Column Title",
+        "addColumn": "Add Column",
+        "editColumn": "Edit Column",
+        "deleteColumn": "Delete Column",
+        "moveLeft": "Move Left",
+        "moveRight": "Move Right",
+        "setWIP": "Set WIP Limit"
+      },
+      "task": {
+        "title": "Task Title",
+        "description": "Description",
+        "assignee": "Assignee",
+        "priority": "Priority",
+        "dueDate": "Due Date",
+        "tags": "Tags",
+        "attachments": "Attachments",
+        "comments": "Comments",
+        "addTask": "Add Task",
+        "add": "Add",
+        "editTask": "Edit Task",
+        "deleteTask": "Delete Task",
+        "moveTask": "Move Task",
+        "copyTask": "Copy Task",
+        "deleteConfirmTitle": "Delete task?",
+        "deleteConfirmDescription": "This action cannot be undone."
+      },
+      "noTasks": {
+        "title": "No tasks yet",
+        "description": "Create your first task to get started",
+        "addTask": "Add Task"
+      },
+      "autoMove": "Auto-move",
+      "autoApprove": "Auto-approve",
+      "autoMoveFailed": "Auto-move failed",
+      "autoMovedTasks": "Auto-moved {{count}} task",
+      "autoMovedTasks_other": "Auto-moved {{count}} tasks",
+      "autoMovedTasksDescription": "Tasks have been moved based on their status",
+      "allProjectsPlaceholder": "All projects",
+      "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "archive": "Archive",
+        "restore": "Restore",
+        "duplicate": "Duplicate",
+        "bulkActions": "Bulk Actions",
+        "selectMultiple": "Select Multiple"
+      },
+      "filters": {
+        "allProjects": "All Projects",
+        "assignee": "Filter by Assignee",
+        "priority": "Filter by Priority",
+        "dueDate": "Filter by Due Date",
+        "tags": "Filter by Tags",
+        "search": "Search tasks...",
+        "clearFilters": "Clear Filters"
+      },
+      "views": {
+        "board": "Board View",
+        "list": "List View",
+        "timeline": "Timeline View",
+        "calendar": "Calendar View"
+      },
+      "priority": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "urgent": "Urgent",
+        "critical": "Critical",
+        "minimal": "Minimal"
+      },
+      "columns": {
+        "templates": "Templates",
+        "backlog": "Backlog",
+        "planning": "Planning",
+        "in_progress": "In Progress",
+        "done": "Done"
+      },
+      "modal": {
+        "createTask": "Create Task",
+        "editTask": "Edit Task",
+        "title": "Title *",
+        "titlePlaceholder": "Task title",
+        "description": "Description",
+        "descriptionPlaceholder": "Task description",
+        "column": "Column",
+        "save": "Save",
+        "create": "Create"
+      },
+      "wip": {
+        "limit": "WIP Limit",
+        "exceeded": "WIP Limit Exceeded",
+        "setLimit": "Set WIP Limit",
+        "removeLimit": "Remove WIP Limit"
+      },
+      "activity": {
+        "title": "Activity",
+        "history": "Task History",
+        "comments": "Comments",
+        "attachments": "Attachments",
+        "timeSpent": "Time Spent"
+      },
+      "limits": {
+        "title": "Column Limits",
+        "planningLimit": "Planning limit",
+        "inProgressLimit": "In Progress limit",
+        "setLimit": "Set limit",
+        "current": "Current",
+        "max": "Max",
+        "unlimited": "Unlimited",
+        "limitReached": "Column limit reached",
+        "limitReachedMessage": "This column has reached its maximum of {limit} tasks.",
+        "save": "Save",
+        "cancel": "Cancel"
+      }
+}

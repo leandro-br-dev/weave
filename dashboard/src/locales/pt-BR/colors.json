@@ -1,0 +1,21 @@
+{
+  "colors": {
+    "title": "Cores",
+    "selectPlaceholder": "Selecione uma cor...",
+    "noSelection": "Nenhuma cor selecionada",
+    "ariaLabel": "Seleção de cor",
+    "blue": "Azul",
+    "green": "Verde",
+    "purple": "Roxo",
+    "pink": "Rosa",
+    "indigo": "Índigo",
+    "teal": "Ciano-esverdeado",
+    "orange": "Laranja",
+    "red": "Vermelho",
+    "cyan": "Ciano",
+    "emerald": "Esmeralda",
+    "amber": "Âmbar",
+    "lime": "Limão",
+    "default": "Padrão"
+  }
+}

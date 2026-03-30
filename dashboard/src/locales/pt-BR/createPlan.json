@@ -1,0 +1,59 @@
+{
+  "validation": {
+    "planNameRequired": "Nome do plano é obrigatório",
+    "taskNameRequired": "Nome da tarefa é obrigatório",
+    "taskPromptRequired": "Prompt da tarefa é obrigatório",
+    "workingDirectoryRequired": "Diretório de trabalho é obrigatório",
+    "agentWorkspaceRequired": "Workspace do agente é obrigatório"
+  },
+  "backToPlans": "Voltar aos Planos",
+  "plans": "Planos",
+  "title": "Criar Plano",
+  "project": {
+    "label": "Projeto",
+    "selectPlaceholder": "Selecione um projeto...",
+    "noProjects": "Nenhum projeto disponível",
+    "createProjectLink": "Criar um projeto"
+  },
+  "planName": {
+    "label": "Nome do Plano",
+    "placeholder": "Digite o nome do plano"
+  },
+  "tasks": {
+    "label": "Tarefas",
+    "addTask": "Adicionar Tarefa",
+    "remove": "Remover",
+    "taskNumber": "Tarefa {{number}}",
+    "selectProjectHint": "Selecione um projeto primeiro para carregar os agentes disponíveis",
+    "taskName": {
+      "label": "Nome da Tarefa",
+      "placeholder": "Digite o nome da tarefa"
+    },
+    "prompt": {
+      "label": "Prompt",
+      "placeholder": "Descreva a tarefa..."
+    },
+    "agent": {
+      "label": "Agente",
+      "selectPlaceholder": "Selecione um agente...",
+      "selectProjectFirst": "Selecione um projeto primeiro",
+      "noAgents": "Nenhum agente disponível",
+      "createWorkspaceLink": "Criar um workspace"
+    },
+    "environment": {
+      "label": "Ambiente",
+      "defaultOption": "Padrão",
+      "noEnvironments": "Nenhum ambiente disponível",
+      "manageProjectsLink": "Gerenciar projetos"
+    },
+    "workingDirectory": {
+      "label": "Diretório de Trabalho",
+      "placeholder": "/caminho/para/projeto"
+    }
+  },
+  "actions": {
+    "cancel": "Cancelar",
+    "creating": "Criando...",
+    "createPlan": "Criar Plano"
+  }
+}

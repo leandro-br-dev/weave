@@ -1,0 +1,182 @@
+import { useState } from 'react'
+import { X, Bot, Map, Sparkles } from 'lucide-react'
+import { Button } from '@/components'
+import { useCreateDefaultAgents } from '@/api/projects'
+import { useTranslation } from 'react-i18next'
+
+interface DefaultAgentsModalProps {
+  isOpen: boolean
+  onClose: () => void
+  projectId: string
+  environmentId: string
+  projectName: string
+  environmentName: string
+}
+
+export function DefaultAgentsModal({
+  isOpen,
+  onClose,
+  projectId,
+  environmentId,
+  projectName,
+  environmentName,
+}: DefaultAgentsModalProps) {
+  const { t } = useTranslation()
+  const createDefaultAgents = useCreateDefaultAgents()
+
+  const [createCoder, setCreateCoder] = useState(true)
+  const [createPlanner, setCreatePlanner] = useState(true)
+
+  if (!isOpen) return null
+
+  const handleCreate = async () => {
+    if (!createCoder && !createPlanner) return
+
+    try {
+      await createDefaultAgents.mutateAsync({
+        projectId,
+        environmentId,
+        create_coder: createCoder,
+        create_planner: createPlanner,
+      })
+      onClose()
+    } catch {
+      // Error handled by mutation state
+    }
+  }
+
+  const handleSkip = () => {
+    onClose()
+  }
+
+  const atLeastOneSelected = createCoder || createPlanner
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={handleSkip} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-full max-w-lg mx-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+              {t('pages.projects.defaultAgents.title')}
+            </span>
+          </div>
+          <button onClick={handleSkip} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+            {t('pages.projects.defaultAgents.description')}
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+            {projectName} / {environmentName}
+          </p>
+
+          <div className="space-y-3">
+            {/* Coder Agent Checkbox */}
+            <label
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                createCoder
+                  ? 'border-blue-300 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={createCoder}
+                onChange={(e) => setCreateCoder(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className="flex-shrink-0 p-1.5 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                  <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {t('pages.projects.defaultAgents.coder.label')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {t('pages.projects.defaultAgents.coder.description')}
+                  </p>
+                </div>
+              </div>
+            </label>
+
+            {/* Planner Agent Checkbox */}
+            <label
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                createPlanner
+                  ? 'border-amber-300 bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={createPlanner}
+                onChange={(e) => setCreatePlanner(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              />
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className="flex-shrink-0 p-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
+                  <Map className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {t('pages.projects.defaultAgents.planner.label')}
+                    </span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                      {t('pages.projects.defaultAgents.requiredBadge')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {t('pages.projects.defaultAgents.planner.description')}
+                  </p>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {/* Error message */}
+          {createDefaultAgents.isError && (
+            <div className="mt-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <p className="text-xs text-red-700 dark:text-red-400">
+                {t('pages.projects.defaultAgents.error')}: {(createDefaultAgents.error as Error)?.message}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkip}
+            disabled={createDefaultAgents.isPending}
+          >
+            {t('pages.projects.defaultAgents.skip')}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleCreate}
+            disabled={!atLeastOneSelected || createDefaultAgents.isPending}
+            loading={createDefaultAgents.isPending}
+          >
+            {createDefaultAgents.isPending
+              ? t('pages.projects.defaultAgents.creating')
+              : t('pages.projects.defaultAgents.create')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

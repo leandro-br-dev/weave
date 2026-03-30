@@ -1,0 +1,26 @@
+{
+  "status": {
+    "pending": "Pending",
+    "running": "Running",
+    "success": "Success",
+    "failed": "Failed",
+    "timeout": "Timeout",
+    "approved": "Approved",
+    "denied": "Denied",
+    "awaitingApproval": "Awaiting Approval",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "processing": "Processing...",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Information",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "inProgress": "In Progress",
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived",
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}

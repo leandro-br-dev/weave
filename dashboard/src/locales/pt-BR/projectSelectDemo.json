@@ -1,0 +1,51 @@
+{
+  "title": "Demonstração de Seleção de Projeto",
+  "description": "Demonstração dos recursos do componente ProjectSelect",
+  "basicUsage": {
+    "title": "Uso Básico",
+    "description": "Seleção simples de projeto",
+    "label": "Projeto",
+    "placeholder": "Selecione um projeto..."
+  },
+  "selected": "Selecionado",
+  "filterMode": {
+    "title": "Modo de Filtro",
+    "description": "Filtrar projetos por ambiente",
+    "label": "Projeto",
+    "placeholder": "Selecione um projeto...",
+    "allOptionLabel": "Todos os Projetos"
+  },
+  "filteringBy": "Filtrando por {{filter}}",
+  "requiredField": {
+    "title": "Campo Obrigatório",
+    "description": "A seleção de projeto é obrigatória",
+    "label": "Projeto *",
+    "placeholder": "Selecione um projeto..."
+  },
+  "errorState": {
+    "title": "Estado de Erro",
+    "description": "Tratando erros com elegância",
+    "label": "Projeto",
+    "placeholder": "Selecione um projeto...",
+    "errorMessage": "Falha ao carregar projetos"
+  },
+  "disabledState": {
+    "title": "Estado Desabilitado",
+    "description": "Componente quando desabilitado",
+    "label": "Projeto"
+  },
+  "features": {
+    "title": "Recursos",
+    "icon": "Ícone",
+    "description": "Descrição",
+    "checkmark": "Marca de Verificação",
+    "keyboard": "Navegação por Teclado",
+    "accessible": "Acessível",
+    "allOption": "Opção Todos",
+    "validation": "Validação",
+    "states": "Múltiplos Estados"
+  },
+  "usageExample": {
+    "title": "Exemplo de Uso"
+  }
+}

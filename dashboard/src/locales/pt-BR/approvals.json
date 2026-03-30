@@ -1,0 +1,82 @@
+{
+      "title": "Aprovações",
+      "description": "Revise e aprove solicitações pendentes",
+      "pendingApproval": "{{count}} aprovação pendente",
+      "pendingApprovals": "{{count}} aprovações pendentes",
+      "noPending": "Nenhuma aprovação pendente",
+      "noPendingDesc": "Não há aprovações pendentes neste momento",
+      "agentPauseDescription": "O agente fará uma pausa aqui quando precisar de permissão",
+      "pendingCount": "{{count}} pendente(s)",
+      "loading": "Carregando aprovações...",
+      "workflowApprovals": "Aprovações de Fluxo de Trabalho",
+      "tasks": "Tarefas",
+      "created": "Criado",
+      "approvals": "Aprovações",
+      "review": "Revisar",
+      "approve": "Aprovar",
+      "deny": "Negar",
+      "toolUseApprovals": "Aprovações de Uso de Ferramenta",
+      "ago": "atrás",
+      "plan": "Plano",
+      "task": "Tarefa",
+      "list": {
+        "title": "Aprovações Pendentes",
+        "empty": "Nenhuma aprovação pendente",
+        "filter": {
+          "type": "Filtrar por Tipo",
+          "priority": "Filtrar por Prioridade",
+          "status": "Filtrar por Status"
+        },
+        "count": "{{count}} itens pendentes"
+      },
+      "workflowSection": "Aprovações de Fluxo de Trabalho",
+      "toolUseSection": "Aprovações de Uso de Ferramenta",
+      "request": {
+        "title": "Solicitação de Aprovação",
+        "type": "Tipo de Solicitação",
+        "requestedBy": "Solicitado Por",
+        "requestedAt": "Solicitado em",
+        "description": "Descrição",
+        "details": "Detalhes",
+        "approve": "Aprovar",
+        "reject": "Rejeitar",
+        "requestChanges": "Solicitar Alterações",
+        "comment": "Comentário"
+      },
+      "actions": {
+        "approve": "Aprovar",
+        "reject": "Rejeitar",
+        "deny": "Negar",
+        "review": "Revisar",
+        "approveAll": "Aprovar Tudo",
+        "rejectAll": "Rejeitar Tudo",
+        "viewDetails": "Ver Detalhes",
+        "addComment": "Adicionar Comentário"
+      },
+      "status": {
+        "pending": "Pendente",
+        "approved": "Aprovado",
+        "rejected": "Rejeitado",
+        "changesRequested": "Alterações Solicitadas"
+      },
+      "type": {
+        "workflow": "Execução de Fluxo",
+        "agent": "Ação de Agente",
+        "project": "Alteração de Projeto",
+        "deployment": "Implantação",
+        "access": "Solicitação de Acesso"
+      },
+      "priority": {
+        "low": "Baixa",
+        "medium": "Média",
+        "high": "Alta",
+        "urgent": "Urgente"
+      },
+      "history": {
+        "title": "Histórico de Aprovações",
+        "all": "Todas as Aprovações",
+        "approved": "Aprovados",
+        "rejected": "Rejeitados",
+        "dateRange": "Período"
+  }
+}

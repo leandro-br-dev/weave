@@ -1,0 +1,117 @@
+{
+      "title": "Projetos",
+      "description": "Gerencie seus projetos e seus ambientes de execu\u00e7\u00e3o",
+      "filters": {
+        "allProjects": "Todos os Projetos"
+      },
+      "list": {
+        "title": "Projetos",
+        "empty": "Nenhum projeto encontrado",
+        "createNew": "Criar Novo Projeto",
+        "searchPlaceholder": "Buscar projetos...",
+        "filter": {
+          "status": "Filtrar por Status",
+          "priority": "Filtrar por Prioridade"
+        },
+        "view": {
+          "grid": "Vis\u00e3o em Grade",
+          "list": "Vis\u00e3o em Lista"
+        }
+      },
+      "header": {
+        "newProject": "Novo Projeto",
+        "new": "Novo"
+      },
+      "empty": {
+        "title": "Nenhum projeto ainda",
+        "description": "Crie seu primeiro projeto para come\u00e7ar a gerenciar seus espa\u00e7os de trabalho",
+        "createProject": "Criar Projeto"
+      },
+      "form": {
+        "createTitle": "Criar Novo Projeto",
+        "projectName": "Nome do Projeto",
+        "projectNamePlaceholder": "ex:, CharHub",
+        "description": "Descri\u00e7\u00e3o",
+        "projectColor": "Cor do Projeto",
+        "projectColorHint": "Escolha uma cor para identificar visualmente este projeto",
+        "creating": "Criando...",
+        "createProject": "Criar Projeto"
+      },
+      "create": {
+        "title": "Criar Projeto",
+        "name": "Nome do Projeto",
+        "description": "Descri\u00e7\u00e3o",
+        "status": "Status",
+        "priority": "Prioridade",
+        "startDate": "Data de In\u00edcio",
+        "endDate": "Data de T\u00e9rmino",
+        "team": "Membros da Equipe",
+        "tags": "Tags",
+        "save": "Criar Projeto",
+        "cancel": "Cancelar"
+      },
+      "edit": {
+        "title": "Editar Projeto",
+        "save": "Atualizar Projeto",
+        "cancel": "Cancelar"
+      },
+      "delete": {
+        "title": "Excluir Projeto",
+        "confirm": "Tem certeza de que deseja excluir o projeto \"{{name}}\"? Esta a\u00e7\u00e3o n\u00e3o pode ser desfeita.",
+        "success": "Projeto exclu\u00eddo com sucesso"
+      },
+      "details": {
+        "title": "Detalhes do Projeto",
+        "overview": "Vis\u00e3o Geral",
+        "tasks": "Tarefas",
+        "team": "Equipe",
+        "activity": "Atividade",
+        "settings": "Configura\u00e7\u00f5es"
+      },
+      "defaultAgents": {
+        "title": "Criar Agentes Padr\u00e3o",
+        "description": "Voc\u00ea pode criar agentes padr\u00e3o para come\u00e7ar rapidamente. O agente planejador \u00e9 essencial para o funcionamento correto do pipeline.",
+        "coder": {
+          "label": "Agente Coder",
+          "description": "Implementa funcionalidades e corre\u00e7\u00f5es seguindo os padr\u00f5es do projeto"
+        },
+        "planner": {
+          "label": "Agente Planner",
+          "description": "Planeja e divide tarefas em workflows execut\u00e1veis. Necess\u00e1rio para opera\u00e7\u00f5es de pipeline."
+        },
+        "requiredBadge": "Recomendado",
+        "create": "Criar Selecionados",
+        "skip": "Pular",
+        "creating": "Criando agentes...",
+        "success": "Agentes criados com sucesso!",
+        "error": "Falha ao criar agentes"
+      },
+      "status": {
+        "planning": "Planejamento",
+        "active": "Ativo",
+        "onHold": "Em Espera",
+        "completed": "Conclu\u00eddo",
+        "archived": "Arquivado"
+      },
+      "priority": {
+        "low": "Baixa",
+        "medium": "M\u00e9dia",
+        "high": "Alta",
+        "urgent": "Urgente"
+      },
+      "environments": {
+        "title": "Ambientes",
+        "add": "Adicionar Ambiente",
+        "empty": "Nenhum ambiente ainda. Crie um para come\u00e7ar."
+      },
+      "agents": {
+        "title": "Agentes",
+        "empty": "Nenhum agente ainda. Use a p\u00e1gina de Agentes para criar agentes para este projeto.",
+        "view": "Ver"
+      },
+      "pipelineSettings": {
+        "title": "Configura\u00e7\u00f5es de Pipeline",
+        "autoApprove": "Aprovar workflows automaticamente",
+        "autoApproveDesc": "Planos gerados iniciam automaticamente"
+      }
+}
