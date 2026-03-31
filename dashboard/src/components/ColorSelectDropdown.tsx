@@ -72,7 +72,7 @@ export function ColorSelectDropdown({
               return (
                 <DropdownMenu.Item
                   key={hexColor}
-                  onSelect={(e) => {
+                  onSelect={(e: { preventDefault: () => void }) => {
                     e.preventDefault()
                     onChange(hexColor)
                   }}

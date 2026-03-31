@@ -7,7 +7,7 @@ import { BackupRestoreSection } from '@/components/BackupRestore';
 import { Tabs } from '@/components/Tabs';
 import { useGetEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable, useInitializeEnvironmentVariableDefaults, type EnvironmentVariable, type EnvironmentVariableInput } from '@/api/environmentVariables';
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Eye, EyeOff, Save, X, Globe, ExternalLink, AlertCircle, Languages, Settings, Link as LinkIcon, Server, GitBranch, Database } from 'lucide-react';
+import { Plus, Trash2, Edit2, Eye, EyeOff, Save, X, Globe, ExternalLink, AlertCircle, Languages, Settings, Link as LinkIcon, Server, GitBranch } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { ProjectSelectDropdown } from '@/components';

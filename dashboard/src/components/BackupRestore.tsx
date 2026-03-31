@@ -7,7 +7,6 @@ import { useToast } from '@/contexts/ToastContext'
 import {
   Download,
   Upload,
-  Info,
   AlertTriangle,
   CheckCircle2,
   Loader2,
@@ -25,7 +24,7 @@ export function BackupRestoreSection() {
   const { showSuccess, showError } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const { data: info, isLoading: infoLoading } = useBackupInfo()
+  const { data: info } = useBackupInfo()
   const exportMutation = useExportBackup()
   const importMutation = useImportBackup()
 

@@ -618,6 +618,9 @@ async def run_daemon(server_url: str, token: str) -> None:
     # Reconcile stuck plans on startup
     await reconcile_running_plans(client, running_plans)
 
+    # Track whether initial setup is still pending to avoid log spam
+    setup_pending_alerted = False
+
     try:
         while not shutdown_requested:
             # Clean up stale entries from running_plans set (plans older than 30 min)
@@ -635,46 +638,66 @@ async def run_daemon(server_url: str, token: str) -> None:
             response = client.get_pending_plans()
 
             if response.error:
-                logger.warn(f"Failed to fetch pending plans: {response.error}")
-            elif response.data and len(response.data) > 0:
-                # Process each pending plan
-                for plan_data in response.data:
-                    if shutdown_requested:
-                        break
+                error_msg = str(response.error)
+                if "Initial setup required" in error_msg or "SETUP_REQUIRED" in error_msg:
+                    if not setup_pending_alerted:
+                        logger.warning("⚠ Initial setup required. The daemon will wait until the first user is created via the dashboard.")
+                        setup_pending_alerted = True
+                    # Skip further polling and go straight to sleep
+                    if not shutdown_requested:
+                        await asyncio.sleep(5)
+                    continue
+                else:
+                    logger.warn(f"Failed to fetch pending plans: {response.error}")
+            else:
+                # Successful response (data may be null or empty) — setup is complete
+                if setup_pending_alerted:
+                    logger.info("✓ Initial setup detected as complete — resuming normal polling.")
+                    setup_pending_alerted = False
+                if response.data and len(response.data) > 0:
+                    # Process each pending plan
+                    for plan_data in response.data:
+                        if shutdown_requested:
+                            break
 
-                    plan_id = plan_data.get("id")
-                    if not plan_id:
-                        continue
+                        plan_id = plan_data.get("id")
+                        if not plan_id:
+                            continue
 
-                    # Skip if already processing this plan
-                    if plan_id in running_plans:
-                        logger.debug(f"Plan {plan_id} already running, skipping")
-                        continue
+                        # Skip if already processing this plan
+                        if plan_id in running_plans:
+                            logger.debug(f"Plan {plan_id} already running, skipping")
+                            continue
 
-                    # Mark as running and track start time
-                    running_plans.add(plan_id)
-                    running_plans_started[plan_id] = time.time()
-                    save_pending_plans(running_plans, running_plans_started)
+                        # Mark as running and track start time
+                        running_plans.add(plan_id)
+                        running_plans_started[plan_id] = time.time()
+                        save_pending_plans(running_plans, running_plans_started)
 
-                    # Create task to process plan asynchronously
-                    # Use default argument to capture current plan_data value (closure bug fix)
-                    async def _run_plan_wrapper(p=plan_data):
-                        try:
-                            await _run_plan(p, client, running_plans, running_plans_started)
-                        except Exception as e:
-                            logger.error(f"Plan execution task error: {e}")
-                            running_plans.discard(p.get('id'))
-                            running_plans_started.pop(p.get('id'), None)
+                        # Create task to process plan asynchronously
+                        # Use default argument to capture current plan_data value (closure bug fix)
+                        async def _run_plan_wrapper(p=plan_data):
+                            try:
+                                await _run_plan(p, client, running_plans, running_plans_started)
+                            except Exception as e:
+                                logger.error(f"Plan execution task error: {e}")
+                                running_plans.discard(p.get('id'))
+                                running_plans_started.pop(p.get('id'), None)
 
-                    task = asyncio.create_task(_run_plan_wrapper())
-                    background_tasks.add(task)
-                    task.add_done_callback(background_tasks.discard)
+                        task = asyncio.create_task(_run_plan_wrapper())
+                        background_tasks.add(task)
+                        task.add_done_callback(background_tasks.discard)
 
             # Poll for pending chat sessions
             sessions_response = client.get_pending_sessions()
 
             if sessions_response.error:
-                logger.warn(f"Failed to fetch pending sessions: {sessions_response.error}")
+                sessions_error_msg = str(sessions_response.error)
+                if "Initial setup required" in sessions_error_msg or "SETUP_REQUIRED" in sessions_error_msg:
+                    # Already warned above from plans poll, skip silently
+                    pass
+                else:
+                    logger.warn(f"Failed to fetch pending sessions: {sessions_response.error}")
             elif sessions_response.data and len(sessions_response.data) > 0:
                 # Process each pending session
                 for session_data in sessions_response.data:
