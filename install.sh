@@ -178,7 +178,8 @@ if [ "${CREATE_SHORTCUT,,}" != 'n' ]; then
       # Escape the install dir for use inside PowerShell string
       PS_INSTALL_DIR=$(echo "$INSTALL_DIR" | sed "s/'/\\'\\'/g")
 
-      powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
+      PS_OUTPUT=$(powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 \$ErrorActionPreference = 'Stop'
 try {
   \$desktop = [Environment]::GetFolderPath('Desktop')
@@ -188,21 +189,31 @@ try {
   \$shortcut.TargetPath = 'C:\Windows\System32\wsl.exe'
   \$shortcut.Arguments = '-d \"$WSL_DISTRO\" bash -c \"cd ''$PS_INSTALL_DIR'' && bash start.sh; exec bash\"'
   \$shortcut.Description = 'Weave'
-  \$shortcut.WorkingDirectory = \$desktop
+  \$shortcut.WorkingDirectory = 'C:\Windows\System32'
   \$shortcut.Save()
-  Write-Host \"OK: \$lnkPath\"
+  Write-Output \"OK: \$lnkPath\"
 } catch {
-  Write-Host \"FAIL: \$_\"
+  Write-Output \"FAIL: \$_\"
   exit 1
 }
-" 2>&1 | while IFS= read -r line; do
-        line=$(echo "$line" | tr -d '\r\0')
+" 2>&1)
+
+      # Check exit code from PowerShell
+      PS_EXIT=$?
+      PS_OUTPUT_CLEAN=$(echo "$PS_OUTPUT" | tr -d '\r\0')
+
+      echo "$PS_OUTPUT_CLEAN" | while IFS= read -r line; do
         case "$line" in
           OK:*)   ok "Desktop shortcut created: ${line#OK: }" ;;
           FAIL:*) warn "Shortcut creation failed: ${line#FAIL: }" ;;
           *)      [ -n "$line" ] && echo "  $line" ;;
         esac
       done
+
+      # If PowerShell exited with error and we got no OK line, report it
+      if [ $PS_EXIT -ne 0 ] && ! echo "$PS_OUTPUT_CLEAN" | grep -q '^OK:'; then
+        err "PowerShell exited with code $PS_EXIT"
+      fi
     else
       warn 'powershell.exe not found — cannot create Windows shortcut automatically.'
       warn "Create manually: Right-click Desktop → New Shortcut"

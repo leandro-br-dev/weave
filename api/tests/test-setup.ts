@@ -16,7 +16,7 @@ const PROD_DB_PATH = path.join(process.cwd(), 'data', 'database.db')
 // Set test environment
 process.env.NODE_ENV = 'test'
 process.env.TEST_DB_PATH = TEST_DB_PATH
-process.env.AGENTS_MANAGER_TOKEN = 'test-token-for-testing-only'
+process.env.WEAVE_TOKEN = 'test-token-for-testing-only'
 
 /**
  * Setup test database before all tests

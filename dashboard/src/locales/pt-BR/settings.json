@@ -165,12 +165,6 @@
     "managedDescription": "O daemon agora é controlado através da interface acima.",
     "manualStart": "Se precisar iniciar manualmente para debug, o script está em: {scriptPath}"
   },
-  "workspaces": {
-    "title": "Espaços de Trabalho",
-    "basePath": "Caminho base",
-    "basePathValue": "Variável de ambiente AGENT_CLIENT_PATH",
-    "description": "Defina AGENT_CLIENT_PATH no .env da API para apontar para o diretório de projetos. Padrão: /root/projects/agent-client/projects"
-  },
   "workflowLimits": {
     "title": "Limites de Workflows",
     "description": "Configure o número máximo de workflows que podem executar simultaneamente. Estes limites se aplicam por projeto.",
@@ -183,5 +177,43 @@
     "save": "Salvar limites",
     "saved": "Limites atualizados com sucesso",
     "selectProject": "Selecione um projeto"
+  },
+  "backup": {
+    "title": "Backup & Restauração",
+    "description": "Exporte e importe todos os dados do seu Weave",
+    "exportTitle": "Exportar Backup",
+    "exportDescription": "Baixe um backup completo de todos os projetos, agentes, quadros kanban, histórico de chat e configurações como arquivo JSON.",
+    "exportButton": "Baixar Backup",
+    "exportSuccess": "Backup baixado com sucesso!",
+    "exportError": "Falha ao exportar backup",
+    "importTitle": "Importar Backup",
+    "importDescription": "Restaure dados de um backup previamente exportado do Weave. Novos IDs serão gerados para evitar conflitos.",
+    "importButton": "Selecionar Arquivo de Backup",
+    "importSuccess": "Importação concluída! {{projects}} projetos e {{agents}} agentes restaurados.",
+    "importError": "Falha ao importar backup",
+    "importing": "Importando...",
+    "importResultTitle": "Importação concluída com sucesso",
+    "invalidFile": "Arquivo de backup inválido: faltando versão ou data de exportação",
+    "invalidJson": "Arquivo JSON inválido",
+    "confirmImportTitle": "Confirmar Importação",
+    "confirmImportMessage": "Isso adicionará todos os dados do backup ao seu ambiente atual. Dados existentes não serão sobrescritos.",
+    "confirmWarning": "Nota: Projetos duplicados com os mesmos dados podem ser criados. Workflows em execução não serão afetados.",
+    "confirmImport": "Restaurar Backup",
+    "cancel": "Cancelar",
+    "version": "Versão",
+    "exportedAt": "Exportado em",
+    "backupFrom": "Backup de: {{date}}",
+    "infoItems": {
+      "projects": "Projetos",
+      "environments": "Ambientes",
+      "agents": "Agentes",
+      "kanbanTasks": "Tarefas Kanban",
+      "plans": "Planos/Workflows",
+      "chatSessions": "Sessões de Chat",
+      "chatMessages": "Mensagens de Chat",
+      "envVars": "Variáveis de Ambiente",
+      "templates": "Templates",
+      "approvals": "Aprovações"
+    }
   }
 }

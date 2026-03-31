@@ -44,7 +44,6 @@ services:
       - PORT=3001
       - DATABASE_URL=/data/test-database.db
       - API_BEARER_TOKEN=test-token-for-testing-only
-      - AGENT_CLIENT_PATH=/tmp/test-agent-client
     ports:
       - "3001:3001"
     depends_on:

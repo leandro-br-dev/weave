@@ -1,5 +1,5 @@
 #!/bin/bash
-# Agents Manager — Updater
+# Weave — Updater
 set -e
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,7 @@ info() { echo -e "${CYAN}  → $*${NC}"; }
 
 echo ''
 echo '████████████████████████████████████████'
-echo '  Agents Manager — Updater'
+echo '  Weave — Updater'
 echo '████████████████████████████████████████'
 echo ''
 

@@ -27,6 +27,17 @@ export default defineConfig((_config) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        '@radix-ui/react-dropdown-menu',
+        '@radix-ui/react-context',
+        '@radix-ui/react-dialog',
+        '@radix-ui/react-select',
+      ],
     },
     build: {
       // Remove all console methods in production using Terser

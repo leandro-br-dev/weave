@@ -3,10 +3,11 @@ import { apiFetch, getApiUrl } from '@/api/client';
 import { PageHeader, Button, Card, Input } from '@/components';
 import { ThemeSelector } from '@/components/ThemeSelector';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { BackupRestoreSection } from '@/components/BackupRestore';
 import { Tabs } from '@/components/Tabs';
 import { useGetEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable, useInitializeEnvironmentVariableDefaults, type EnvironmentVariable, type EnvironmentVariableInput } from '@/api/environmentVariables';
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, Eye, EyeOff, Save, X, Globe, ExternalLink, AlertCircle, Languages, Settings, Link as LinkIcon, Server, GitBranch } from 'lucide-react';
+import { Plus, Trash2, Edit2, Eye, EyeOff, Save, X, Globe, ExternalLink, AlertCircle, Languages, Settings, Link as LinkIcon, Server, GitBranch, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { ProjectSelectDropdown } from '@/components';
@@ -651,7 +652,6 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <LanguageSection />
           <AppearanceSection />
-          <WorkspacesSection />
           <WorkflowLimitsSection />
         </div>
       )
@@ -676,6 +676,7 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <DaemonSection daemon={daemon} startDaemon={startDaemon} stopDaemon={stopDaemon} />
           <ClientSection />
+          <BackupRestoreSection />
         </div>
       )
     }
@@ -690,27 +691,6 @@ export default function SettingsPage() {
 
       <Tabs tabs={tabsConfig} defaultTab="general" />
     </div>
-  );
-}
-
-// Workspaces Section
-function WorkspacesSection() {
-  const { t } = useTranslation();
-  return (
-    <section>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.workspaces.title')}</h2>
-      <Card className="bg-gray-50 dark:bg-gray-900">
-        <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{t('pages.settings.workspaces.basePath')}</span>
-          <code className="text-xs sm:text-sm font-mono text-gray-900 dark:text-white">
-            {t('pages.settings.workspaces.basePathValue')}
-          </code>
-        </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 whitespace-pre-line">
-          {t('pages.settings.workspaces.description')}
-        </p>
-      </Card>
-    </section>
   );
 }
 

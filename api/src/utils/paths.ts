@@ -34,12 +34,12 @@ export function getProjectsDir(appEnv?: string): string {
 
 /**
  * Base path for agent workspaces.
- * Priority: DATA_DIR env > AGENTS_BASE_PATH env > AGENT_CLIENT_PATH env > default
+ * Priority: DATA_DIR env > AGENTS_BASE_PATH env > default
  */
 export const AGENTS_BASE_PATH = (() => {
   const dataDir = process.env.DATA_DIR
   if (dataDir) return path.join(dataDir, 'projects')
-  const envPath = process.env.AGENTS_BASE_PATH || process.env.AGENT_CLIENT_PATH
+  const envPath = process.env.AGENTS_BASE_PATH
   if (envPath) {
     // Expand ~ if present
     return envPath.startsWith('~') ? path.join(os.homedir(), envPath.slice(1)) : envPath

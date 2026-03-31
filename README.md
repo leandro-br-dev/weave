@@ -100,8 +100,8 @@ Agent workspaces live outside the repository in the user's home directory:
 ## Quick Start
 
 **WSL / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/leandro-br-dev/weave/main/install.sh | bash
+```
+bash curl -fsSL https://raw.githubusercontent.com/leandro-br-dev/weave/main/install.sh | bash
 ```
 
 **Windows** (requires WSL):

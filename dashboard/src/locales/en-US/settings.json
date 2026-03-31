@@ -165,12 +165,6 @@
     "managedDescription": "The daemon is now controlled through the interface above.",
     "manualStart": "If you need to start manually for debugging, the script is at: {scriptPath}"
   },
-  "workspaces": {
-    "title": "Workspaces",
-    "basePath": "Base path",
-    "basePathValue": "AGENT_CLIENT_PATH environment variable",
-    "description": "Set AGENT_CLIENT_PATH in the API .env to point to the projects directory. Default: /root/projects/agent-client/projects"
-  },
   "workflowLimits": {
     "title": "Workflow Limits",
     "description": "Configure the maximum number of workflows that can run simultaneously. These limits apply per project.",
@@ -183,5 +177,43 @@
     "save": "Save limits",
     "saved": "Limits updated successfully",
     "selectProject": "Select a project"
+  },
+  "backup": {
+    "title": "Backup & Restore",
+    "description": "Export and import all your Weave data",
+    "exportTitle": "Export Backup",
+    "exportDescription": "Download a complete backup of all projects, agents, kanban boards, chat history, and settings as a JSON file.",
+    "exportButton": "Download Backup",
+    "exportSuccess": "Backup downloaded successfully!",
+    "exportError": "Failed to export backup",
+    "importTitle": "Import Backup",
+    "importDescription": "Restore data from a previously exported Weave backup file. New IDs will be generated to avoid conflicts.",
+    "importButton": "Select Backup File",
+    "importSuccess": "Import completed! {{projects}} projects and {{agents}} agents restored.",
+    "importError": "Failed to import backup",
+    "importing": "Importing...",
+    "importResultTitle": "Import completed successfully",
+    "invalidFile": "Invalid backup file: missing version or export date",
+    "invalidJson": "Invalid JSON file",
+    "confirmImportTitle": "Confirm Import",
+    "confirmImportMessage": "This will add all data from the backup to your current environment. Existing data will not be overwritten.",
+    "confirmWarning": "Note: Duplicate projects with the same data may be created. Running workflows will not be affected.",
+    "confirmImport": "Restore Backup",
+    "cancel": "Cancel",
+    "version": "Version",
+    "exportedAt": "Exported at",
+    "backupFrom": "Backup from: {{date}}",
+    "infoItems": {
+      "projects": "Projects",
+      "environments": "Environments",
+      "agents": "Agents",
+      "kanbanTasks": "Kanban Tasks",
+      "plans": "Plans/Workflows",
+      "chatSessions": "Chat Sessions",
+      "chatMessages": "Chat Messages",
+      "envVars": "Env Variables",
+      "templates": "Templates",
+      "approvals": "Approvals"
+    }
   }
 }

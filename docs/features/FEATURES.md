@@ -111,22 +111,22 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 For each agent, create a workspace with the appropriate role:
 
 ```bash
-AGENT_CLIENT_PATH="/root/projects/weave/projects"
+AGENTS_BASE_PATH="/root/projects/weave/projects"
 PROJECT_NAME="myapp"
 
 # Create agents directory
-mkdir -p "$AGENT_CLIENT_PATH/$PROJECT_NAME/agents"
+mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents"
 
 # Create planner agent
-mkdir -p "$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/planner/.claude"
+mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/planner/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
 # Create coder agent
-mkdir -p "$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/coder/.claude"
+mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/coder/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
 # Create reviewer agent
-mkdir -p "$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/reviewer/.claude"
+mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/reviewer/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 ```
 
@@ -138,19 +138,19 @@ PROJECT_ID="<from step 1>"
 # Link planner agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/planner\"}" \
+  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/planner\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
 # Link coder agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/coder\"}" \
+  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/coder\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
 # Link reviewer agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENT_CLIENT_PATH/$PROJECT_NAME/agents/reviewer\"}" \
+  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/reviewer\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 ```
 

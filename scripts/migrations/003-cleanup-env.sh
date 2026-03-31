@@ -9,7 +9,7 @@ API_ENV="$SCRIPT_DIR/../../api/.env"
 
 for FILE in "$API_ENV" "$ROOT_ENV"; do
   [ ! -f "$FILE" ] && continue
-  for VAR in DATABASE_URL AGENT_CLIENT_PATH AGENTS_BASE_PATH; do
+  for VAR in DATABASE_URL AGENTS_BASE_PATH; do
     if grep -q "^${VAR}=" "$FILE" 2>/dev/null; then
       echo "[migration-003] Removing $VAR from $FILE"
       sed -i "/^${VAR}=/d" "$FILE"

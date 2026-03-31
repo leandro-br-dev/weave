@@ -1019,8 +1019,8 @@ This race condition handling ensures successful completion is preserved even if 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AGENT_CLIENT_PATH` | `/root/projects/weave/projects` | Base path for agent workspaces |
-| `AGENTS_BASE_PATH` | `/root/projects/weave/projects` | Base path for agents |
+| `AGENTS_BASE_PATH` | `~/.local/share/weave/projects` | Base path for agent workspaces |
+| `DATA_DIR` | — | Custom data directory (takes priority over AGENTS_BASE_PATH) |
 
 ---
 

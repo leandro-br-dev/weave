@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, type Environment } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/workspaces'
 import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ColorSelectDropdown, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
 
 export default function ProjectsPage() {
   const { t } = useTranslation()
@@ -377,14 +377,12 @@ export default function ProjectsPage() {
 
                   {/* Right side: Settings */}
                   <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                    <ColorPicker
-                      label=""
+                    <ColorSelectDropdown
                       value={project.color || '#3b82f6'}
                       onChange={(color) => updateProjectMutation.mutate({
                         id: project.id,
                         color,
                       })}
-                      compact
                     />
                     <span className="text-xs sm:text-sm text-gray-500">
                       {project.environments.length} env{project.environments.length !== 1 ? 's' : ''}

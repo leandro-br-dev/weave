@@ -258,7 +258,7 @@ python main.py --daemon
 #### api/.env
 ```
 WEAVE_TOKEN=dev-token-change-in-production
-AGENT_CLIENT_PATH=/root/projects/weave/projects
+AGENTS_BASE_PATH=/root/projects/weave/projects
 APPROVAL_TIMEOUT_MINUTES=10
 PLAN_TIMEOUT_MINUTES=120  # 2 hours (must match client's PLAN_TIMEOUT_SECONDS/60)
 PORT=3000

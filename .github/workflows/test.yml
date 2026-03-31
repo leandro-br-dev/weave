@@ -137,7 +137,7 @@ jobs:
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: agents_manager_test
+          POSTGRES_DB: weave_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -183,7 +183,7 @@ jobs:
         run: |
           npm run test:integration
         env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/agents_manager_test
+          DATABASE_URL: postgresql://test:test@localhost:5432/weave_test
           REDIS_URL: redis://localhost:6379
           NODE_ENV: test
 

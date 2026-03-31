@@ -5,7 +5,7 @@ import { db } from '../db/index.js'
 
 // JWT Configuration
 const JWT_SECRET: string = process.env.JWT_SECRET || 'change-this-secret-in-production'
-const JWT_EXPIRES_IN = '24h'
+const JWT_EXPIRES_IN = '7d'
 
 /**
  * Hash a password using bcrypt with 12 salt rounds.

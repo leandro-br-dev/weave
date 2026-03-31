@@ -213,7 +213,7 @@ curl -H "Authorization: Bearer dev-token-change-in-production" \
 | `WEAVE_TOKEN` | `dev-token-change-in-production` | Manager token for daemon |
 | `APPROVAL_TIMEOUT_MINUTES` | `10` | Approval timeout in minutes |
 | `PLAN_TIMEOUT_MINUTES` | `120` | Plan execution timeout in minutes (must match client's PLAN_TIMEOUT_SECONDS/60) |
-| `AGENT_CLIENT_PATH` | `/root/projects/weave/projects` | Base path for agent workspaces |
+| `AGENTS_BASE_PATH` | `~/.local/share/weave/projects` | Base path for agent workspaces |
 
 ### CORS Configuration
 The API supports CORS for:

@@ -26,6 +26,7 @@ import marketplaceRouter from './routes/marketplace.js'
 import templatesRouter from './routes/templates.js'
 import environmentVariablesRouter from './routes/environmentVariables.js'
 import cloudflareRouter from './routes/cloudflare.js'
+import backupRouter from './routes/backup.js'
 import { db } from './db/index.js'
 
 const app = express()
@@ -63,11 +64,11 @@ app.use(cors({
   },
   credentials: true,
 }))
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
 
 // Health check endpoint (no auth required)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Agents Manager API is running' })
+  res.json({ status: 'ok', message: 'Weave API is running' })
 })
 
 // Auth routes (public — no global auth middleware)
@@ -135,6 +136,9 @@ app.use('/api/environment-variables', environmentVariablesRouter)
 
 // Cloudflare routes
 app.use('/api/cloudflare', cloudflareRouter)
+
+// Backup routes
+app.use('/api/backup', backupRouter)
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

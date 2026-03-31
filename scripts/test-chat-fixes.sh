@@ -14,7 +14,7 @@ cd client
 source venv/bin/activate
 export WEAVE_URL=http://localhost:3000
 export WEAVE_TOKEN=dev-token-change-in-production
-export AGENT_CLIENT_PATH=/root/projects/weave/projects
+export AGENTS_BASE_PATH=/root/projects/weave/projects
 
 # Kill any existing daemon
 pkill -9 -f 'python main.py --daemon' 2>/dev/null || true

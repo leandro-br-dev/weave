@@ -36,7 +36,7 @@ export interface AuthContextType {
   resetPassword: (newPassword: string, confirmPassword: string) => Promise<void>;
 }
 
-const TOKEN_SESSION_KEY = 'auth_token';
+const TOKEN_STORAGE_KEY = 'auth_token';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -60,12 +60,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const initializing = useRef(false);
 
-  // Restore token from sessionStorage on mount and validate it
+  // Restore token from localStorage on mount and validate it
   const checkAuthStatus = useCallback(async () => {
     if (initializing.current) return;
     initializing.current = true;
 
     try {
+      // Restore the token from localStorage into memory BEFORE checking auth,
+      // so the API call includes the Authorization header.
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (storedToken) {
+        setDynamicToken(storedToken);
+      }
+
       const status: AuthStatusResponse = await getAuthStatus();
       setHasUsers(status.hasUsers);
       setIsLocalhost(status.isLocalhost);
@@ -73,22 +80,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (status.authenticated && status.user) {
         setUser(status.user);
-        // Server confirmed the token is valid; ensure it's set on the client
-        const existingToken = sessionStorage.getItem(TOKEN_SESSION_KEY);
-        if (existingToken) {
-          setDynamicToken(existingToken);
-        }
       } else {
         // Token invalid or missing — clear everything
-        sessionStorage.removeItem(TOKEN_SESSION_KEY);
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
         setDynamicToken(null);
         setUser(null);
       }
     } catch {
-      // If the status endpoint itself fails, clear auth state
-      sessionStorage.removeItem(TOKEN_SESSION_KEY);
-      setDynamicToken(null);
-      setUser(null);
+      // If the status endpoint itself fails, keep existing token
+      // (server might be restarting — don't logout unnecessarily)
     } finally {
       setIsLoading(false);
       initializing.current = false;
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Listen for the custom unauthorized event
   useEffect(() => {
     const handleUnauthorized = () => {
-      sessionStorage.removeItem(TOKEN_SESSION_KEY);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
       setDynamicToken(null);
       setUser(null);
     };
@@ -140,20 +140,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (password: string) => {
     const response = await apiLogin(password);
-    sessionStorage.setItem(TOKEN_SESSION_KEY, response.token);
+    localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
     setDynamicToken(response.token);
     setUser(response.user);
   }, []);
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem(TOKEN_SESSION_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     setDynamicToken(null);
     setUser(null);
   }, []);
 
   const setup = useCallback(async (password: string, confirmPassword: string) => {
     const response = await apiSetup(password, confirmPassword);
-    sessionStorage.setItem(TOKEN_SESSION_KEY, response.token);
+    localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
     setDynamicToken(response.token);
     setUser(response.user);
     setHasUsers(true);

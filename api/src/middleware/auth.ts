@@ -16,7 +16,7 @@ declare global {
  * or the `?token=<token>` query parameter (for SSE / EventSource).
  *
  * Falls back to a static bearer token (`API_BEARER_TOKEN` or
- * `AGENTS_MANAGER_TOKEN`) for daemon backward compatibility.
+ * `WEAVE_TOKEN`) for daemon backward compatibility.
  * This fallback can be removed once the daemon fully migrates to JWT.
  *
  * On success: sets `req.user = { userId, username }` and calls `next()`.
@@ -37,7 +37,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
   // Daemon backward compatibility: if the token matches the static bearer token,
   // treat it as a system/internal token.
-  const staticToken = process.env.API_BEARER_TOKEN || process.env.AGENTS_MANAGER_TOKEN
+  const staticToken = process.env.API_BEARER_TOKEN || process.env.WEAVE_TOKEN
   if (staticToken && token === staticToken) {
     req.user = { userId: 'system', username: 'daemon' }
     return next()
@@ -105,7 +105,7 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction) {
 
   if (token) {
     // Daemon backward compatibility
-    const staticToken = process.env.API_BEARER_TOKEN || process.env.AGENTS_MANAGER_TOKEN
+    const staticToken = process.env.API_BEARER_TOKEN || process.env.WEAVE_TOKEN
     if (staticToken && token === staticToken) {
       req.user = { userId: 'system', username: 'daemon' }
       return next()

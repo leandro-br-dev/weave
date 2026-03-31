@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Coverage Report Generator for Agents Manager
+# Coverage Report Generator for Weave
 # Generates and combines coverage reports for all test types
 
 set -e

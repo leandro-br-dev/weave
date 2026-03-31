@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test Watch Mode for Agents Manager
+# Test Watch Mode for Weave
 # Runs tests in watch mode for development
 
 set -e
@@ -24,7 +24,7 @@ show_usage() {
     cat << EOF
 Usage: $0 [OPTIONS] [FILTER]
 
-Watch mode test runner for Agents Manager
+Watch mode test runner for Weave
 
 OPTIONS:
     -a, --all         Watch all test suites (default)

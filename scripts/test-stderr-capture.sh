@@ -26,7 +26,7 @@ echo ""
 echo "→ Starting daemon for 30 seconds..."
 export WEAVE_URL=http://localhost:3000
 export WEAVE_TOKEN=dev-token-change-in-production
-export AGENT_CLIENT_PATH=/root/projects/weave/projects
+export AGENTS_BASE_PATH=/root/projects/weave/projects
 
 # Start daemon in background
 timeout 30 python main.py --daemon 2>&1 &

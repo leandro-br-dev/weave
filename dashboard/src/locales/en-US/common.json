@@ -22,7 +22,7 @@
     "dashboard": "Dashboard"
   },
   "app": {
-    "title": "Agents Manager",
+    "title": "Weave",
     "toggleMenu": "Toggle menu",
     "closeMenu": "Close menu"
   },

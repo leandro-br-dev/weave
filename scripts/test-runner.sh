@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Unified Test Runner for Agents Manager
+# Unified Test Runner for Weave
 # This script runs all test suites in the correct order and generates combined reports
 
 set -e
@@ -81,7 +81,7 @@ main() {
     local test_type=${1:-all}
     local start_time=$(date +%s)
 
-    print_status "${YELLOW}" "🧪 Agents Manager Test Runner"
+    print_status "${YELLOW}" "🧪 Weave Test Runner"
     print_status "${YELLOW}" "Test Type: ${test_type}"
     echo ""
 

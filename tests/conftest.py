@@ -43,7 +43,6 @@ def test_env() -> dict:
         'test_api_token': os.getenv('TEST_API_TOKEN', 'test-token-for-testing-only'),
         'test_projects_dir': os.getenv('TEST_PROJECTS_DIR', '/tmp/test-projects'),
         'test_workspace_dir': os.getenv('TEST_WORKSPACE_DIR', '/tmp/test-workspaces'),
-        'test_agent_client_path': os.getenv('TEST_AGENT_CLIENT_PATH', '/tmp/test-agent-client'),
         'test_cleanup_enabled': os.getenv('TEST_CLEANUP_ENABLED', 'true').lower() == 'true',
         'test_timeout': int(os.getenv('TEST_TIMEOUT', '30')),
     }
