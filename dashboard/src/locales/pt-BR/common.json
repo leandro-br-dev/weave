@@ -22,7 +22,7 @@
     "dashboard": "Painel"
   },
   "app": {
-    "title": "Gerenciador de Agentes",
+    "title": "Weave",
     "toggleMenu": "Alternar menu",
     "closeMenu": "Fechar menu"
   },

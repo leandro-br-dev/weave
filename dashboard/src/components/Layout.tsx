@@ -6,6 +6,7 @@ import { QuickActionModal } from '@/components/QuickActionModal'
 import { ThemeSelector } from '@/components/ThemeSelector'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
+import weaveLogo from '@/assets/weave-logo.svg'
 
 export default function Layout() {
   const { t } = useTranslation()
@@ -58,7 +59,8 @@ export default function Layout() {
         bg-gray-900 dark:bg-gray-950
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-6">
+        <div className="p-6 flex items-center gap-3">
+          <img src={weaveLogo} alt="Weave" className="h-8 w-8" />
           <h1 className="text-xl font-bold">{t('common.app.title')}</h1>
         </div>
         <nav className="mt-6">

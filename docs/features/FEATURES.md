@@ -634,7 +634,7 @@ async def get_project_planning_context(self, project_id: str) -> dict:
 📋 PROJECT:
   - ID: 3b48bfd7-bdd7-4dad-831e-6f98716765f2
   - Name: weave
-  - Description: Gerenciador de agentes de IA
+  - Description: Weave - Plataforma de automação de fluxos de trabalho
   - Settings: {'auto_approve_workflows': False, ...}
 
 🌍 ENVIRONMENTS:

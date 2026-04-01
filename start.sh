@@ -44,14 +44,6 @@ echo "  → Data directory:   $DATA_DIR"
 echo "  → Agent workspaces: $AGENTS_BASE_PATH"
 echo ""
 
-# ─── Run migration scripts ───────────────────────────────────────
-if [ -d "$ROOT/scripts/migrations" ]; then
-  echo '→ Running data migrations...'
-  for script in "$ROOT/scripts/migrations"/*.sh; do
-    [ -f "$script" ] && bash "$script" "$DATA_DIR" "$APP_ENV"
-  done
-fi
-
 # ─── Check for updates ───────────────────────────────────────────
 if command -v git >/dev/null 2>&1 && [ -d "$ROOT/.git" ]; then
   git -C "$ROOT" fetch origin --quiet 2>/dev/null || true
