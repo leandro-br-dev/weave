@@ -4,7 +4,7 @@ import { apiFetch } from './client'
 export interface QuickActionPayload {
   name?: string
   message: string
-  workspace_id: string
+  team_id: string
   environment_id?: string
   project_id?: string
   native_skill?: string

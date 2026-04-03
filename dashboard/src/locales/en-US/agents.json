@@ -1,6 +1,6 @@
 {
       "title": "Agents",
-      "description": "Manage your AI agent workspaces and configurations",
+      "description": "Manage your AI agent teams and configurations",
       "filters": {
         "allProjects": "All Projects"
       },

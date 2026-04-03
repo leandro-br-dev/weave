@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CreatePlanForm } from './CreatePlanForm';
 import * as ReactRouter from 'react-router';
 import * as plansApi from '@/api/plans';
-import * as workspacesApi from '@/api/workspaces';
+import * as workspacesApi from '@/api/teams';
 import * as projectsApi from '@/api/projects';
 
 const mockNavigate = vi.fn();
@@ -22,7 +22,7 @@ vi.mock('@/api/plans', () => ({
   useCreatePlan: vi.fn(),
 }));
 
-vi.mock('@/api/workspaces', () => ({
+vi.mock('@/api/teams', () => ({
   useGetWorkspaces: vi.fn(),
 }));
 

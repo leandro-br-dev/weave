@@ -1071,7 +1071,7 @@ ${rework_prompt}`
       const plannerRow = db.prepare(`
         SELECT pa.workspace_path
         FROM project_agents pa
-        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
         WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
         LIMIT 1
       `).get(sourcePlan.project_id) as any
@@ -1089,7 +1089,7 @@ ${rework_prompt}`
           pa.workspace_path,
           COALESCE(wr.role, 'generic') as role
         FROM project_agents pa
-        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
         WHERE pa.project_id = ?
       `).all(sourcePlan.project_id) as any[]
 
@@ -1132,7 +1132,7 @@ Output your plan enclosed in <plan>...</plan> tags.`
         id: taskId,
         name: 'Replan workflow for rework',
         prompt: plannerPrompt,
-        cwd: environments[0]?.project_path || sourcePlan.workspace_id || '/root/projects/weave',
+        cwd: environments[0]?.project_path || sourcePlan.team_id || '/root/projects/weave',
         workspace: plannerRow.workspace_path,
         tools: ['Read', 'Write', 'Bash', 'Glob', 'Edit', 'Grep', 'WebFetch', 'Skill'],
         permission_mode: 'acceptEdits',
@@ -1148,12 +1148,12 @@ Output your plan enclosed in <plan>...</plan> tags.`
       const coderRow = db.prepare(`
         SELECT pa.workspace_path
         FROM project_agents pa
-        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
         WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'coder'
         LIMIT 1
       `).get(sourcePlan.project_id) as any
 
-      const coderWorkspace = coderRow?.workspace_path || sourcePlan.workspace_id || '/root/projects/weave'
+      const coderWorkspace = coderRow?.workspace_path || sourcePlan.team_id || '/root/projects/weave'
 
       const contextPrompt = `${commonContext}
 
@@ -1182,7 +1182,7 @@ IMPORTANT: Use the context above to understand what was previously attempted and
     const now = new Date().toISOString()
 
     db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, type, project_id, workspace_id, parent_plan_id, rework_prompt, rework_mode, created_at)
+      INSERT INTO plans (id, name, tasks, status, type, project_id, team_id, parent_plan_id, rework_prompt, rework_mode, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       newId,
@@ -1191,7 +1191,7 @@ IMPORTANT: Use the context above to understand what was previously attempted and
       'pending',
       planType,
       sourcePlan.project_id,
-      sourcePlan.workspace_id || null,
+      sourcePlan.team_id || null,
       sourceId,
       rework_prompt,
       rework_mode,

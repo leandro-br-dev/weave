@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, type Environment } from '@/api/projects'
-import { useGetWorkspaces } from '@/api/workspaces'
+import { useGetWorkspaces } from '@/api/teams'
 import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree } from 'lucide-react'
 import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ColorSelectDropdown, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
 import {
@@ -35,6 +35,8 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const [newProjectColor, setNewProjectColor] = useState('#3b82f6')
+  const [newProjectGitUrl, setNewProjectGitUrl] = useState('')
+  const [newProjectCreateDefaultEnvs, setNewProjectCreateDefaultEnvs] = useState(false)
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [showSettings, setShowSettings] = useState<Set<string>>(new Set())
   const [showEnvForm, setShowEnvForm] = useState<Set<string>>(new Set())
@@ -117,10 +119,14 @@ export default function ProjectsPage() {
         name: newProjectName,
         description: newProjectDescription || undefined,
         color: newProjectColor,
+        git_url: newProjectGitUrl.trim() || undefined,
+        create_default_envs: newProjectCreateDefaultEnvs ? true : undefined,
       })
       setNewProjectName('')
       setNewProjectDescription('')
       setNewProjectColor('#3b82f6')
+      setNewProjectGitUrl('')
+      setNewProjectCreateDefaultEnvs(false)
       setShowNewProjectForm(false)
     } catch (error) {
       alert(`Failed to create project: ${(error as Error).message}`)
@@ -338,6 +344,37 @@ export default function ProjectsPage() {
                 hint={t('pages.projects.form.projectColorHint')}
                 compact
               />
+              <Input
+                label={t('pages.projects.form.gitUrl')}
+                value={newProjectGitUrl}
+                onChange={(e) => setNewProjectGitUrl(e.target.value)}
+                placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
+                hint="Optional: Link to your git repository"
+              />
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className={`block text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
+                    {t('pages.projects.form.createDefaultEnvs')}
+                  </label>
+                  <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`}>
+                    {t('pages.projects.form.createDefaultEnvsDesc')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!newProjectGitUrl.trim()}
+                  onClick={() => setNewProjectCreateDefaultEnvs(!newProjectCreateDefaultEnvs)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    newProjectCreateDefaultEnvs
+                      ? withDarkMode(bgColors.inverted, 'dark:bg-orange-600')
+                      : withDarkMode('bg-gray-200', 'dark:bg-gray-700')
+                  } ${!newProjectGitUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    newProjectCreateDefaultEnvs ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button type="submit" variant="primary" disabled={createProjectMutation.isPending} loading={createProjectMutation.isPending} className="w-full sm:w-auto">
                   {createProjectMutation.isPending ? t('pages.projects.form.creating') : t('pages.projects.form.createProject')}
@@ -350,6 +387,8 @@ export default function ProjectsPage() {
                     setNewProjectName('')
                     setNewProjectDescription('')
                     setNewProjectColor('#3b82f6')
+                    setNewProjectGitUrl('')
+                    setNewProjectCreateDefaultEnvs(false)
                   }}
                   className="w-full sm:w-auto"
                 >
@@ -383,6 +422,12 @@ export default function ProjectsPage() {
                       <h3 className={`text-base sm:text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} truncate`}>{project.name}</h3>
                       {project.description && (
                         <p className={`text-xs sm:text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mt-0.5 line-clamp-2`}>{project.description}</p>
+                      )}
+                      {project.git_url && (
+                        <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} mt-0.5 flex items-center gap-1 truncate`}>
+                          <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                          <code className="truncate">{project.git_url}</code>
+                        </p>
                       )}
                     </div>
                   </div>
@@ -472,13 +517,6 @@ export default function ProjectsPage() {
                             hint="Where your project files are located"
                             className="sm:col-span-2"
                             required
-                          />
-                          <Input
-                            label="Git Repository"
-                            value={newEnvData.git_repository || ''}
-                            onChange={(e) => setNewEnvData({ ...newEnvData, git_repository: e.target.value })}
-                            placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
-                            hint="Optional: Link to your git repository"
                           />
                           {newEnvData.type === 'ssh' && (
                             <>
@@ -571,16 +609,9 @@ export default function ProjectsPage() {
                                   hint="Where your project files are located"
                                   required
                                 />
-                                <Input
-                                  label="Git Repository"
-                                  value={editEnvData.git_repository || ''}
-                                  onChange={(e) => setEditEnvData({ ...editEnvData, git_repository: e.target.value })}
-                                  placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
-                                  hint="Optional: Link to your git repository"
-                                />
                               </div>
                               <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} mt-2`}>
-                                Agent workspace is auto-generated and cannot be edited
+                                Agent team is auto-generated and cannot be edited
                               </p>
                               <div className="flex gap-2">
                                 <Button type="submit" variant="primary" size="sm" disabled={updateEnvironmentMutation.isPending} loading={updateEnvironmentMutation.isPending}>
@@ -614,14 +645,9 @@ export default function ProjectsPage() {
                                     <div>
                                       <span className="font-medium">Project path:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs`}>{env.project_path}</code>
                                     </div>
-                                    {env.git_repository && (
-                                      <div>
-                                        <span className="font-medium">Git repository:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs break-all`}>{env.git_repository}</code>
-                                      </div>
-                                    )}
                                     {env.agent_workspace && (
                                     <details className="mt-2">
-                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Agent workspace path</summary>
+                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Agent team path</summary>
                                       <code className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} block mt-1 break-all`}>{env.agent_workspace}</code>
                                     </details>
                                     )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router';
 import { useCreatePlan, type Task } from '@/api/plans';
-import { useGetWorkspaces } from '@/api/workspaces';
+import { useGetWorkspaces } from '@/api/teams';
 import { useGetProjects } from '@/api/projects';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';

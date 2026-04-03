@@ -72,9 +72,9 @@ function listAllWorkspaces(): WorkspaceInfo[] {
           'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
         ).get(fullPath) as any
 
-        // Fetch role from workspace_roles table
+        // Fetch role from team_roles table
         const roleRow = db.prepare(
-          'SELECT role FROM workspace_roles WHERE workspace_path = ? LIMIT 1'
+          'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
         ).get(fullPath) as any
 
         // Read model from settings.local.json (ANTHROPIC_MODEL env var)
@@ -117,9 +117,9 @@ function listAllWorkspaces(): WorkspaceInfo[] {
           'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
         ).get(agentPath) as any
 
-        // Fetch role from workspace_roles table
+        // Fetch role from team_roles table
         const roleRow = db.prepare(
-          'SELECT role FROM workspace_roles WHERE workspace_path = ? LIMIT 1'
+          'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
         ).get(agentPath) as any
 
         // Derive role from directory name as fallback
@@ -156,9 +156,9 @@ function listAllWorkspaces(): WorkspaceInfo[] {
         'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
       ).get(legacyAgentCoderPath) as any
 
-      // Fetch role from workspace_roles table
+      // Fetch role from team_roles table
       const roleRow = db.prepare(
-        'SELECT role FROM workspace_roles WHERE workspace_path = ? LIMIT 1'
+        'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
       ).get(legacyAgentCoderPath) as any
 
       // Read model from settings.local.json (ANTHROPIC_MODEL env var)
@@ -310,9 +310,9 @@ router.get('/:id', authenticateToken, (req, res) => {
     WHERE ae.workspace_path = ?
   `).all(coderPath) as any[]
 
-  // Fetch role from workspace_roles table
+  // Fetch role from team_roles table
   const roleRow = db.prepare(
-    'SELECT role FROM workspace_roles WHERE workspace_path = ? LIMIT 1'
+    'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
   ).get(coderPath) as any
 
   // Read model from settings.local.json
@@ -455,7 +455,7 @@ router.post('/', authenticateToken, (req, res) => {
   // Save role if provided
   if (role && role !== 'generic') {
     db.prepare(
-      'INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)'
+      'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
     ).run(coderPath, role)
   }
 
@@ -548,7 +548,7 @@ router.put('/:id', authenticateToken, (req, res) => {
     }
 
     db.prepare(
-      'INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)'
+      'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
     ).run(workspace.path, role)
 
     updates.role = role
@@ -597,7 +597,7 @@ router.put('/:id', authenticateToken, (req, res) => {
 
     // Store in database for quick access
     db.prepare(
-      'INSERT OR REPLACE INTO workspace_models (workspace_path, model) VALUES (?, ?)'
+      'INSERT OR REPLACE INTO team_models (workspace_path, model) VALUES (?, ?)'
     ).run(workspace.path, model)
 
     updates.model = model
@@ -605,11 +605,11 @@ router.put('/:id', authenticateToken, (req, res) => {
 
   // Fetch updated workspace data
   const roleRow = db.prepare(
-    'SELECT role FROM workspace_roles WHERE workspace_path = ? LIMIT 1'
+    'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
   ).get(workspace.path) as any
 
   const modelRow = db.prepare(
-    'SELECT model FROM workspace_models WHERE workspace_path = ? LIMIT 1'
+    'SELECT model FROM team_models WHERE workspace_path = ? LIMIT 1'
   ).get(workspace.path) as any
 
   return res.json({
@@ -644,7 +644,7 @@ router.put('/:id/role', authenticateToken, (req, res) => {
   }
 
   db.prepare(
-    'INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)'
+    'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
   ).run(workspace.path, role)
 
   return res.json({ data: { role }, error: null })
@@ -742,7 +742,7 @@ router.put('/:id/model', authenticateToken, (req, res) => {
 
   // Store in database for quick access
   db.prepare(
-    'INSERT OR REPLACE INTO workspace_models (workspace_path, model) VALUES (?, ?)'
+    'INSERT OR REPLACE INTO team_models (workspace_path, model) VALUES (?, ?)'
   ).run(workspace.path, model)
 
   return res.json({ data: { model }, error: null })
@@ -764,17 +764,17 @@ router.delete('/:id', authenticateToken, (req, res) => {
     'DELETE FROM project_agents WHERE workspace_path = ?'
   ).run(coderPath)
 
-  // Also remove from workspace_roles table if it exists
+  // Also remove from team_roles table if it exists
   try {
     db.prepare(
-      'DELETE FROM workspace_roles WHERE workspace_path = ?'
+      'DELETE FROM team_roles WHERE workspace_path = ?'
     ).run(coderPath)
   } catch {}
 
-  // Also remove from workspace_models table if it exists
+  // Also remove from team_models table if it exists
   try {
     db.prepare(
-      'DELETE FROM workspace_models WHERE workspace_path = ?'
+      'DELETE FROM team_models WHERE workspace_path = ?'
     ).run(coderPath)
   } catch {}
 
@@ -1231,7 +1231,7 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
     // Get planner workspace for this project
     const plannerRow = db.prepare(`
       SELECT pa.workspace_path FROM project_agents pa
-      LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
       WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
       LIMIT 1
     `).get(workspace.project_id) as any
@@ -1333,7 +1333,7 @@ This step is REQUIRED for the approval flow to work. Do not skip it. The task is
     }]
 
     db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, project_id, type, workspace_id)
+      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id)
       VALUES (?, ?, ?, 'pending', ?, 'improve_claude_md', ?)
     `).run(planId, `Improve CLAUDE.md for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id)
 

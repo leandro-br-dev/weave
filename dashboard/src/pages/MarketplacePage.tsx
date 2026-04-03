@@ -3,7 +3,7 @@ import { Search, Download, Star, ExternalLink, Package, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, PageHeader, EmptyState } from '@/components';
 import { useMarketplaceSearch, useRepoContents, useSkillPreview, useInstallSkill } from '@/api/marketplace';
-import { useGetWorkspaces } from '@/api/workspaces';
+import { useGetWorkspaces } from '@/api/teams';
 import {
   textColors, darkModeTextColors, bgColors, darkModeBgColors,
   borderColors, darkModeBorderColors, accentColors,

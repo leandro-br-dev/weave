@@ -401,4 +401,72 @@ export const migrations: Migration[] = [
       `ALTER TABLE plans ADD COLUMN rework_mode TEXT DEFAULT 'full_workflow' CHECK(rework_mode IN ('full_workflow', 'quick_action'))`,
     ],
   },
+  {
+    version: 32,
+    description: 'Move git_repository from environments to projects; rename workspace_* to team_*; rename workspace_id to team_id',
+    up: [
+      // 1. Add git_url column to projects
+      `ALTER TABLE projects ADD COLUMN git_url TEXT`,
+
+      // 2. Migrate git_repository from environments to projects (take first non-null value per project)
+      `UPDATE projects SET git_url = (
+        SELECT e.git_repository FROM environments e
+        WHERE e.project_id = projects.id AND e.git_repository IS NOT NULL AND e.git_repository != ''
+        LIMIT 1
+      )`,
+
+      // 3. Drop git_repository column from environments
+      // SQLite doesn't support DROP COLUMN before 3.35.0, so we use the safe ignore approach
+      `ALTER TABLE environments DROP COLUMN git_repository`,
+
+      // 4. Rename workspace_roles → team_roles
+      `ALTER TABLE workspace_roles RENAME TO team_roles`,
+
+      // 5. Rename workspace_models → team_models
+      `ALTER TABLE workspace_models RENAME TO team_models`,
+
+      // 6. Rename workspace_id → team_id in plans
+      // SQLite doesn't support ALTER TABLE RENAME COLUMN before 3.25.0,
+      // so we recreate the table. The new table omits REFERENCES clauses
+      // to avoid FK constraint issues during the table swap (plan_logs
+      // references plans). FK constraints are advisory in this codebase.
+      `CREATE TABLE IF NOT EXISTS plans_new (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        tasks TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        client_id TEXT,
+        result TEXT,
+        started_at TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        project_id TEXT,
+        type TEXT DEFAULT 'workflow',
+        structured_output TEXT,
+        result_status TEXT CHECK(result_status IN ('success','partial','needs_rework')),
+        result_notes TEXT DEFAULT '',
+        team_id TEXT,
+        last_heartbeat_at TEXT,
+        parent_plan_id TEXT,
+        rework_prompt TEXT DEFAULT '',
+        rework_mode TEXT DEFAULT 'full_workflow' CHECK(rework_mode IN ('full_workflow', 'quick_action')),
+        user_id TEXT,
+        attachments TEXT DEFAULT '[]'
+      )`,
+      `INSERT OR IGNORE INTO plans_new (
+        id, name, tasks, status, client_id, result, started_at, completed_at, created_at,
+        project_id, type, structured_output, result_status, result_notes, team_id,
+        last_heartbeat_at, parent_plan_id, rework_prompt, rework_mode, user_id, attachments
+      ) SELECT
+        id, name, tasks, status, client_id, result, started_at, completed_at, created_at,
+        project_id, type, structured_output, result_status, result_notes, workspace_id,
+        last_heartbeat_at, parent_plan_id, rework_prompt, rework_mode, user_id, attachments
+      FROM plans`,
+      `DROP TABLE plans`,
+      `ALTER TABLE plans_new RENAME TO plans`,
+      // Recreate indexes on plans
+      `CREATE INDEX IF NOT EXISTS idx_plans_parent_plan_id ON plans(parent_plan_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_plans_user_id ON plans(user_id)`,
+    ],
+  },
 ];

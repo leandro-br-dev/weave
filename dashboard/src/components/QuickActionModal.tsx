@@ -4,7 +4,7 @@ import { Button, Select } from '@/components'
 import { FileAttachmentInput, type FileAttachment } from '@/components/FileAttachmentInput'
 import { useCreateQuickAction } from '@/api/quickActions'
 import { useGetProjects } from '@/api/projects'
-import { useGetWorkspaces } from '@/api/workspaces'
+import { useGetWorkspaces } from '@/api/teams'
 import { useGetPlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'
@@ -37,7 +37,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<'form' | 'running' | 'result'>('form')
   const [projectId, setProjectId] = useState('')
-  const [workspaceId, setWorkspaceId] = useState('')
+  const [teamId, setTeamId] = useState('')
   const [environmentId, setEnvironmentId] = useState('')
   const [nativeSkill, setNativeSkill] = useState('planning')
   const [message, setMessage] = useState('')
@@ -56,7 +56,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
   // When workspace changes, reset environment
   const handleWorkspaceChange = (wsId: string) => {
-    setWorkspaceId(wsId)
+    setTeamId(wsId)
     setEnvironmentId('')
   }
 
@@ -92,7 +92,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
   }, [planId, step])
 
   const handleSubmit = async () => {
-    if (!message.trim() || !workspaceId) return
+    if (!message.trim() || !teamId) return
 
     let attachmentIds: string[] = []
 
@@ -139,7 +139,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
     const result = await createAction.mutateAsync({
       message: message.trim(),
-      workspace_id: workspaceId,
+      team_id: teamId,
       environment_id: environmentId || undefined,
       project_id: projectId || undefined,
       native_skill: nativeSkill || undefined,
@@ -183,7 +183,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
               <Select
                 label={t('components.quickAction.project')}
                 value={projectId}
-                onChange={e => { setProjectId(e.target.value); setWorkspaceId(''); setEnvironmentId('') }}
+                onChange={e => { setProjectId(e.target.value); setTeamId(''); setEnvironmentId('') }}
               >
                 <option value="">{t('components.quickAction.allProjects')}</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -192,7 +192,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
               {/* Agent */}
               <Select
                 label={t('components.quickAction.agentRequired')}
-                value={workspaceId}
+                value={teamId}
                 onChange={e => handleWorkspaceChange(e.target.value)}
                 required
               >
@@ -354,7 +354,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
             <Button
               variant="primary" size="sm"
               onClick={handleSubmit}
-              disabled={!message.trim() || !workspaceId || uploadFiles.isPending}
+              disabled={!message.trim() || !teamId || uploadFiles.isPending}
               loading={createAction.isPending || uploadFiles.isPending}
             >
               <Zap className="h-3.5 w-3.5" /> {t('components.quickAction.run')}

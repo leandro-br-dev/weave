@@ -6,6 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 import { envAgentPath, envAgentPlannerPath, AGENTS_BASE_PATH } from '../utils/paths.js'
+import { createDefaultEnvironments, isValidGitUrl } from '../services/gitClone.js'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
@@ -74,7 +75,7 @@ router.get('/', authenticateToken, (req, res) => {
 
 // POST /api/projects
 router.post('/', authenticateToken, (req, res) => {
-  const { name, description, settings, color } = req.body
+  const { name, description, settings, color, git_url, create_default_envs } = req.body
   if (!name) return res.status(400).json({ data: null, error: 'name is required' })
 
   // Validate workflow limits if provided in settings
@@ -85,15 +86,77 @@ router.post('/', authenticateToken, (req, res) => {
     }
   }
 
+  // If create_default_envs is true, git_url is required
+  if (create_default_envs && !git_url) {
+    return res.status(400).json({ data: null, error: 'git_url is required when create_default_envs is true' })
+  }
+
+  // Validate git_url format if provided
+  if (git_url && !isValidGitUrl(git_url)) {
+    return res.status(400).json({ data: null, error: 'git_url must be a valid git URL (HTTPS, SSH, or git://)' })
+  }
+
   const id = uuid()
   const settingsJson = JSON.stringify(settings || {})
-  db.prepare('INSERT INTO projects (id, name, description, settings, color) VALUES (?, ?, ?, ?, ?)').run(id, name, description ?? null, settingsJson, color ?? '')
-  return res.status(201).json({ data: { id, name, description, settings: settings || {}, color: color ?? '' }, error: null })
+  db.prepare('INSERT INTO projects (id, name, description, settings, color, git_url) VALUES (?, ?, ?, ?, ?, ?)').run(id, name, description ?? null, settingsJson, color ?? '', git_url ?? null)
+
+  // Auto-create default environments if requested
+  let environments: any[] = []
+  if (create_default_envs && git_url) {
+    try {
+      const cloneResults = createDefaultEnvironments(git_url, name)
+
+      // Insert environment records into the database
+      for (const result of cloneResults) {
+        if (result.success) {
+          const envId = uuid()
+          db.prepare(`
+            INSERT INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            envId,
+            id,
+            result.name,
+            'local-wsl',
+            result.project_path,
+            '', // agent_workspace is empty until user confirms via default-agents endpoint
+            null,
+            null
+          )
+          environments.push({
+            id: envId,
+            name: result.name,
+            type: 'local-wsl',
+            project_path: result.project_path,
+            agent_workspace: '',
+            branch: result.branch,
+          })
+        }
+      }
+    } catch (err: any) {
+      console.error('[POST /api/projects] Error creating default environments:', err.message)
+      // Don't fail the project creation — return project without environments
+      // The user can still create environments manually
+    }
+  }
+
+  return res.status(201).json({
+    data: {
+      id,
+      name,
+      description,
+      settings: settings || {},
+      color: color ?? '',
+      git_url: git_url ?? null,
+      environments,
+    },
+    error: null,
+  })
 })
 
 // POST /api/projects/:id/environments
 router.post('/:id/environments', authenticateToken, (req, res) => {
-  const { name, type, project_path, ssh_config, env_vars, git_repository } = req.body
+  const { name, type, project_path, ssh_config, env_vars } = req.body
   if (!name || !project_path) {
     return res.status(400).json({ data: null, error: 'name and project_path are required' })
   }
@@ -106,24 +169,23 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
 
   const id = uuid()
   db.prepare(`
-    INSERT INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars, git_repository)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, req.params.id, name,
     type ?? 'local-wsl',
     project_path,
     agent_workspace,
     ssh_config ? JSON.stringify(ssh_config) : null,
-    env_vars ? JSON.stringify(env_vars) : null,
-    git_repository ?? null
+    env_vars ? JSON.stringify(env_vars) : null
   )
 
-  return res.status(201).json({ data: { id, name, type, project_path, agent_workspace, git_repository }, error: null })
+  return res.status(201).json({ data: { id, name, type, project_path, agent_workspace }, error: null })
 })
 
 // PUT /api/projects/:projectId/environments/:envId
 router.put('/:projectId/environments/:envId', authenticateToken, (req, res) => {
-  const { name, type, project_path, ssh_config, env_vars, git_repository } = req.body
+  const { name, type, project_path, ssh_config, env_vars } = req.body
   // Verify project exists
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId)
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
@@ -134,13 +196,12 @@ router.put('/:projectId/environments/:envId', authenticateToken, (req, res) => {
   }
 
   db.prepare(`
-    UPDATE environments SET name=?, type=?, project_path=?, ssh_config=?, env_vars=?, git_repository=?
+    UPDATE environments SET name=?, type=?, project_path=?, ssh_config=?, env_vars=?
     WHERE id=? AND project_id=?
   `).run(
     name, type, project_path,
     ssh_config ? JSON.stringify(ssh_config) : null,
     env_vars ? JSON.stringify(env_vars) : null,
-    git_repository ?? null,
     req.params.envId, req.params.projectId
   )
   return res.json({ data: { updated: true }, error: null })
@@ -212,7 +273,7 @@ router.delete('/:id', authenticateToken, (req, res) => {
 // PUT /api/projects/:id
 router.put('/:id', authenticateToken, (req, res) => {
   try {
-    const { name, description, settings, color } = req.body
+    const { name, description, settings, color, git_url } = req.body
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as any
     if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
 
@@ -227,8 +288,8 @@ router.put('/:id', authenticateToken, (req, res) => {
     const currentSettings = JSON.parse(project.settings || '{}')
     const newSettings = settings ? { ...currentSettings, ...settings } : currentSettings
 
-    db.prepare('UPDATE projects SET name = COALESCE(?, name), description = COALESCE(?, description), settings = ?, color = COALESCE(?, color) WHERE id = ?')
-      .run(name, description, JSON.stringify(newSettings), color, req.params.id)
+    db.prepare('UPDATE projects SET name = COALESCE(?, name), description = COALESCE(?, description), settings = ?, color = COALESCE(?, color), git_url = COALESCE(?, git_url) WHERE id = ?')
+      .run(name, description, JSON.stringify(newSettings), color, git_url, req.params.id)
 
     const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as any
     updated.settings = JSON.parse(updated.settings || '{}')
@@ -252,7 +313,7 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
         wr.role,
         pa.created_at
       FROM project_agents pa
-      LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
       WHERE pa.project_id = ?
       ORDER BY pa.created_at ASC
     `).all(req.params.id) as any[]
@@ -309,7 +370,7 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
 
     // Fetch environments
     const environments = db.prepare(`
-      SELECT id, name, type, project_path, agent_workspace, git_repository
+      SELECT id, name, type, project_path, agent_workspace
       FROM environments
       WHERE project_id = ?
       ORDER BY created_at ASC
@@ -373,7 +434,7 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
         pa.workspace_path,
         COALESCE(wr.role, 'generic') as role
       FROM project_agents pa
-      LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
       WHERE pa.project_id = ?
     `).all(req.params.id) as any[]
 
@@ -654,7 +715,7 @@ router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
     // Planner workspace — usa o planner do projeto ou o padrão
     const plannerRow = db.prepare(`
       SELECT pa.workspace_path FROM project_agents pa
-      LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
       WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
       LIMIT 1
     `).get(req.params.id) as any
@@ -864,7 +925,7 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
           'INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
         ).run(projectId, workspacePath)
         db.prepare(
-          'INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)'
+          'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
         ).run(workspacePath, role)
         return
       }
@@ -979,7 +1040,7 @@ You are the coding agent for the **${project.name}** project.
 
       // Save role
       db.prepare(
-        'INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)'
+        'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
       ).run(workspacePath, role)
     }
 

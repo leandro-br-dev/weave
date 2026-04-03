@@ -14,7 +14,7 @@ import { authenticateToken } from './middleware/auth.js'
 import authRouter from './routes/auth.js'
 import { getUserCount } from './services/userService.js'
 import plansRouter, { recoverStuckPlans } from './routes/plans.js'
-import workspacesRouter from './routes/workspaces.js'
+import teamsRouter from './routes/teams.js'
 import approvalsRouter from './routes/approvals.js'
 import daemonRouter from './routes/daemon.js'
 import projectsRouter from './routes/projects.js'
@@ -103,8 +103,8 @@ app.get('/api/executions', authenticateToken, (req, res) => {
 // Plans routes
 app.use('/api/plans', plansRouter)
 
-// Workspaces routes
-app.use('/api/workspaces', workspacesRouter)
+// Teams routes
+app.use('/api/teams', teamsRouter)
 
 // Approvals routes
 app.use('/api/approvals', approvalsRouter)

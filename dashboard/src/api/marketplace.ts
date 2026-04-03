@@ -63,7 +63,7 @@ export function useInstallSkill() {
       type?: string;
     }) => apiClient.post('/api/marketplace/install', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['workspaces'] });
+      qc.invalidateQueries({ queryKey: ['teams'] });
     },
   });
 }

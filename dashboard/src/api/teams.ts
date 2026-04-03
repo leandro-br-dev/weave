@@ -2,9 +2,9 @@ import React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient, apiFetch } from './client'
 
-export type WorkspaceRole = 'planner' | 'coder' | 'reviewer' | 'tester' | 'debugger' | 'devops' | 'generic'
+export type TeamRole = 'planner' | 'coder' | 'reviewer' | 'tester' | 'debugger' | 'devops' | 'generic'
 
-export type Workspace = {
+export type Team = {
   id: string
   name: string
   path: string
@@ -13,11 +13,11 @@ export type Workspace = {
   hasClaude: boolean
   baseUrl: string | null
   project_id: string | null
-  role: WorkspaceRole
+  role: TeamRole
   model?: string
 }
 
-export type WorkspaceDetail = {
+export type TeamDetail = {
   id: string
   name: string
   path: string
@@ -28,32 +28,47 @@ export type WorkspaceDetail = {
   project_id: string | null
 }
 
-export const workspaceKeys = {
-  list: () => ['workspaces'] as const,
-  detail: (id: string) => ['workspaces', id] as const,
+export const teamKeys = {
+  list: () => ['teams'] as const,
+  detail: (id: string) => ['teams', id] as const,
 }
 
-export function useGetWorkspaces(params?: { project_id?: string }) {
+/** @deprecated Use TeamRole instead */
+export type WorkspaceRole = TeamRole
+
+/** @deprecated Use Team instead */
+export type Workspace = Team
+
+/** @deprecated Use TeamDetail instead */
+export type WorkspaceDetail = Team
+
+export function useGetTeams(params?: { project_id?: string }) {
   return useQuery({
-    queryKey: ['workspaces', params],
+    queryKey: ['teams', params],
     queryFn: () => {
       const queryString = params?.project_id
         ? `?project_id=${encodeURIComponent(params.project_id)}`
         : '';
-      return apiClient.get<Workspace[]>(`/api/workspaces${queryString}`);
+      return apiClient.get<Team[]>(`/api/teams${queryString}`);
     },
   })
 }
 
-export function useGetWorkspace(id: string) {
+/** @deprecated Use useGetTeams instead */
+export const useGetWorkspaces = useGetTeams
+
+export function useGetTeam(id: string) {
   return useQuery({
-    queryKey: workspaceKeys.detail(id),
-    queryFn: () => apiClient.get<WorkspaceDetail>(`/api/workspaces/${id}`),
+    queryKey: teamKeys.detail(id),
+    queryFn: () => apiClient.get<TeamDetail>(`/api/teams/${id}`),
     enabled: !!id,
   })
 }
 
-export function useCreateWorkspace() {
+/** @deprecated Use useGetTeam instead */
+export const useGetWorkspace = useGetTeam
+
+export function useCreateTeam() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: {
@@ -62,66 +77,78 @@ export function useCreateWorkspace() {
       anthropic_base_url?: string;
       project_id?: string;
       template_id?: string;
-      role?: WorkspaceRole;
+      role?: TeamRole;
       model?: string;
       environment_variables?: Record<string, string>
     }) =>
-      apiClient.post<{ id: string; path: string }>('/api/workspaces', data),
+      apiClient.post<{ id: string; path: string }>('/api/teams', data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workspaceKeys.list() })
+      qc.invalidateQueries({ queryKey: teamKeys.list() })
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }
+
+/** @deprecated Use useCreateTeam instead */
+export const useCreateWorkspace = useCreateTeam
 
 export function useGetAgentTemplates() {
   return useQuery({
     queryKey: ['agent-templates'],
-    queryFn: () => apiClient.get<Array<{ id: string; label: string; description: string }>>('/api/workspaces/templates'),
+    queryFn: () => apiClient.get<Array<{ id: string; label: string; description: string }>>('/api/teams/templates'),
   })
 }
 
-export function useDeleteWorkspace() {
+export function useDeleteTeam() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) =>
-      apiClient.delete<{ deleted: boolean }>(`/api/workspaces/${id}`),
+      apiClient.delete<{ deleted: boolean }>(`/api/teams/${id}`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workspaceKeys.list() })
+      qc.invalidateQueries({ queryKey: teamKeys.list() })
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }
 
-export function useUpdateWorkspaceRole() {
+/** @deprecated Use useDeleteTeam instead */
+export const useDeleteWorkspace = useDeleteTeam
+
+export function useUpdateTeamRole() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, role }: { id: string; role: WorkspaceRole }) =>
-      apiClient.put<{ updated: boolean }>(`/api/workspaces/${id}`, { role }),
+    mutationFn: ({ id, role }: { id: string; role: TeamRole }) =>
+      apiClient.put<{ updated: boolean }>(`/api/teams/${id}`, { role }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workspaceKeys.list() })
+      qc.invalidateQueries({ queryKey: teamKeys.list() })
     },
   })
 }
 
-export function useUpdateWorkspaceProject() {
+/** @deprecated Use useUpdateTeamRole instead */
+export const useUpdateWorkspaceRole = useUpdateTeamRole
+
+export function useUpdateTeamProject() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, project_id }: { id: string; project_id: string }) =>
-      apiClient.put<{ updated: boolean }>(`/api/workspaces/${id}/project`, { project_id }),
+      apiClient.put<{ updated: boolean }>(`/api/teams/${id}/project`, { project_id }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workspaceKeys.list() })
+      qc.invalidateQueries({ queryKey: teamKeys.list() })
       qc.invalidateQueries({ queryKey: ['projects'] })
     },
   })
 }
+
+/** @deprecated Use useUpdateTeamProject instead */
+export const useUpdateWorkspaceProject = useUpdateTeamProject
 
 export function useSaveClaudeMd(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (content: string) =>
-      apiClient.put<{ saved: boolean }>(`/api/workspaces/${id}/claude-md`, { content }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(id) }),
+      apiClient.put<{ saved: boolean }>(`/api/teams/${id}/claude-md`, { content }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(id) }),
   })
 }
 
@@ -129,74 +156,74 @@ export function useSaveSettings(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (settings: any) =>
-      apiClient.put<{ saved: boolean }>(`/api/workspaces/${id}/settings`, { settings }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(id) }),
+      apiClient.put<{ saved: boolean }>(`/api/teams/${id}/settings`, { settings }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(id) }),
   })
 }
 
-export function useGetSkill(workspaceId: string, skillName: string) {
+export function useGetSkill(teamId: string, skillName: string) {
   return useQuery({
-    queryKey: ['workspaces', workspaceId, 'skills', skillName] as const,
+    queryKey: ['teams', teamId, 'skills', skillName] as const,
     queryFn: () => apiClient.get<{ name: string; content: string }>(
-      `/api/workspaces/${workspaceId}/skills/${skillName}`
+      `/api/teams/${teamId}/skills/${skillName}`
     ),
-    enabled: !!workspaceId && !!skillName,
+    enabled: !!teamId && !!skillName,
   })
 }
 
-export function useInstallSkill(workspaceId: string) {
+export function useInstallSkill(teamId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ name, content }: { name: string; content: string }) =>
       apiClient.post<{ name: string; installed: boolean }>(
-        `/api/workspaces/${workspaceId}/skills`,
+        `/api/teams/${teamId}/skills`,
         { name, content }
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(teamId) }),
   })
 }
 
-export function useDeleteSkill(workspaceId: string) {
+export function useDeleteSkill(teamId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (skillName: string) =>
       apiClient.delete<{ deleted: boolean }>(
-        `/api/workspaces/${workspaceId}/skills/${skillName}`
+        `/api/teams/${teamId}/skills/${skillName}`
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(teamId) }),
   })
 }
 
-export function useGetAgent(workspaceId: string, agentName: string) {
+export function useGetAgent(teamId: string, agentName: string) {
   return useQuery({
-    queryKey: ['workspaces', workspaceId, 'agents', agentName] as const,
+    queryKey: ['teams', teamId, 'agents', agentName] as const,
     queryFn: () => apiClient.get<{ name: string; content: string }>(
-      `/api/workspaces/${workspaceId}/agents/${agentName}`
+      `/api/teams/${teamId}/agents/${agentName}`
     ),
-    enabled: !!workspaceId && !!agentName,
+    enabled: !!teamId && !!agentName,
   })
 }
 
-export function useSaveAgent(workspaceId: string) {
+export function useSaveAgent(teamId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ name, content }: { name: string; content: string }) =>
       apiClient.put<{ saved: boolean }>(
-        `/api/workspaces/${workspaceId}/agents/${name}`,
+        `/api/teams/${teamId}/agents/${name}`,
         { content }
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(teamId) }),
   })
 }
 
-export function useDeleteAgent(workspaceId: string) {
+export function useDeleteAgent(teamId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (agentName: string) =>
       apiClient.delete<{ deleted: boolean }>(
-        `/api/workspaces/${workspaceId}/agents/${agentName}`
+        `/api/teams/${teamId}/agents/${agentName}`
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.detail(teamId) }),
   })
 }
 
@@ -205,41 +232,44 @@ export function useRenameAgent() {
   return useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       apiClient.put<{ old_path: string; new_path: string }>(
-        `/api/workspaces/${id}/rename`,
+        `/api/teams/${id}/rename`,
         { name }
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workspaceKeys.list() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamKeys.list() }),
   })
 }
 
-export function useGetWorkspaceEnvironments(workspaceId: string) {
+export function useGetTeamEnvironments(teamId: string) {
   return useQuery({
-    queryKey: ['workspace-environments', workspaceId],
-    queryFn: () => apiClient.get<{ id: string; name: string; type: string; project_path: string }[]>(`/api/workspaces/${workspaceId}/environments`),
-    enabled: !!workspaceId,
+    queryKey: ['team-environments', teamId],
+    queryFn: () => apiClient.get<{ id: string; name: string; type: string; project_path: string }[]>(`/api/teams/${teamId}/environments`),
+    enabled: !!teamId,
   })
 }
+
+/** @deprecated Use useGetTeamEnvironments instead */
+export const useGetWorkspaceEnvironments = useGetTeamEnvironments
 
 export function useLinkEnvironment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, environment_id }: { workspaceId: string; environment_id: string }) =>
-      apiClient.post<{ linked: boolean }>(`/api/workspaces/${workspaceId}/environments`, {
+    mutationFn: ({ teamId, environment_id }: { teamId: string; environment_id: string }) =>
+      apiClient.post<{ linked: boolean }>(`/api/teams/${teamId}/environments`, {
         environment_id
       }),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['workspace-environments', vars.workspaceId] }),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['team-environments', vars.teamId] }),
   })
 }
 
 export function useUnlinkEnvironment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, environment_id }: { workspaceId: string; environment_id: string }) =>
-      apiFetch<{ unlinked: boolean }>(`/api/workspaces/${workspaceId}/environments`, {
+    mutationFn: ({ teamId, environment_id }: { teamId: string; environment_id: string }) =>
+      apiFetch<{ unlinked: boolean }>(`/api/teams/${teamId}/environments`, {
         method: 'DELETE',
         body: JSON.stringify({ environment_id })
       }),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['workspace-environments', vars.workspaceId] }),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['team-environments', vars.teamId] }),
   })
 }
 
@@ -253,23 +283,23 @@ export function useGetNativeSkills() {
 export function useInstallNativeSkill() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, skillId }: { workspaceId: string; skillId: string }) =>
+    mutationFn: ({ teamId, skillId }: { teamId: string; skillId: string }) =>
       apiClient.post<{ installed: boolean; path: string }>(
-        `/api/workspaces/${workspaceId}/native-skills/${skillId}`
+        `/api/teams/${teamId}/native-skills/${skillId}`
       ),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: workspaceKeys.detail(vars.workspaceId) }),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: teamKeys.detail(vars.teamId) }),
   })
 }
 
 export function useImportCustomSkill() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, skillName, content }: { workspaceId: string; skillName: string; content: string }) =>
+    mutationFn: ({ teamId, skillName, content }: { teamId: string; skillName: string; content: string }) =>
       apiClient.post<{ created: boolean; path: string }>(
-        `/api/workspaces/${workspaceId}/skills`,
+        `/api/teams/${teamId}/skills`,
         { name: skillName, content }
       ),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: workspaceKeys.detail(vars.workspaceId) }),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: teamKeys.detail(vars.teamId) }),
   })
 }
 
@@ -287,20 +317,23 @@ export function useGetAgentModels() {
   })
 }
 
-export function useUpdateWorkspaceModel() {
+export function useUpdateTeamModel() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, model }: { id: string; model: string }) =>
-      apiClient.put(`/api/workspaces/${id}`, { model }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['workspaces'] }),
+      apiClient.put(`/api/teams/${id}`, { model }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teams'] }),
   })
 }
 
+/** @deprecated Use useUpdateTeamModel instead */
+export const useUpdateWorkspaceModel = useUpdateTeamModel
+
 export function useImproveClaudeMd() {
   return useMutation({
-    mutationFn: ({ workspaceId, currentContent }: { workspaceId: string; currentContent: string }) =>
+    mutationFn: ({ teamId, currentContent }: { teamId: string; currentContent: string }) =>
       apiClient.post<{ planId: string; taskId: string; message: string }>(
-        `/api/workspaces/${workspaceId}/improve-claude-md`,
+        `/api/teams/${teamId}/improve-claude-md`,
         { currentContent }
       ),
   })
@@ -309,18 +342,18 @@ export function useImproveClaudeMd() {
 export function useGetNativeAgents() {
   return useQuery({
     queryKey: ['native-agents'] as const,
-    queryFn: () => apiClient.get<Array<{ name: string; description: string; model: string; tools: string[]; color: string; file: string }>>('/api/workspaces/native-agents'),
+    queryFn: () => apiClient.get<Array<{ name: string; description: string; model: string; tools: string[]; color: string; file: string }>>('/api/teams/native-agents'),
   })
 }
 
 export function useInstallNativeAgent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ workspaceId, agentName }: { workspaceId: string; agentName: string }) =>
+    mutationFn: ({ teamId, agentName }: { teamId: string; agentName: string }) =>
       apiClient.post<{ installed: boolean }>(
-        `/api/workspaces/${workspaceId}/native-agents/${agentName}`
+        `/api/teams/${teamId}/native-agents/${agentName}`
       ),
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: workspaceKeys.detail(vars.workspaceId) }),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: teamKeys.detail(vars.teamId) }),
   })
 }
 

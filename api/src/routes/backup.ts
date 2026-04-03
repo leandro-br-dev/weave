@@ -47,8 +47,8 @@ interface BackupData {
   environments: any[]
   project_agents: any[]
   agent_environments: any[]
-  workspace_roles: any[]
-  workspace_models: any[]
+  team_roles: any[]
+  team_models: any[]
   plans: any[]
   plan_logs: any[]
   kanban_tasks: any[]
@@ -302,8 +302,8 @@ router.post('/export', authenticateToken, (_req, res) => {
       environments: [],
       project_agents: [],
       agent_environments: [],
-      workspace_roles: [],
-      workspace_models: [],
+      team_roles: [],
+      team_models: [],
       plans: [],
       plan_logs: [],
       kanban_tasks: [],
@@ -320,8 +320,8 @@ router.post('/export', authenticateToken, (_req, res) => {
     backup.environments = db.prepare('SELECT * FROM environments ORDER BY created_at').all() as any[]
     backup.project_agents = db.prepare('SELECT * FROM project_agents ORDER BY created_at').all() as any[]
     backup.agent_environments = db.prepare('SELECT * FROM agent_environments ORDER BY created_at').all() as any[]
-    backup.workspace_roles = db.prepare('SELECT * FROM workspace_roles').all() as any[]
-    backup.workspace_models = db.prepare('SELECT * FROM workspace_models').all() as any[]
+    backup.team_roles = db.prepare('SELECT * FROM team_roles').all() as any[]
+    backup.team_models = db.prepare('SELECT * FROM team_models').all() as any[]
     backup.plans = db.prepare('SELECT * FROM plans ORDER BY created_at').all() as any[]
     backup.plan_logs = db.prepare('SELECT * FROM plan_logs ORDER BY created_at').all() as any[]
     backup.kanban_tasks = db.prepare('SELECT * FROM kanban_tasks ORDER BY created_at').all() as any[]
@@ -377,8 +377,8 @@ router.post('/import', authenticateToken, (req, res) => {
     const importDb = db.transaction(() => {
       // ---- 1. Projects -------------------------------------------------------
       const insertProject = db.prepare(`
-        INSERT OR IGNORE INTO projects (id, name, description, settings, color, created_at, user_id, max_concurrent_workflows, max_planning_tasks, max_in_progress_tasks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO projects (id, name, description, settings, color, created_at, user_id, max_concurrent_workflows, max_planning_tasks, max_in_progress_tasks, git_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       for (const p of backup.projects) {
@@ -395,13 +395,14 @@ router.post('/import', authenticateToken, (req, res) => {
           p.max_concurrent_workflows || 0,
           p.max_planning_tasks || 1,
           p.max_in_progress_tasks || 1,
+          p.git_url || null,
         )
       }
 
       // ---- 2. Environments ---------------------------------------------------
       const insertEnv = db.prepare(`
-        INSERT OR IGNORE INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars, git_repository, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       for (const e of backup.environments) {
@@ -418,7 +419,6 @@ router.post('/import', authenticateToken, (req, res) => {
           e.agent_workspace || '',
           e.ssh_config || null,
           e.env_vars || null,
-          e.git_repository || null,
           e.created_at || new Date().toISOString(),
         )
       }
@@ -444,19 +444,19 @@ router.post('/import', authenticateToken, (req, res) => {
         insertAE.run(ae.workspace_path || '', mappedEnvId, ae.created_at || new Date().toISOString())
       }
 
-      const insertRole = db.prepare(`INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES (?, ?)`)
-      for (const wr of backup.workspace_roles) {
+      const insertRole = db.prepare(`INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)`)
+      for (const wr of backup.team_roles) {
         insertRole.run(wr.workspace_path, wr.role)
       }
 
-      const insertModel = db.prepare(`INSERT OR REPLACE INTO workspace_models (workspace_path, model) VALUES (?, ?)`)
-      for (const wm of backup.workspace_models) {
+      const insertModel = db.prepare(`INSERT OR REPLACE INTO team_models (workspace_path, model) VALUES (?, ?)`)
+      for (const wm of backup.team_models) {
         insertModel.run(wm.workspace_path, wm.model)
       }
 
       // ---- 4. Plans ----------------------------------------------------------
       const insertPlan = db.prepare(`
-        INSERT OR IGNORE INTO plans (id, name, tasks, status, client_id, result, started_at, completed_at, created_at, project_id, type, structured_output, result_status, result_notes, workspace_id, last_heartbeat_at, parent_plan_id, rework_prompt, user_id)
+        INSERT OR IGNORE INTO plans (id, name, tasks, status, client_id, result, started_at, completed_at, created_at, project_id, type, structured_output, result_status, result_notes, team_id, last_heartbeat_at, parent_plan_id, rework_prompt, user_id)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
@@ -478,7 +478,7 @@ router.post('/import', authenticateToken, (req, res) => {
           pl.structured_output || null,
           pl.result_status || null,
           pl.result_notes || '',
-          pl.workspace_id || null,
+          pl.team_id || pl.workspace_id || null,
           pl.last_heartbeat_at || null,
           (pl.parent_plan_id && idMap[pl.parent_plan_id]) || null,
           pl.rework_prompt || '',

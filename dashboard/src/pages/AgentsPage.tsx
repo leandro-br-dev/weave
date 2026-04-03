@@ -1,5 +1,5 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, type Workspace, type WorkspaceRole, type AgentModel } from '../api/workspaces'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { useState, useRef, useMemo, useEffect } from 'react'
@@ -55,10 +55,10 @@ const ROLE_HINTS: Record<string, string> = {
 
 export default function AgentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const workspaceId = searchParams.get('workspace')
+  const teamId = searchParams.get('workspace')
 
-  if (workspaceId) {
-    return <WorkspaceDetail workspaceId={workspaceId} onClose={() => setSearchParams({})} />
+  if (teamId) {
+    return <WorkspaceDetail teamId={teamId} onClose={() => setSearchParams({})} />
   }
 
   return <WorkspaceList onSelectWorkspace={(id) => setSearchParams({ workspace: id })} />
@@ -432,7 +432,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
       ) : (
         <EmptyState
           title="No agents yet"
-          description="Create your first agent workspace to get started"
+          description="Create your first agent team to get started"
         />
       )}
 
@@ -698,9 +698,9 @@ function WorkspaceTableRow({
   )
 }
 
-function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
+function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => void }) {
   const { t } = useTranslation()
-  const { data: workspace, isLoading, error } = useGetWorkspace(workspaceId)
+  const { data: workspace, isLoading, error } = useGetWorkspace(teamId)
   const [activeTab, setActiveTab] = useState<'claude' | 'settings' | 'skills' | 'agents' | 'environments'>('claude')
   const [editingName, setEditingName] = useState(false)
   const [newName, setNewName] = useState('')
@@ -716,7 +716,7 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
 
   const handleDelete = () => {
     setIsDeleting(true)
-    deleteWorkspace.mutate(workspaceId, {
+    deleteWorkspace.mutate(teamId, {
       onSuccess: () => {
         onClose()
       },
@@ -727,7 +727,7 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
   const handleRename = () => {
     if (newName && workspace && newName !== workspace.name) {
       renameAgent.mutate(
-        { id: workspaceId, name: newName },
+        { id: teamId, name: newName },
         {
           onSuccess: () => {
             setEditingName(false)
@@ -829,11 +829,11 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
         </nav>
       </div>
 
-      {activeTab === 'claude' && <ClaudeMdTab workspaceId={workspaceId} content={workspace.claudeMd} />}
-      {activeTab === 'settings' && <SettingsTab workspaceId={workspaceId} settings={workspace.settings} />}
-      {activeTab === 'skills' && <SkillsTab workspaceId={workspaceId} skills={workspace.skills} />}
-      {activeTab === 'agents' && <AgentsTab workspaceId={workspaceId} agents={workspace.agents} />}
-      {activeTab === 'environments' && <EnvironmentsTab workspaceId={workspaceId} />}
+      {activeTab === 'claude' && <ClaudeMdTab teamId={teamId} content={workspace.claudeMd} />}
+      {activeTab === 'settings' && <SettingsTab teamId={teamId} settings={workspace.settings} />}
+      {activeTab === 'skills' && <SkillsTab teamId={teamId} skills={workspace.skills} />}
+      {activeTab === 'agents' && <AgentsTab teamId={teamId} agents={workspace.agents} />}
+      {activeTab === 'environments' && <EnvironmentsTab teamId={teamId} />}
     </div>
 
     <ConfirmDialog
@@ -873,7 +873,7 @@ function TabButton({
   )
 }
 
-function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: string | null }) {
+function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | null }) {
   const { t } = useTranslation()
   const [value, setValue] = useState(content || '')
   const [improvedContent, setImprovedContent] = useState('')
@@ -887,12 +887,12 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
   // Ref to track if we've already shown the modal for the current improvement
   const hasShownModalForContentRef = useRef(false)
 
-  const saveClaudeMd = useSaveClaudeMd(workspaceId)
+  const saveClaudeMd = useSaveClaudeMd(teamId)
   const improveClaudeMd = useImproveClaudeMd()
   const { showToast } = useToast()
 
   // LocalStorage key for persisting improvement plan ID
-  const improvementStorageKey = `claude-md-improvement-${workspaceId}`
+  const improvementStorageKey = `claude-md-improvement-${teamId}`
 
   // Load improvement plan ID from localStorage on mount
   useEffect(() => {
@@ -947,14 +947,14 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
         isMutationPending: improveClaudeMd.isPending,
         isPolling: isImproving,
         planId: improvementPlanId,
-        workspaceId
+        teamId
       })
       showToast('info', 'AI Improvement Started', 'Your CLAUDE.md is being analyzed and improved...')
       setShowedStartToast(true)
     } else if (!improveClaudeMd.isPending && !isImproving) {
       setShowedStartToast(false)
     }
-  }, [improveClaudeMd.isPending, isImproving, showedStartToast, showToast, improvementPlanId, workspaceId])
+  }, [improveClaudeMd.isPending, isImproving, showedStartToast, showToast, improvementPlanId, teamId])
 
   // Handle successful improvement completion
   useEffect(() => {
@@ -963,7 +963,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
         planId: improvementPlanId,
         contentLength: polledImprovedContent.length,
         currentModalState: showImprovementModal,
-        workspaceId
+        teamId
       })
 
       // Preserve planId for modal before cleanup
@@ -980,7 +980,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
       setShowedStartToast(false)
       showToast('success', 'Improvement Complete!', 'Review the AI-suggested changes below.')
     }
-  }, [polledImprovedContent, showToast, improvementPlanId, showImprovementModal, workspaceId])
+  }, [polledImprovedContent, showToast, improvementPlanId, showImprovementModal, teamId])
 
   // Handle polling error (timeout or other errors)
   useEffect(() => {
@@ -988,7 +988,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
       console.error(`[${new Date().toISOString()}] [ClaudeMdTab] ❌ Improvement polling error`, {
         planId: improvementPlanId,
         error: pollingError,
-        workspaceId
+        teamId
       })
       setImprovementError(pollingError)
       // Don't clear planId on error - keep it so user can check the plan
@@ -1001,11 +1001,11 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
         : pollingError
       showToast('error', 'Improvement Incomplete', errorMessage)
     }
-  }, [pollingError, showToast, improvementPlanId, workspaceId])
+  }, [pollingError, showToast, improvementPlanId, teamId])
 
   const handleImproveWithAI = async () => {
     console.log(`[${new Date().toISOString()}] [ClaudeMdTab] 🚀 Triggering AI improvement`, {
-      workspaceId,
+      teamId,
       currentContentLength: value.length,
       hasExistingPlanId: !!improvementPlanId
     })
@@ -1014,7 +1014,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
     hasShownModalForContentRef.current = false
     try {
       const result = await improveClaudeMd.mutateAsync({
-        workspaceId,
+        teamId,
         currentContent: value,
       })
 
@@ -1022,21 +1022,21 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
         planId: result?.planId,
         taskId: result?.taskId,
         message: result?.message,
-        workspaceId
+        teamId
       })
 
       if (result?.planId) {
         // Store the plan ID for polling instead of navigating
         console.log(`[${new Date().toISOString()}] [ClaudeMdTab] ✅ Plan ID stored, polling will start`, {
           planId: result.planId,
-          workspaceId
+          teamId
         })
         setImprovementPlanId(result.planId)
       }
     } catch (error) {
       console.error(`[${new Date().toISOString()}] [ClaudeMdTab] ❌ Error improving CLAUDE.md`, {
         error: error instanceof Error ? error.message : String(error),
-        workspaceId
+        teamId
       })
       setImprovementError('Failed to improve CLAUDE.md. Please try again.')
       setImprovementPlanId(null)
@@ -1052,7 +1052,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
   const handleApproveImprovement = (approvedContent: string) => {
     console.log(`[${new Date().toISOString()}] [ClaudeMdTab] ✅ User approved improvement`, {
       contentLength: approvedContent.length,
-      workspaceId,
+      teamId,
       willSaveToServer: true
     })
     setValue(approvedContent)
@@ -1066,7 +1066,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
 
   const handleDiscardImprovement = () => {
     console.log(`[${new Date().toISOString()}] [ClaudeMdTab] ❌ User discarded improvement`, {
-      workspaceId,
+      teamId,
       improvedContentLength: improvedContent.length
     })
     setShowImprovementModal(false)
@@ -1083,9 +1083,9 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
       improvedContentLength: improvedContent.length,
       planId: improvementPlanId,
       isImproving,
-      workspaceId
+      teamId
     })
-  }, [showImprovementModal, improvedContent, improvementPlanId, isImproving, workspaceId])
+  }, [showImprovementModal, improvedContent, improvementPlanId, isImproving, teamId])
 
   return (
     <div className="space-y-4">
@@ -1130,7 +1130,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
                 {improveClaudeMd.isPending ? 'Starting AI Improvement...' : 'AI is Analyzing & Improving Your CLAUDE.md...'}
               </p>
               <p className={`text-xs ${withDarkMode(infoColors.text, darkModeInfoColors.text)} mt-1`}>
-                {improveClaudeMd.isPending ? 'Initializing workspace connection...' : 'This may take 30-60 seconds. Please wait.'}
+                {improveClaudeMd.isPending ? 'Initializing team connection...' : 'This may take 30-60 seconds. Please wait.'}
               </p>
             </div>
             <div className="flex gap-1">
@@ -1170,7 +1170,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
   )
 }
 
-function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings: any }) {
+function SettingsTab({ teamId, settings }: { teamId: string; settings: any }) {
   const { t } = useTranslation()
   // env is an object like { KEY: 'value', KEY2: 'value2' }, convert to array of {key, value}
   const [envVars, setEnvVars] = useState<Array<{ key: string; value: string }>>(() =>
@@ -1183,7 +1183,7 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
   const [additionalDirs, setAdditionalDirs] = useState<string[]>(
     settings?.permissions?.additionalDirectories || []
   )
-  const saveSettings = useSaveSettings(workspaceId)
+  const saveSettings = useSaveSettings(teamId)
 
   const handleSave = () => {
     // Convert array of {key, value} back to object
@@ -1318,7 +1318,7 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
   )
 }
 
-function SkillsTab({ workspaceId, skills }: { workspaceId: string; skills: Array<{ name: string; hasSkillMd: boolean }> }) {
+function SkillsTab({ teamId, skills }: { teamId: string; skills: Array<{ name: string; hasSkillMd: boolean }> }) {
   const { t } = useTranslation()
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingSkill, setEditingSkill] = useState<string | null>(null)
@@ -1327,9 +1327,9 @@ function SkillsTab({ workspaceId, skills }: { workspaceId: string; skills: Array
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const importSkillRef = useRef<HTMLInputElement>(null)
 
-  const installSkill = useInstallSkill(workspaceId)
-  const deleteSkill = useDeleteSkill(workspaceId)
-  const { data: skillData } = useGetSkill(workspaceId, editingSkill || '')
+  const installSkill = useInstallSkill(teamId)
+  const deleteSkill = useDeleteSkill(teamId)
+  const { data: skillData } = useGetSkill(teamId, editingSkill || '')
   const { data: nativeSkills = [] } = useGetNativeSkills()
   const installNativeSkill = useInstallNativeSkill()
   const importCustomSkill = useImportCustomSkill()
@@ -1397,7 +1397,7 @@ description: "Descreva quando usar esta skill"
     const skillName = file.name.replace(/\.(md|txt|markdown)$/, '')
 
     await importCustomSkill.mutateAsync({
-      workspaceId,
+      teamId,
       skillName,
       content,
     })
@@ -1465,7 +1465,7 @@ description: "Descreva quando usar esta skill"
                 ) : (
                   <Button
                     variant="secondary" size="sm"
-                    onClick={() => installNativeSkill.mutate({ workspaceId, skillId: skill.id })}
+                    onClick={() => installNativeSkill.mutate({ teamId, skillId: skill.id })}
                     disabled={installNativeSkill.isPending}
                   >
                     {installNativeSkill.isPending ? t('pages.agents.skillsTab.installing') : t('pages.agents.skillsTab.add')}
@@ -1559,7 +1559,7 @@ description: "Descreva quando usar esta skill"
   )
 }
 
-function AgentsTab({ workspaceId, agents }: { workspaceId: string; agents: Array<{ name: string; file: string }> }) {
+function AgentsTab({ teamId, agents }: { teamId: string; agents: Array<{ name: string; file: string }> }) {
   const { t } = useTranslation()
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingAgent, setEditingAgent] = useState<string | null>(null)
@@ -1567,9 +1567,9 @@ function AgentsTab({ workspaceId, agents }: { workspaceId: string; agents: Array
   const [agentContent, setAgentContent] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
-  const saveAgent = useSaveAgent(workspaceId)
-  const deleteAgent = useDeleteAgent(workspaceId)
-  const { data: agentData } = useGetAgent(workspaceId, editingAgent || '')
+  const saveAgent = useSaveAgent(teamId)
+  const deleteAgent = useDeleteAgent(teamId)
+  const { data: agentData } = useGetAgent(teamId, editingAgent || '')
   const { data: nativeAgents = [] } = useGetNativeAgents()
   const installNativeAgent = useInstallNativeAgent()
 
@@ -1683,7 +1683,7 @@ Descreva a especialidade e comportamento deste agente.
                 ) : (
                   <Button
                     variant="secondary" size="sm"
-                    onClick={() => installNativeAgent.mutate({ workspaceId, agentName: agent.name })}
+                    onClick={() => installNativeAgent.mutate({ teamId, agentName: agent.name })}
                     disabled={installNativeAgent.isPending}
                   >
                     {installNativeAgent.isPending ? t('pages.agents.agentsTab.installing') : t('pages.agents.agentsTab.add')}
@@ -1775,10 +1775,10 @@ Descreva a especialidade e comportamento deste agente.
   )
 }
 
-function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
+function EnvironmentsTab({ teamId }: { teamId: string }) {
   const { t } = useTranslation()
-  const { data: linkedEnvs, isLoading } = useGetWorkspaceEnvironments(workspaceId)
-  const { data: workspace } = useGetWorkspace(workspaceId)
+  const { data: linkedEnvs, isLoading } = useGetWorkspaceEnvironments(teamId)
+  const { data: workspace } = useGetWorkspace(teamId)
   const { data: allEnvironments } = useGetAllEnvironments()
   const { data: projects } = useGetProjects()
   const [linkingEnv, setLinkingEnv] = useState(false)
@@ -1852,7 +1852,7 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => unlinkEnv.mutate({ workspaceId, environment_id: env.id })}
+                  onClick={() => unlinkEnv.mutate({ teamId, environment_id: env.id })}
                   title={t('pages.agents.environmentsTab.unlinkEnvironment')}
                   disabled={unlinkEnv.isPending}
                 >
@@ -1921,7 +1921,7 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
                     onClick={() => {
                       if (selectedEnvToLink) {
                         linkEnv.mutate(
-                          { workspaceId, environment_id: selectedEnvToLink },
+                          { teamId, environment_id: selectedEnvToLink },
                           {
                             onSuccess: () => {
                               setLinkingEnv(false)

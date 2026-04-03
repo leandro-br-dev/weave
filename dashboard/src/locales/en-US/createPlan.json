@@ -4,7 +4,7 @@
     "taskNameRequired": "Task name is required",
     "taskPromptRequired": "Task prompt is required",
     "workingDirectoryRequired": "Working directory is required",
-    "agentWorkspaceRequired": "Agent workspace is required"
+    "agentWorkspaceRequired": "Agent team is required"
   },
   "backToPlans": "Back to Plans",
   "plans": "Plans",
@@ -38,7 +38,7 @@
       "selectPlaceholder": "Select an agent...",
       "selectProjectFirst": "Select a project first",
       "noAgents": "No agents available",
-      "createWorkspaceLink": "Create a workspace"
+      "createWorkspaceLink": "Create a team"
     },
     "environment": {
       "label": "Environment",

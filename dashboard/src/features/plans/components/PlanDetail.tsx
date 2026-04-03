@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePlan, useEditPlan, useCheckCompletion, useReworkPlan } from '@/api/plans';
-import { useSaveClaudeMd } from '@/api/workspaces';
+import { useSaveClaudeMd } from '@/api/teams';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
 import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn } from 'lucide-react';
@@ -213,8 +213,8 @@ export function PlanDetail() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
-  // Initialize saveClaudeMd hook with workspace_id from plan
-  const saveClaudeMd = useSaveClaudeMd(plan?.workspace_id || '');
+  // Initialize saveClaudeMd hook with team_id from plan
+  const saveClaudeMd = useSaveClaudeMd(plan?.team_id || '');
   const forceStop = useMutation({
     mutationFn: (planId: string) =>
       apiFetch(`/api/plans/${planId}/force-stop`, { method: 'POST' }),
@@ -364,10 +364,10 @@ export function PlanDetail() {
   };
 
   const handleApproveImprovement = async (content: string) => {
-    // Check if we have a workspace_id
-    if (!plan?.workspace_id) {
+    // Check if we have a team_id
+    if (!plan?.team_id) {
       showToast('error', t('planDetail.cannotSaveImprovements'), t('planDetail.workspaceIdNotFound'));
-      console.error('Cannot save improvements: no workspace_id in plan', plan);
+      console.error('Cannot save improvements: no team_id in plan', plan);
       return;
     }
 
@@ -671,12 +671,12 @@ export function PlanDetail() {
                         {new Date(plan.structured_output.improvementApprovedAt).toLocaleString()}
                       </dd>
                     </div>
-                    {plan.workspace_id && (
+                    {plan.team_id && (
                       <div>
                         <dt className="text-sm font-medium text-gray-500">{t('planDetail.actions')}</dt>
                         <dd className="mt-1 text-sm text-gray-900">
                           <button
-                            onClick={() => navigate(`/workspaces/${plan.workspace_id}`)}
+                            onClick={() => navigate(`/workspaces/${plan.team_id}`)}
                             className="text-orange-600 hover:text-orange-800 text-sm font-medium"
                           >
                             {t('planDetail.viewUpdatedClaudeMd')} →

@@ -67,6 +67,12 @@ function runMigrations(database: Database.Database): void {
 
     console.log(`[DB] Applying migration ${migration.version}: ${migration.description}`)
 
+    // For migration 32, disable foreign keys temporarily outside the transaction
+    // to allow table recreation (plan_logs references plans).
+    if (migration.version === 32) {
+      database.pragma('foreign_keys = OFF')
+    }
+
     // Roda cada statement da migration numa transação
     const apply = database.transaction(() => {
       for (const sql of migration.up) {
@@ -90,6 +96,11 @@ function runMigrations(database: Database.Database): void {
     apply()
     count++
     console.log(`[DB] Migration ${migration.version} applied OK`)
+
+    // Re-enable foreign keys after migration 32
+    if (migration.version === 32) {
+      database.pragma('foreign_keys = ON')
+    }
   }
 
   if (count === 0) {

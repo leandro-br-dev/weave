@@ -20,7 +20,7 @@ export interface Plan {
   tasks: Task[];
   client_id?: string;
   project_id?: string;
-  workspace_id?: string;
+  team_id?: string;
   parent_plan_id?: string;
   rework_prompt?: string;
   rework_mode?: string;

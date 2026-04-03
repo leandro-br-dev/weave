@@ -19,7 +19,7 @@
     "general": {
       "label": "Geral",
       "description": "Configurações básicas e preferências",
-      "sections": ["language", "appearance", "workspaces"]
+      "sections": ["language", "appearance", "teams"]
     },
     "connections": {
       "label": "Conexões",

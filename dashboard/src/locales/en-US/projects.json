@@ -24,7 +24,7 @@
       },
       "empty": {
         "title": "No projects yet",
-        "description": "Create your first project to start managing your workspaces",
+        "description": "Create your first project to start managing your teams",
         "createProject": "Create Project"
       },
       "form": {
@@ -34,6 +34,9 @@
         "description": "Description",
         "projectColor": "Project Color",
         "projectColorHint": "Choose a color to visually identify this project",
+        "gitUrl": "Git Repository URL",
+        "createDefaultEnvs": "Create default environments",
+        "createDefaultEnvsDesc": "Automatically create plan, dev, and staging environments from the repository",
         "creating": "Creating...",
         "createProject": "Create Project"
       },

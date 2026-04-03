@@ -10,7 +10,6 @@ export type Environment = {
   agent_workspace: string
   ssh_config?: string | null
   env_vars?: string | null
-  git_repository?: string | null
   created_at: string
 }
 
@@ -29,6 +28,7 @@ export type Project = {
   name: string
   description: string | null
   color?: string
+  git_url?: string | null
   created_at: string
   environments: Environment[]
   agent_paths?: string[]
@@ -45,8 +45,14 @@ export function useGetProjects() {
 export function useCreateProject() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; description?: string; color?: string }) =>
-      apiFetch<{ id: string }>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
+    mutationFn: (data: {
+      name: string
+      description?: string
+      color?: string
+      git_url?: string
+      create_default_envs?: boolean
+    }) =>
+      apiFetch<{ id: string; environments?: any[] }>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
   })
 }
@@ -153,7 +159,7 @@ export function useGenerateAgent() {
       )
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['workspaces'] })
+      qc.invalidateQueries({ queryKey: ['teams'] })
       qc.invalidateQueries({ queryKey: ['plans'] })
     },
   })
@@ -209,7 +215,7 @@ export function useCreateDefaultAgents() {
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
-      qc.invalidateQueries({ queryKey: ['workspaces'] })
+      qc.invalidateQueries({ queryKey: ['teams'] })
     },
   })
 }

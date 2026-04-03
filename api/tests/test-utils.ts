@@ -157,7 +157,6 @@ export class DatabaseTestHelper {
   cleanupTestData(): void {
     this.db.prepare('DELETE FROM project_agents WHERE project_id LIKE "test-%"').run()
     this.db.prepare('DELETE FROM kanban_tasks WHERE project_id LIKE "test-%"').run()
-    this.db.prepare('DELETE FROM workspaces WHERE project_id LIKE "test-%"').run()
     this.db.prepare('DELETE FROM projects WHERE id LIKE "test-%"').run()
   }
 

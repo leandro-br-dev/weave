@@ -7,7 +7,7 @@ import {
 import type { FileAttachment } from '@/components'
 import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession } from '@/api/sessions'
 import { useGetProjects } from '@/api/projects'
-import { useGetWorkspaces } from '@/api/workspaces'
+import { useGetWorkspaces } from '@/api/teams'
 import { useCreatePlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'

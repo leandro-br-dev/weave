@@ -15,7 +15,7 @@ mockUseImprovementStatus.mockReturnValue({
   error: null
 })
 
-vi.mock('../api/workspaces', () => ({
+vi.mock('../api/teams', () => ({
   useGetWorkspaces: () => ({ data: mockWorkspaces, isLoading: false, error: null }),
   useGetWorkspace: (id: string) => ({
     data: id === 'ws1' ? { id: 'ws1', name: 'Agent 1', claudeMd: '# Test', settings: {}, skills: [], agents: [] } : null,

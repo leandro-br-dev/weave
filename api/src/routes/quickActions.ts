@@ -80,20 +80,20 @@ router.post('/', authenticateToken, (req, res) => {
   const {
     name,
     message,           // o que o usuário quer
-    workspace_id,      // qual agente
+    team_id,           // qual agente
     environment_id,    // qual ambiente (para cwd)
     project_id,
     native_skill,      // 'planning' | 'reviewer' | 'debugger' | null
     attachment_ids,    // array of uploaded attachment IDs
   } = req.body
 
-  if (!message || !workspace_id) {
-    return res.status(400).json({ data: null, error: 'message and workspace_id are required' })
+  if (!message || !team_id) {
+    return res.status(400).json({ data: null, error: 'message and team_id are required' })
   }
 
   // Resolver workspace path a partir do ID
   const allWs = listAllWorkspaces()
-  const ws = allWs.find((w: any) => w.id === workspace_id)
+  const ws = allWs.find((w: any) => w.id === team_id)
   if (!ws) {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
