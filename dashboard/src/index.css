@@ -49,6 +49,22 @@
   .sidebar-transition {
     transition: transform 0.3s ease-in-out;
   }
+
+  /* Navigation rail panel slide-in */
+  .animate-slide-in {
+    animation: slide-in 0.2s ease-out;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Mobile-specific optimizations */

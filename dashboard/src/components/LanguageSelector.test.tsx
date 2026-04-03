@@ -149,21 +149,21 @@ describe('LanguageSelector', () => {
       render(<LanguageSelector />);
       const englishButton = screen.getByLabelText(/Switch to English/);
 
-      expect(englishButton).toHaveClass('bg-gray-900', 'text-white', 'border-gray-900');
+      expect(englishButton).toHaveClass('bg-gray-900', 'text-white', 'dark:bg-gray-800');
     });
 
     it('applies correct inactive button styles', () => {
       render(<LanguageSelector />);
       const portugueseButton = screen.getByLabelText(/Switch to Portuguese/);
 
-      expect(portugueseButton).toHaveClass('bg-white', 'text-gray-700', 'border-gray-300');
+      expect(portugueseButton).toHaveClass('bg-white', 'text-gray-600', 'border-gray-300');
     });
 
     it('applies hover state to inactive buttons', () => {
       render(<LanguageSelector />);
       const portugueseButton = screen.getByLabelText(/Switch to Portuguese/);
 
-      expect(portugueseButton).toHaveClass('hover:bg-gray-50');
+      expect(portugueseButton).toHaveClass('hover:bg-gray-100');
     });
   });
 });

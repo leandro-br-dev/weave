@@ -10,6 +10,7 @@ export interface Task {
   cwd: string;
   workspace: string;
   env_context?: string;
+  attachment_ids?: string[];
 }
 
 export interface Plan {
@@ -22,6 +23,8 @@ export interface Plan {
   workspace_id?: string;
   parent_plan_id?: string;
   rework_prompt?: string;
+  rework_mode?: string;
+  attachments?: string[];
   created_at: string;
   started_at?: string;
   completed_at?: string;
@@ -235,6 +238,7 @@ export const useCheckCompletion = () => {
 
 export interface ReworkPlanRequest {
   rework_prompt: string;
+  rework_mode?: 'full_workflow' | 'quick_action';
 }
 
 export const useReworkPlan = () => {

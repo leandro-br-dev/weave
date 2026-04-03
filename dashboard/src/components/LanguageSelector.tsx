@@ -1,6 +1,17 @@
 import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from 'react';
+import {
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  withDarkMode,
+} from '@/lib/colors';
 
 type Layout = 'horizontal' | 'vertical';
 
@@ -60,15 +71,17 @@ export function LanguageSelector({ className = '', layout = 'vertical' }: Langua
 
   const baseButtonClass = `
     flex items-center gap-2 px-3 py-2 rounded-md border transition-all duration-150
-    focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1
+    focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:ring-offset-1
   `;
 
   const activeButtonClass = `
-    bg-gray-900 text-white border-gray-900
+    ${bgColors.inverted} ${textColors.inverted} ${borderColors.transparent}
+    ${darkModeBgColors.tertiary} ${darkModeTextColors.primary} ${darkModeBorderColors.thick}
   `;
 
   const inactiveButtonClass = `
-    bg-white text-gray-700 border-gray-300 hover:bg-gray-50
+    ${bgColors.secondary} ${textColors.secondary} ${borderColors.thick}
+    ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)}
   `;
 
   const horizontalButtonClass = isHorizontal ? 'flex-col gap-1 px-2.5 py-2' : '';
@@ -100,7 +113,7 @@ export function LanguageSelector({ className = '', layout = 'vertical' }: Langua
               {!isHorizontal && (
                 <div className="flex flex-col items-start flex-1">
                   <span className="text-sm font-medium">{option.nativeName}</span>
-                  <span className="text-xs opacity-70">{option.localName}</span>
+                  <span className={`text-xs opacity-70`}>{option.localName}</span>
                 </div>
               )}
               {isHorizontal && (

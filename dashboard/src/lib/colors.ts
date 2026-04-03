@@ -86,6 +86,219 @@ export interface InteractiveStateColors {
   disabled: string
 }
 
+/**
+ * Accent/brand color scheme for primary brand identity (orange)
+ */
+export interface AccentColorScheme {
+  /** Primary accent background */
+  bg: string
+  /** Primary accent text */
+  text: string
+  /** Primary accent border */
+  border: string
+  /** Solid accent for indicators, dots, icons */
+  solid: string
+  /** Subtle accent background (lighter tint) */
+  bgSubtle: string
+  /** Accent text on dark backgrounds */
+  textOnDark: string
+  /** Accent border on dark backgrounds */
+  borderOnDark: string
+  /** Hover state for accent backgrounds */
+  hoverBg: string
+  /** Focus ring using accent color */
+  focusRing: string
+  /** Gradient start color */
+  gradientFrom: string
+  /** Gradient end color */
+  gradientTo: string
+}
+
+/**
+ * Color scheme for sidebar navigation panel
+ */
+export interface SidebarColorScheme {
+  /** Sidebar background */
+  bg: string
+  /** Sidebar text color */
+  text: string
+  /** Active navigation item styles */
+  activeItem: string
+  /** Hover state for navigation items */
+  hoverItem: string
+  /** Divider line between sections */
+  divider: string
+}
+
+/**
+ * Color scheme for navigation rail (narrow w-16 vertical bar on desktop)
+ */
+export interface RailColorScheme {
+  /** Rail background */
+  bg: string
+  /** Rail text color */
+  text: string
+  /** Active navigation item styles */
+  activeItem: string
+  /** Hover state for navigation items */
+  hoverItem: string
+  /** Divider line between sections */
+  divider: string
+  /** Tooltip background (shown to the right of icons) */
+  tooltipBg: string
+  /** Tooltip text color */
+  tooltipText: string
+}
+
+/**
+ * Color scheme for modal dialogs and overlays
+ */
+export interface ModalColorScheme {
+  /** Overlay/backdrop behind the modal */
+  overlay: string
+  /** Modal panel background */
+  panel: string
+  /** Modal border */
+  border: string
+  /** Modal header text */
+  header: string
+}
+
+/**
+ * Color scheme for data tables
+ */
+export interface TableColorScheme {
+  /** Table header background */
+  headerBg: string
+  /** Table header text */
+  headerText: string
+  /** Table row background */
+  rowBg: string
+  /** Alternating row background */
+  rowAltBg: string
+  /** Row hover state */
+  rowHover: string
+  /** Table border */
+  border: string
+}
+
+/**
+ * Color scheme for kanban board columns and cards
+ */
+export interface KanbanColorScheme {
+  /** Kanban column background */
+  columnBg: string
+  /** Kanban card background */
+  cardBg: string
+  /** Kanban card border */
+  cardBorder: string
+  /** Kanban column header text */
+  columnHeader: string
+}
+
+/**
+ * Color scheme for chat message bubbles
+ */
+export interface ChatColorScheme {
+  /** Own message bubble styles */
+  ownBubble: string
+  /** Other user message bubble styles */
+  otherBubble: string
+  /** Chat input background */
+  inputBg: string
+  /** Chat input border */
+  inputBorder: string
+}
+
+/**
+ * Color scheme for dropdown menus
+ */
+export interface DropdownColorScheme {
+  /** Dropdown background */
+  bg: string
+  /** Dropdown border */
+  border: string
+  /** Dropdown item hover state */
+  itemHover: string
+  /** Dropdown item text */
+  itemText: string
+  /** Dropdown divider */
+  divider: string
+}
+
+/**
+ * Color scheme for code blocks
+ */
+export interface CodeBlockColorScheme {
+  /** Code block background */
+  bg: string
+  /** Code block text */
+  text: string
+}
+
+// ============================================================================
+// ACCENT / PRIMARY BRAND COLORS (ORANGE)
+// ============================================================================
+
+/**
+ * Primary brand accent colors — orange theme
+ *
+ * Used for: Primary CTAs, focus rings, active states, brand highlights,
+ * the Quick Action button, selected states, and any element that needs
+ * to draw attention as a primary interactive element.
+ *
+ * **Color Family:** Amber-500 → Orange-500 → Orange-600
+ * Matches the existing logo gradient (#f59e0b → #ea580c).
+ *
+ * **Design Principle:** Orange is reserved for interactive/active elements only.
+ * It should NOT be used for decorative purposes or informational content.
+ */
+export const accentColors: AccentColorScheme = {
+  /** Primary accent background — orange-600 for strong visual weight */
+  bg: 'bg-orange-600',
+  /** Primary accent text — for links or inline orange text */
+  text: 'text-orange-600',
+  /** Primary accent border */
+  border: 'border-orange-500',
+  /** Solid accent for dots, icons, small indicators */
+  solid: 'bg-orange-500',
+  /** Subtle accent background — orange-50 for selected/hover states */
+  bgSubtle: 'bg-orange-50',
+  /** Accent text intended for dark backgrounds (lighter shade) */
+  textOnDark: 'text-orange-400',
+  /** Accent border on dark backgrounds */
+  borderOnDark: 'border-orange-500',
+  /** Hover state for accent backgrounds */
+  hoverBg: 'hover:bg-orange-700',
+  /** Focus ring using accent orange */
+  focusRing: 'ring-orange-500',
+  /** Gradient start — matches logo amber gradient start */
+  gradientFrom: 'from-amber-500',
+  /** Gradient end — matches logo orange gradient end */
+  gradientTo: 'to-orange-600',
+} as const
+
+/**
+ * Complete color palette for reference
+ *
+ * These are organized by color family for easy reference when designing new components.
+ * Try to use the semantic color groups above first, and only use these when needed.
+ */
+export const orangePalette = {
+  /** Orange scale — primary brand color family */
+  50: 'bg-orange-50',
+  100: 'bg-orange-100',
+  200: 'bg-orange-200',
+  300: 'bg-orange-300',
+  400: 'bg-orange-400',
+  500: 'bg-orange-500',
+  600: 'bg-orange-600',
+  700: 'bg-orange-700',
+  800: 'bg-orange-800',
+  900: 'bg-orange-900',
+  950: 'bg-orange-950',
+} as const
+
 // ============================================================================
 // STATUS COLORS
 // ============================================================================
@@ -199,12 +412,12 @@ export const statusColors: Record<string, StatusColorScheme> = {
  * - `ghost`: Minimal action, no background (transparent)
  */
 export const buttonVariants: Record<string, ButtonColorScheme> = {
-  /** Main call-to-action button - dark gray for strong visual weight */
+  /** Main call-to-action button - orange brand color for strong visual identity */
   primary: {
-    bg: 'bg-gray-900',
+    bg: 'bg-orange-600',
     text: 'text-white',
     border: 'border-transparent',
-    hoverBg: 'hover:bg-gray-800',
+    hoverBg: 'hover:bg-orange-700',
   },
 
   /** Secondary action button - white with border for visual hierarchy */
@@ -350,13 +563,19 @@ export const infoColors = {
  * Background colors for structural elements
  *
  * Used for: Layout backgrounds, card backgrounds, section backgrounds
+ *
+ * **Light Mode Hierarchy:**
+ * - primary: Main content area (gray-50 - off-white)
+ * - secondary: Cards, panels (white - pure white)
+ * - tertiary: Nested sections, code blocks (gray-100 - subtle gray)
+ * - inverted: Dark sections (gray-900 - near black)
  */
 export const bgColors: NeutralColorScheme = {
-  /** Primary background - main content area */
-  primary: 'bg-white',
-  /** Secondary background - cards, panels */
-  secondary: 'bg-gray-50',
-  /** Tertiary background - nested sections, dividers */
+  /** Primary background - main content area (off-white) */
+  primary: 'bg-gray-50',
+  /** Secondary background - cards, panels (pure white, elevated) */
+  secondary: 'bg-white',
+  /** Tertiary background - nested sections, code blocks */
   tertiary: 'bg-gray-100',
   /** Dark/inverted background - dark mode sections, code blocks */
   inverted: 'bg-gray-900',
@@ -366,16 +585,23 @@ export const bgColors: NeutralColorScheme = {
  * Text colors for content hierarchy
  *
  * Used for: Headings, body text, captions, labels
+ *
+ * **Light Mode Hierarchy:**
+ * - primary: gray-900 (near-black, headings)
+ * - secondary: gray-600 (body content, softer than before)
+ * - tertiary: gray-500 (supporting text)
+ * - muted: gray-400 (captions, placeholders)
+ * - veryMuted: gray-400 (timestamps, subtle labels)
  */
 export const textColors = {
   /** Primary text - headings, important content */
   primary: 'text-gray-900',
   /** Secondary text - body content, descriptions */
-  secondary: 'text-gray-700',
+  secondary: 'text-gray-600',
   /** Tertiary text - supporting text, metadata */
-  tertiary: 'text-gray-600',
+  tertiary: 'text-gray-500',
   /** Muted text - captions, placeholders, disabled */
-  muted: 'text-gray-500',
+  muted: 'text-gray-400',
   /** Very muted text - timestamps, subtle labels */
   veryMuted: 'text-gray-400',
   /** Inverted text - on dark backgrounds */
@@ -386,16 +612,19 @@ export const textColors = {
  * Border colors for structural elements
  *
  * Used for: Card borders, input borders, section dividers
+ *
+ * **Design Principle:** Keep borders subtle to avoid visual noise.
+ * Use gray-200 as default (light) and gray-800 as default (dark).
  */
 export const borderColors = {
-  /** Default border - cards, inputs */
+  /** Default border - cards, inputs (subtle) */
   default: 'border-gray-200',
   /** Thick border - emphasis borders */
   thick: 'border-gray-300',
   /** Subtle border - fine dividers */
   subtle: 'border-gray-100',
   /** Strong border - emphasis, sections */
-  strong: 'border-gray-500',
+  strong: 'border-gray-400',
   /** Transparent border - spacing, layout */
   transparent: 'border-transparent',
 } as const
@@ -408,14 +637,17 @@ export const borderColors = {
  * Interactive state colors
  *
  * Used for: Hover states, focus states, disabled states
+ *
+ * **Design Principle:** All focus rings use orange brand accent for consistency.
+ * Hover backgrounds should be subtle but noticeable.
  */
 export const interactiveStates: InteractiveStateColors = {
-  /** Focus ring color - keyboard navigation, focused inputs */
-  focusRing: 'ring-indigo-500',
-  /** Focus ring alternative - for varied hierarchy */
-  focusRingAlt: 'ring-blue-500',
+  /** Focus ring color - orange brand accent for keyboard navigation, focused inputs */
+  focusRing: 'ring-orange-500',
+  /** Focus ring alternative - amber for varied hierarchy */
+  focusRingAlt: 'ring-amber-400',
   /** Hover background - subtle interaction feedback */
-  hoverBg: 'hover:bg-gray-50',
+  hoverBg: 'hover:bg-gray-100',
   /** Disabled state - reduced opacity */
   disabled: 'disabled:opacity-50',
 } as const
@@ -531,6 +763,201 @@ export type ButtonVariant = keyof typeof buttonVariants
 export type MetricColor = keyof typeof metricColors
 
 // ============================================================================
+// SIDEBAR NAVIGATION COLORS
+// ============================================================================
+
+/**
+ * Sidebar navigation panel colors
+ *
+ * Used for: Main navigation sidebar, slide-out panels, navigation menus
+ *
+ * **Design Principle:** Sidebar uses a dark background (gray-900) to create
+ * visual separation from the main content area, even in light mode.
+ * Active items are highlighted with orange brand accent border.
+ */
+export const sidebarColors: SidebarColorScheme = {
+  /** Sidebar background - dark surface for visual separation */
+  bg: 'bg-gray-900',
+  /** Sidebar text - light gray for readability on dark bg */
+  text: 'text-gray-300',
+  /** Active navigation item - highlighted with orange border */
+  activeItem: 'bg-gray-800 text-white border-orange-500',
+  /** Hover state for navigation items */
+  hoverItem: 'hover:bg-gray-800',
+  /** Divider line between sidebar sections */
+  divider: 'border-gray-800',
+} as const
+
+// ============================================================================
+// NAVIGATION RAIL COLORS
+// ============================================================================
+
+/**
+ * Navigation rail colors (light mode)
+ *
+ * Used for: Narrow w-16 vertical rail at the left edge on desktop.
+ * Shares the same dark background as the sidebar for visual consistency.
+ * Active items use a left border accent and subtle background highlight.
+ * Tooltips appear to the right of icon-only items.
+ */
+export const railColors: RailColorScheme = {
+  /** Rail background - same dark surface as sidebar */
+  bg: 'bg-gray-900',
+  /** Rail text - light gray for readability on dark bg */
+  text: 'text-gray-300',
+  /** Active item - left border accent with subtle background */
+  activeItem: 'bg-gray-700 text-white border-l-2 border-orange-500',
+  /** Hover state for navigation items */
+  hoverItem: 'hover:bg-gray-800',
+  /** Divider line between rail sections */
+  divider: 'border-gray-800',
+  /** Tooltip background - dark tooltip to the right of icons */
+  tooltipBg: 'bg-gray-900',
+  /** Tooltip text color - high contrast white */
+  tooltipText: 'text-white',
+} as const
+
+// ============================================================================
+// MODAL DIALOG COLORS
+// ============================================================================
+
+/**
+ * Modal dialog and overlay colors
+ *
+ * Used for: Confirmation dialogs, form modals, overlay panels
+ *
+ * **Design Principle:** Modals use a semi-transparent black overlay to
+ * dim the background, with a clean white panel for the modal content.
+ */
+export const modalColors: ModalColorScheme = {
+  /** Overlay backdrop behind the modal */
+  overlay: 'bg-black/50',
+  /** Modal panel background - clean white */
+  panel: 'bg-white',
+  /** Modal border - subtle gray */
+  border: 'border-gray-200',
+  /** Modal header text - high contrast */
+  header: 'text-gray-900',
+} as const
+
+// ============================================================================
+// DATA TABLE COLORS
+// ============================================================================
+
+/**
+ * Data table colors
+ *
+ * Used for: Data tables, list views, spreadsheet-like layouts
+ *
+ * **Design Principle:** Tables use subtle gray-50 for alternating rows
+ * and headers, with clear borders for readability.
+ */
+export const tableColors: TableColorScheme = {
+  /** Table header background - subtle gray */
+  headerBg: 'bg-gray-50',
+  /** Table header text - muted for hierarchy */
+  headerText: 'text-gray-600',
+  /** Table row background - white for contrast with page */
+  rowBg: 'bg-white',
+  /** Alternating row background - subtle differentiation */
+  rowAltBg: 'bg-gray-50',
+  /** Row hover state - subtle highlight */
+  rowHover: 'hover:bg-gray-50',
+  /** Table border - subtle gray */
+  border: 'border-gray-200',
+} as const
+
+// ============================================================================
+// KANBAN BOARD COLORS
+// ============================================================================
+
+/**
+ * Kanban board column and card colors
+ *
+ * Used for: Kanban boards, task boards, column-based layouts
+ *
+ * **Design Principle:** Columns use gray-100 background to visually group
+ * cards, while cards themselves are white with subtle borders.
+ */
+export const kanbanColors: KanbanColorScheme = {
+  /** Kanban column background - light gray to group cards */
+  columnBg: 'bg-gray-100',
+  /** Kanban card background - white for elevation */
+  cardBg: 'bg-white',
+  /** Kanban card border - subtle gray */
+  cardBorder: 'border-gray-200',
+  /** Kanban column header text - medium weight */
+  columnHeader: 'text-gray-700',
+} as const
+
+// ============================================================================
+// CHAT MESSAGE COLORS
+// ============================================================================
+
+/**
+ * Chat message bubble colors
+ *
+ * Used for: Chat interfaces, messaging components, comment threads
+ *
+ * **Design Principle:** Own messages use orange-600 for brand identity,
+ * while other messages use a neutral gray. Input area uses white background.
+ */
+export const chatColors: ChatColorScheme = {
+  /** Own message bubble - orange brand color for sender identity */
+  ownBubble: 'bg-orange-600 text-white',
+  /** Other user message bubble - neutral gray */
+  otherBubble: 'bg-gray-100 text-gray-900',
+  /** Chat input background - white */
+  inputBg: 'bg-white',
+  /** Chat input border - subtle gray */
+  inputBorder: 'border-gray-200',
+} as const
+
+// ============================================================================
+// DROPDOWN MENU COLORS
+// ============================================================================
+
+/**
+ * Dropdown menu colors
+ *
+ * Used for: Dropdown menus, context menus, select menus, popover lists
+ *
+ * **Design Principle:** Dropdowns use white background with subtle borders.
+ * Hover states use gray-100 for clear item selection feedback.
+ */
+export const dropdownColors: DropdownColorScheme = {
+  /** Dropdown background - white */
+  bg: 'bg-white',
+  /** Dropdown border - subtle gray */
+  border: 'border-gray-200',
+  /** Dropdown item hover state - subtle highlight */
+  itemHover: 'hover:bg-gray-100',
+  /** Dropdown item text - medium weight gray */
+  itemText: 'text-gray-700',
+  /** Dropdown divider between sections */
+  divider: 'border-gray-100',
+} as const
+
+// ============================================================================
+// CODE BLOCK COLORS
+// ============================================================================
+
+/**
+ * Code block colors
+ *
+ * Used for: Code snippets, code editors, terminal output, preformatted text
+ *
+ * **Design Principle:** Code blocks use a dark background (gray-900) to
+ * visually distinguish code content from prose. Light text ensures readability.
+ */
+export const codeBlockColors: CodeBlockColorScheme = {
+  /** Code block background - dark for visual distinction */
+  bg: 'bg-gray-900',
+  /** Code block text - light for readability on dark bg */
+  text: 'text-gray-100',
+} as const
+
+// ============================================================================
 // DARK MODE COLORS
 // ============================================================================
 
@@ -626,18 +1053,18 @@ export const darkModeStatusColors: Record<string, StatusColorScheme> = {
  * Dark mode button variant color schemes
  *
  * **Design Principles:**
- * - Primary buttons use white background (inverted from light mode)
- * - Secondary buttons use gray-800 with subtle borders
+ * - Primary buttons use orange-600 for strong brand identity
+ * - Secondary buttons use gray-800 with subtle gray-700 borders
  * - Ghost buttons use transparent with light text
- * - Hover states provide clear feedback with darker backgrounds
+ * - Hover states provide clear feedback
  */
 export const darkModeButtonVariants: Record<string, ButtonColorScheme> = {
-  /** Main call-to-action - white background with dark text (inverted) */
+  /** Main call-to-action - orange brand color maintains identity in dark mode */
   primary: {
-    bg: 'dark:bg-white',
-    text: 'dark:text-gray-900',
+    bg: 'dark:bg-orange-600',
+    text: 'dark:text-white',
     border: 'dark:border-transparent',
-    hoverBg: 'dark:hover:bg-gray-100',
+    hoverBg: 'dark:hover:bg-orange-700',
   },
 
   /** Secondary action - gray-800 background with light text */
@@ -765,21 +1192,23 @@ export const darkModeInfoColors = {
 /**
  * Dark mode background colors for structural elements
  *
- * **Hierarchy:**
- * - primary: Main content (gray-950 - almost black)
- * - secondary: Cards, panels (gray-900)
- * - tertiary: Nested sections (gray-800)
- * - inverted: Light sections in dark mode (gray-700)
+ * **Hierarchy (deepest → lightest):**
+ * - primary: Page background (gray-950 - near black)
+ * - secondary: Cards, panels (gray-900 - elevated surface)
+ * - tertiary: Nested sections, code blocks (gray-800)
+ * - inverted: Light/accent sections in dark mode (gray-800/700)
+ *
+ * **Key Change:** page bg is gray-950, cards are gray-900 → clear separation
  */
 export const darkModeBgColors: NeutralColorScheme = {
-  /** Primary background - main content area (darkest) */
+  /** Primary background - main content area (near black) */
   primary: 'dark:bg-gray-950',
-  /** Secondary background - cards, panels */
+  /** Secondary background - cards, panels (elevated) */
   secondary: 'dark:bg-gray-900',
-  /** Tertiary background - nested sections, dividers */
+  /** Tertiary background - nested sections, code blocks */
   tertiary: 'dark:bg-gray-800',
   /** Inverted background - light sections in dark mode */
-  inverted: 'dark:bg-gray-700',
+  inverted: 'dark:bg-gray-800',
 } as const
 
 /**
@@ -787,11 +1216,13 @@ export const darkModeBgColors: NeutralColorScheme = {
  *
  * **Hierarchy:**
  * - Uses gray-100 through gray-400 for proper contrast
- * - Avoids gray-500+ as it becomes hard to read on dark backgrounds
+ * - Avoids pure `white` in favor of gray-100 (softer, less harsh)
  * - Inverted text uses dark gray for light elements
+ *
+ * **Key Change:** primary is gray-100 (soft white) instead of white
  */
 export const darkModeTextColors = {
-  /** Primary text - headings (brightest) */
+  /** Primary text - headings (soft white) */
   primary: 'dark:text-gray-100',
   /** Secondary text - body content */
   secondary: 'dark:text-gray-300',
@@ -808,10 +1239,12 @@ export const darkModeTextColors = {
 /**
  * Dark mode border colors for structural elements
  *
- * Uses gray-800 through gray-600 for visible but not harsh borders on dark backgrounds
+ * **Design Principle:** Borders should be very subtle in dark mode.
+ * Use gray-800 for default (blends with dark backgrounds) and
+ * gray-700 only for emphasis.
  */
 export const darkModeBorderColors = {
-  /** Default border - cards, inputs */
+  /** Default border - cards, inputs (subtle) */
   default: 'dark:border-gray-800',
   /** Thick border - emphasis borders */
   thick: 'dark:border-gray-700',
@@ -828,18 +1261,230 @@ export const darkModeBorderColors = {
  *
  * **Key Changes:**
  * - Hover backgrounds use darker shades (gray-800/900)
- * - Focus rings maintain the same colors (they work in both modes)
- * - Disabled state uses opacity-50 instead of opacity-40 for better visibility
+ * - Focus rings use orange brand accent for consistency
+ * - Disabled state uses opacity-50 for better visibility
  */
 export const darkModeInteractiveStates: InteractiveStateColors = {
-  /** Focus ring color - same as light mode */
-  focusRing: 'ring-indigo-500',
-  /** Focus ring alternative - same as light mode */
-  focusRingAlt: 'ring-blue-500',
-  /** Hover background - darker than light mode */
+  /** Focus ring color - orange brand accent works in both modes */
+  focusRing: 'ring-orange-500',
+  /** Focus ring alternative - amber for varied hierarchy */
+  focusRingAlt: 'ring-amber-400',
+  /** Hover background - subtle elevation in dark mode */
   hoverBg: 'dark:hover:bg-gray-800',
   /** Disabled state - slightly higher opacity for visibility */
   disabled: 'dark:disabled:opacity-50',
+} as const
+
+// ============================================================================
+// DARK MODE ACCENT / BRAND COLORS (ORANGE)
+// ============================================================================
+
+/**
+ * Dark mode primary brand accent colors — orange theme
+ *
+ * Uses orange-600 for backgrounds (strong brand presence) and orange-500
+ * for text/borders (good contrast on dark backgrounds).
+ * Maintains brand identity while ensuring readability.
+ */
+export const darkModeAccentColors: AccentColorScheme = {
+  /** Primary accent background — orange-600 for strong brand presence */
+  bg: 'dark:bg-orange-600',
+  /** Primary accent text — orange-500 for readability on dark backgrounds */
+  text: 'dark:text-orange-500',
+  /** Primary accent border */
+  border: 'dark:border-orange-600',
+  /** Solid accent for dots, icons, small indicators */
+  solid: 'bg-orange-500',
+  /** Subtle accent background — orange-950 for selected/hover states */
+  bgSubtle: 'dark:bg-orange-950',
+  /** Accent text intended for dark backgrounds */
+  textOnDark: 'dark:text-orange-500',
+  /** Accent border on dark backgrounds */
+  borderOnDark: 'dark:border-orange-500',
+  /** Hover state for accent backgrounds */
+  hoverBg: 'dark:hover:bg-orange-700',
+  /** Focus ring using accent orange */
+  focusRing: 'ring-orange-500',
+  /** Gradient start — slightly brighter for dark mode */
+  gradientFrom: 'dark:from-amber-500',
+  /** Gradient end — matches dark accent bg */
+  gradientTo: 'dark:to-orange-600',
+} as const
+
+// ============================================================================
+// DARK MODE SIDEBAR COLORS
+// ============================================================================
+
+/**
+ * Dark mode sidebar navigation panel colors
+ *
+ * Uses gray-950 for the sidebar background to create deeper visual separation
+ * in dark mode. Active items maintain the orange brand accent border.
+ */
+export const darkModeSidebarColors: SidebarColorScheme = {
+  /** Sidebar background - near black for maximum contrast */
+  bg: 'dark:bg-gray-950',
+  /** Sidebar text - slightly dimmer gray */
+  text: 'dark:text-gray-400',
+  /** Active navigation item - highlighted with orange border */
+  activeItem: 'dark:bg-gray-800 dark:text-white dark:border-orange-500',
+  /** Hover state for navigation items */
+  hoverItem: 'dark:hover:bg-gray-800',
+  /** Divider line between sidebar sections */
+  divider: 'dark:border-gray-800',
+} as const
+
+// ============================================================================
+// DARK MODE NAVIGATION RAIL COLORS
+// ============================================================================
+
+/**
+ * Dark mode navigation rail colors
+ *
+ * Uses gray-950 for the rail background to match the dark mode sidebar,
+ * creating deeper visual separation. Active items maintain the orange
+ * brand accent with a left border. Tooltips use the same dark surface.
+ */
+export const darkModeRailColors: RailColorScheme = {
+  /** Rail background - near black to match dark mode sidebar */
+  bg: 'dark:bg-gray-800',
+  /** Rail text - slightly dimmer gray */
+  text: 'dark:text-gray-400',
+  /** Active item - left border accent with subtle background */
+  activeItem: 'dark:bg-gray-700 dark:text-white dark:border-l-2 dark:border-orange-500',
+  /** Hover state for navigation items */
+  hoverItem: 'dark:hover:bg-gray-800',
+  /** Divider line between rail sections */
+  divider: 'dark:border-gray-800',
+  /** Tooltip background - dark tooltip surface */
+  tooltipBg: 'dark:bg-gray-900',
+  /** Tooltip text color - high contrast white */
+  tooltipText: 'dark:text-white',
+} as const
+
+// ============================================================================
+// DARK MODE MODAL COLORS
+// ============================================================================
+
+/**
+ * Dark mode modal dialog and overlay colors
+ *
+ * Uses a darker overlay (black/70) and gray-900 panel for dark mode.
+ */
+export const darkModeModalColors: ModalColorScheme = {
+  /** Overlay backdrop - darker for better dimming in dark mode */
+  overlay: 'dark:bg-black/70',
+  /** Modal panel background - dark surface */
+  panel: 'dark:bg-gray-900',
+  /** Modal border - subtle dark border */
+  border: 'dark:border-gray-800',
+  /** Modal header text - bright for readability */
+  header: 'dark:text-gray-100',
+} as const
+
+// ============================================================================
+// DARK MODE TABLE COLORS
+// ============================================================================
+
+/**
+ * Dark mode data table colors
+ *
+ * Uses gray-950 for rows, gray-900 for headers and alternating rows.
+ * Borders use gray-800 for subtle separation.
+ */
+export const darkModeTableColors: TableColorScheme = {
+  /** Table header background - dark elevated surface */
+  headerBg: 'dark:bg-gray-900',
+  /** Table header text - muted for hierarchy */
+  headerText: 'dark:text-gray-400',
+  /** Table row background - deepest surface */
+  rowBg: 'dark:bg-gray-950',
+  /** Alternating row background - slightly elevated */
+  rowAltBg: 'dark:bg-gray-900',
+  /** Row hover state - subtle elevation */
+  rowHover: 'dark:hover:bg-gray-900',
+  /** Table border - subtle dark border */
+  border: 'dark:border-gray-800',
+} as const
+
+// ============================================================================
+// DARK MODE KANBAN COLORS
+// ============================================================================
+
+/**
+ * Dark mode kanban board column and card colors
+ *
+ * Uses gray-900 for columns and gray-800 for cards to create depth.
+ */
+export const darkModeKanbanColors: KanbanColorScheme = {
+  /** Kanban column background - dark surface */
+  columnBg: 'dark:bg-gray-900',
+  /** Kanban card background - slightly elevated */
+  cardBg: 'dark:bg-gray-800',
+  /** Kanban card border - subtle dark border */
+  cardBorder: 'dark:border-gray-700',
+  /** Kanban column header text - light gray */
+  columnHeader: 'dark:text-gray-300',
+} as const
+
+// ============================================================================
+// DARK MODE CHAT COLORS
+// ============================================================================
+
+/**
+ * Dark mode chat message bubble colors
+ *
+ * Own messages still use orange-600 for brand consistency.
+ * Other messages and input use gray-800 for dark surfaces.
+ */
+export const darkModeChatColors: ChatColorScheme = {
+  /** Own message bubble - orange brand color maintained */
+  ownBubble: 'dark:bg-orange-600 dark:text-white',
+  /** Other user message bubble - dark surface */
+  otherBubble: 'dark:bg-gray-800 dark:text-gray-100',
+  /** Chat input background - dark surface */
+  inputBg: 'dark:bg-gray-800',
+  /** Chat input border - subtle dark border */
+  inputBorder: 'dark:border-gray-700',
+} as const
+
+// ============================================================================
+// DARK MODE DROPDOWN COLORS
+// ============================================================================
+
+/**
+ * Dark mode dropdown menu colors
+ *
+ * Uses gray-800 for background and gray-700 for hover states.
+ */
+export const darkModeDropdownColors: DropdownColorScheme = {
+  /** Dropdown background - dark surface */
+  bg: 'dark:bg-gray-800',
+  /** Dropdown border - subtle dark border */
+  border: 'dark:border-gray-700',
+  /** Dropdown item hover state - slightly lighter */
+  itemHover: 'dark:hover:bg-gray-700',
+  /** Dropdown item text - light gray */
+  itemText: 'dark:text-gray-200',
+  /** Dropdown divider between sections */
+  divider: 'dark:border-gray-700',
+} as const
+
+// ============================================================================
+// DARK MODE CODE BLOCK COLORS
+// ============================================================================
+
+/**
+ * Dark mode code block colors
+ *
+ * Uses gray-950 for an even darker background that differentiates
+ * code blocks from other dark surfaces in dark mode.
+ */
+export const darkModeCodeBlockColors: CodeBlockColorScheme = {
+  /** Code block background - near black for maximum contrast */
+  bg: 'dark:bg-gray-950',
+  /** Code block text - light for readability */
+  text: 'dark:text-gray-100',
 } as const
 
 /**
@@ -873,6 +1518,9 @@ export const darkModeColors = {
   /** Button variants - primary, secondary, danger, ghost */
   buttons: darkModeButtonVariants,
 
+  /** Accent/brand colors - primary orange identity */
+  accent: darkModeAccentColors,
+
   /** Metric colors - statistics, KPIs */
   metrics: darkModeMetricColors,
 
@@ -899,6 +1547,27 @@ export const darkModeColors = {
 
   /** Interactive states - hover, focus, disabled */
   interactive: darkModeInteractiveStates,
+
+  /** Sidebar navigation panel */
+  sidebar: darkModeSidebarColors,
+
+  /** Modal dialogs and overlays */
+  modal: darkModeModalColors,
+
+  /** Data tables */
+  table: darkModeTableColors,
+
+  /** Kanban board columns and cards */
+  kanban: darkModeKanbanColors,
+
+  /** Chat message bubbles */
+  chat: darkModeChatColors,
+
+  /** Dropdown menus */
+  dropdown: darkModeDropdownColors,
+
+  /** Code blocks */
+  codeBlock: darkModeCodeBlockColors,
 } as const
 
 /**

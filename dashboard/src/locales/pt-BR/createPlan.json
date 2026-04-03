@@ -49,6 +49,10 @@
     "workingDirectory": {
       "label": "Diretório de Trabalho",
       "placeholder": "/caminho/para/projeto"
+    },
+    "attachments": {
+      "label": "Anexos",
+      "uploadNow": "Enviar agora"
     }
   },
   "actions": {

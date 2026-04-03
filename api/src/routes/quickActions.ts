@@ -84,6 +84,7 @@ router.post('/', authenticateToken, (req, res) => {
     environment_id,    // qual ambiente (para cwd)
     project_id,
     native_skill,      // 'planning' | 'reviewer' | 'debugger' | null
+    attachment_ids,    // array of uploaded attachment IDs
   } = req.body
 
   if (!message || !workspace_id) {
@@ -134,10 +135,13 @@ router.post('/', authenticateToken, (req, res) => {
     env_context: env_context || undefined,
   }
 
+  // Build attachments JSON if attachment_ids were provided
+  const attachmentsJson = JSON.stringify(attachment_ids ?? [])
+
   db.prepare(`
-    INSERT INTO plans (id, name, tasks, status, project_id, type)
-    VALUES (?, ?, ?, 'pending', ?, 'quick_action')
-  `).run(planId, name ?? `Quick: ${message.slice(0, 60)}`, JSON.stringify([task]), project_id ?? null)
+    INSERT INTO plans (id, name, tasks, status, project_id, type, attachments)
+    VALUES (?, ?, ?, 'pending', ?, 'quick_action', ?)
+  `).run(planId, name ?? `Quick: ${message.slice(0, 60)}`, JSON.stringify([task]), project_id ?? null, attachmentsJson)
 
   return res.status(201).json({
     data: { id: planId, task_id: taskId },

@@ -3,6 +3,12 @@ import { PageHeader, Card } from '@/components'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Loader2, UserCircle, Shield, Save } from 'lucide-react'
+import {
+  textColors, darkModeTextColors, bgColors, darkModeBgColors,
+  borderColors, darkModeBorderColors, accentColors,
+  successColors, darkModeSuccessColors, errorColors, darkModeErrorColors,
+  interactiveStates, withDarkMode
+} from '@/lib/colors'
 
 export default function UsersPage() {
   const { t } = useTranslation()
@@ -61,28 +67,28 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className={`min-h-screen ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
       <div className="max-w-3xl mx-auto px-4 py-8 lg:px-8">
         <PageHeader title={t('auth.userManagement.title')} />
 
         {/* Current User Info Card */}
         <Card className="mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <span className="text-lg font-bold text-white">
+            <div className={`w-12 h-12 rounded-full ${accentColors.solid} flex items-center justify-center flex-shrink-0`}>
+              <span className={`text-lg font-bold ${textColors.inverted}`}>
                 {user?.username?.charAt(0).toUpperCase() || 'U'}
               </span>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                 {t('auth.userManagement.currentUser')}
               </h3>
-              <p className="text-base font-medium text-gray-800 dark:text-gray-200 mt-0.5">
+              <p className={`text-base font-medium ${withDarkMode('text-gray-800', 'dark:text-gray-200')} mt-0.5`}>
                 {user?.username || 'User'}
               </p>
             </div>
             <div className="ml-auto">
-              <UserCircle size={24} className="text-gray-400 dark:text-gray-500" />
+              <UserCircle size={24} className={withDarkMode(textColors.muted, darkModeTextColors.muted)} />
             </div>
           </div>
         </Card>
@@ -90,22 +96,22 @@ export default function UsersPage() {
         {/* Change Password Card */}
         <Card>
           <div className="flex items-center gap-2 mb-4">
-            <Shield size={18} className="text-gray-500 dark:text-gray-400" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <Shield size={18} className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} />
+            <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
               {t('auth.userManagement.changePassword.title')}
             </h3>
           </div>
 
           {/* Success Message */}
           {success && (
-            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-400">
+            <div className={`mb-4 p-3 ${successColors.bg} ${darkModeSuccessColors.bg} ${successColors.border} ${darkModeSuccessColors.border} rounded-lg text-sm ${successColors.text} ${darkModeSuccessColors.text}`}>
               {t('auth.userManagement.changePassword.success')}
             </div>
           )}
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
+            <div className={`mb-4 p-3 ${errorColors.bg} ${darkModeErrorColors.bg} ${errorColors.border} ${darkModeErrorColors.border} rounded-lg text-sm ${errorColors.text} ${darkModeErrorColors.text}`}>
               {error}
             </div>
           )}
@@ -113,7 +119,7 @@ export default function UsersPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Current Password */}
             <div>
-              <label htmlFor="currentPassword" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="currentPassword" className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('auth.userManagement.changePassword.currentPassword')}
               </label>
               <div className="relative">
@@ -127,12 +133,12 @@ export default function UsersPage() {
                   autoFocus
                   autoComplete="current-password"
                   disabled={isLoading}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-400 dark:disabled:text-gray-500 pr-10"
+                  className={`w-full border ${borderColors.thick} ${darkModeBorderColors.thick} rounded-md px-3 py-2 text-sm ${bgColors.secondary} ${darkModeBgColors.secondary} ${textColors.primary} ${darkModeTextColors.primary} placeholder:${textColors.muted} dark:placeholder:${darkModeTextColors.muted} focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent disabled:${bgColors.primary} dark:disabled:${darkModeBgColors.primary} disabled:${textColors.muted} dark:disabled:${darkModeTextColors.muted} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${textColors.muted} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} transition-colors`}
                   tabIndex={-1}
                 >
                   {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -142,7 +148,7 @@ export default function UsersPage() {
 
             {/* New Password */}
             <div>
-              <label htmlFor="newPassword" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="newPassword" className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('auth.userManagement.changePassword.newPassword')}
               </label>
               <div className="relative">
@@ -155,12 +161,12 @@ export default function UsersPage() {
                   required
                   autoComplete="new-password"
                   disabled={isLoading}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-400 dark:disabled:text-gray-500 pr-10"
+                  className={`w-full border ${borderColors.thick} ${darkModeBorderColors.thick} rounded-md px-3 py-2 text-sm ${bgColors.secondary} ${darkModeBgColors.secondary} ${textColors.primary} ${darkModeTextColors.primary} placeholder:${textColors.muted} dark:placeholder:${darkModeTextColors.muted} focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent disabled:${bgColors.primary} dark:disabled:${darkModeBgColors.primary} disabled:${textColors.muted} dark:disabled:${darkModeTextColors.muted} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${textColors.muted} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} transition-colors`}
                   tabIndex={-1}
                 >
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -170,7 +176,7 @@ export default function UsersPage() {
 
             {/* Confirm New Password */}
             <div>
-              <label htmlFor="confirmNewPassword" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label htmlFor="confirmNewPassword" className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('auth.userManagement.changePassword.confirmPassword')}
               </label>
               <div className="relative">
@@ -183,12 +189,12 @@ export default function UsersPage() {
                   required
                   autoComplete="new-password"
                   disabled={isLoading}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-400 dark:disabled:text-gray-500 pr-10"
+                  className={`w-full border ${borderColors.thick} ${darkModeBorderColors.thick} rounded-md px-3 py-2 text-sm ${bgColors.secondary} ${darkModeBgColors.secondary} ${textColors.primary} ${darkModeTextColors.primary} placeholder:${textColors.muted} dark:placeholder:${darkModeTextColors.muted} focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent disabled:${bgColors.primary} dark:disabled:${darkModeBgColors.primary} disabled:${textColors.muted} dark:disabled:${darkModeTextColors.muted} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 ${textColors.muted} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} transition-colors`}
                   tabIndex={-1}
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -201,7 +207,7 @@ export default function UsersPage() {
               <button
                 type="submit"
                 disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors text-sm"
+                className={`inline-flex items-center gap-2 px-4 py-2 ${accentColors.bg} ${accentColors.hoverBg} disabled:bg-orange-300 dark:disabled:bg-orange-800 disabled:cursor-not-allowed ${textColors.inverted} font-medium rounded-lg transition-colors text-sm`}
               >
                 {isLoading ? (
                   <>

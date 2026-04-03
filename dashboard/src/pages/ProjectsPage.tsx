@@ -5,6 +5,18 @@ import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, u
 import { useGetWorkspaces } from '@/api/workspaces'
 import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree } from 'lucide-react'
 import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ColorSelectDropdown, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
+import {
+  bgColors, darkModeBgColors,
+  textColors, darkModeTextColors,
+  borderColors, darkModeBorderColors,
+  accentColors, darkModeAccentColors,
+  interactiveStates, darkModeInteractiveStates,
+  errorColors, darkModeErrorColors,
+  successColors, darkModeSuccessColors,
+  warningColors, darkModeWarningColors,
+  infoColors, darkModeInfoColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 export default function ProjectsPage() {
   const { t } = useTranslation()
@@ -78,9 +90,9 @@ export default function ProjectsPage() {
     return (
       <div className="max-w-6xl mx-auto py-8 px-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          <div className={`h-8 ${withDarkMode('bg-gray-200', 'dark:bg-gray-700')} rounded w-1/4 mb-4`}></div>
+          <div className={`h-4 ${withDarkMode('bg-gray-200', 'dark:bg-gray-700')} rounded w-full mb-2`}></div>
+          <div className={`h-4 ${withDarkMode('bg-gray-200', 'dark:bg-gray-700')} rounded w-3/4`}></div>
         </div>
       </div>
     )
@@ -89,8 +101,8 @@ export default function ProjectsPage() {
   if (error) {
     return (
       <div className="max-w-6xl mx-auto py-8 px-6">
-        <Card className="bg-red-50 border-red-200">
-          <p className="text-red-700">Error loading projects: {(error as Error).message}</p>
+        <Card className={`${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} ${withDarkMode(errorColors.border, darkModeErrorColors.border)}`}>
+          <p className={`${withDarkMode(errorColors.textAlt, darkModeErrorColors.textAlt)}`}>Error loading projects: {(error as Error).message}</p>
         </Card>
       </div>
     )
@@ -219,13 +231,13 @@ export default function ProjectsPage() {
   const getEnvironmentBadgeColor = (type: string) => {
     switch (type) {
       case 'local-wsl':
-        return 'bg-green-100 text-green-800'
+        return `${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} ${withDarkMode('text-green-800', 'dark:text-green-300')}`
       case 'local-windows':
-        return 'bg-blue-100 text-blue-800'
+        return `${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} ${withDarkMode('text-blue-800', 'dark:text-blue-300')}`
       case 'ssh':
-        return 'bg-yellow-100 text-yellow-800'
+        return `${withDarkMode(warningColors.bg, darkModeWarningColors.bg)} ${withDarkMode('text-yellow-800', 'dark:text-yellow-300')}`
       default:
-        return 'bg-gray-100 text-gray-800'
+        return `${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`
     }
   }
 
@@ -310,11 +322,11 @@ export default function ProjectsPage() {
                 required
               />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('pages.projects.form.description')}</label>
+                <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.projects.form.description')}</label>
                 <textarea
                   value={newProjectDescription}
                   onChange={(e) => setNewProjectDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className={`w-full px-3 py-2 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-lg focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent`}
                   rows={3}
                   placeholder="Brief description of the project..."
                 />
@@ -357,10 +369,10 @@ export default function ProjectsPage() {
             const projectAgents = allWorkspaces?.filter(ws => ws.project_id === project.id) || []
 
             return (
-              <div key={project.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+              <div key={project.id} className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} rounded-lg shadow-sm overflow-hidden`}>
               {/* Project Header */}
               <div
-                className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className={`p-3 sm:p-4 cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} transition-colors`}
                 onClick={() => toggleProjectExpanded(project.id)}
               >
                 <div className="flex items-center justify-between gap-3">
@@ -368,9 +380,9 @@ export default function ProjectsPage() {
                   <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                     <ProjectIcon project={project} size={20} className="flex-shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">{project.name}</h3>
+                      <h3 className={`text-base sm:text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} truncate`}>{project.name}</h3>
                       {project.description && (
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">{project.description}</p>
+                        <p className={`text-xs sm:text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mt-0.5 line-clamp-2`}>{project.description}</p>
                       )}
                     </div>
                   </div>
@@ -384,20 +396,20 @@ export default function ProjectsPage() {
                         color,
                       })}
                     />
-                    <span className="text-xs sm:text-sm text-gray-500">
+                    <span className={`text-xs sm:text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
                       {project.environments.length} env{project.environments.length !== 1 ? 's' : ''}
                     </span>
                     {expandedProjects.has(project.id) ? (
-                      <ChevronUp size={18} className="text-gray-500" />
+                      <ChevronUp size={18} className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} />
                     ) : (
-                      <ChevronDown size={18} className="text-gray-500" />
+                      <ChevronDown size={18} className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} />
                     )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeleteProject(project.id, project.name)
                       }}
-                      className="p-1.5 sm:p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className={`p-1.5 sm:p-2 ${withDarkMode(errorColors.text, darkModeErrorColors.text)} ${withDarkMode('hover:bg-red-50', 'dark:hover:bg-red-950')} rounded-lg transition-colors`}
                       title="Delete project"
                     >
                       <Trash2 size={16} />
@@ -408,11 +420,11 @@ export default function ProjectsPage() {
 
               {/* Environments and Agents */}
               {expandedProjects.has(project.id) && (
-                <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4">
+                <div className={`border-t ${withDarkMode(borderColors.default, darkModeBorderColors.default)} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} p-3 sm:p-4`}>
                   {/* Environments Section */}
                   <div className="mb-4 sm:mb-6">
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('pages.projects.environments.title')}</h4>
+                      <h4 className={`text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('pages.projects.environments.title')}</h4>
                       <button
                         onClick={() => {
                           setShowEnvForm(prev => new Set(prev).add(project.id))
@@ -422,7 +434,7 @@ export default function ProjectsPage() {
                             project_path: '',
                           })
                         }}
-                        className="flex items-center gap-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 text-xs sm:text-sm ${withDarkMode(accentColors.solid, 'dark:bg-orange-600')} text-white rounded-lg ${withDarkMode(accentColors.hoverBg, darkModeAccentColors.hoverBg)} transition-colors`}
                       >
                         <Plus size={14} />
                         <span className="hidden sm:inline">{t('pages.projects.environments.add')}</span>
@@ -527,11 +539,11 @@ export default function ProjectsPage() {
 
                   {/* Environments List */}
                   {project.environments.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">{t('pages.projects.environments.empty')}</p>
+                    <p className={`text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} italic`}>{t('pages.projects.environments.empty')}</p>
                   ) : (
                     <div className="space-y-3">
                       {project.environments.map((env) => (
-                        <div key={env.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        <div key={env.id} className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} rounded-lg p-3`}>
                           {editingEnv?.projectId === project.id && editingEnv?.envId === env.id ? (
                             // Edit Form
                             <form onSubmit={(e) => handleUpdateEnvironment(project.id, env.id, e)}>
@@ -567,7 +579,7 @@ export default function ProjectsPage() {
                                   hint="Optional: Link to your git repository"
                                 />
                               </div>
-                              <p className="text-xs text-gray-400 mt-2">
+                              <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} mt-2`}>
                                 Agent workspace is auto-generated and cannot be edited
                               </p>
                               <div className="flex gap-2">
@@ -593,29 +605,29 @@ export default function ProjectsPage() {
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <h5 className="font-medium text-gray-900 dark:text-white">{env.name}</h5>
+                                    <h5 className={`font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{env.name}</h5>
                                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getEnvironmentBadgeColor(env.type)}`}>
                                       {env.type}
                                     </span>
                                   </div>
-                                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                                  <div className={`space-y-1 text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
                                     <div>
-                                      <span className="font-medium">Project path:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">{env.project_path}</code>
+                                      <span className="font-medium">Project path:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs`}>{env.project_path}</code>
                                     </div>
                                     {env.git_repository && (
                                       <div>
-                                        <span className="font-medium">Git repository:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs break-all">{env.git_repository}</code>
+                                        <span className="font-medium">Git repository:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs break-all`}>{env.git_repository}</code>
                                       </div>
                                     )}
                                     {env.agent_workspace && (
                                     <details className="mt-2">
-                                      <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Agent workspace path</summary>
-                                      <code className="text-xs text-gray-500 block mt-1 break-all">{env.agent_workspace}</code>
+                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Agent workspace path</summary>
+                                      <code className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} block mt-1 break-all`}>{env.agent_workspace}</code>
                                     </details>
                                     )}
                                     {env.type === 'ssh' && env.ssh_config && (
                                       <div>
-                                        <span className="font-medium">SSH:</span> <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+                                        <span className="font-medium">SSH:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs`}>
                                           {(() => {
                                             const config = JSON.parse(env.ssh_config)
                                             return `${config.user}@${config.host}`
@@ -652,32 +664,32 @@ export default function ProjectsPage() {
 
                   {/* Agents Section */}
                   <div className="mt-4">
-                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{t('pages.projects.agents.title')}</h4>
+                    <h4 className={`text-xs font-semibold ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} uppercase tracking-wide mb-2`}>{t('pages.projects.agents.title')}</h4>
                     {projectAgents.length === 0 ? (
-                      <p className="text-xs text-gray-400">
+                      <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`}>
                         {t('pages.projects.agents.empty')}
                       </p>
                     ) : (
                       <div className="space-y-2">
                         {projectAgents.map(agent => (
                           <div key={agent.id || agent.path}
-                            className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded border border-gray-100 dark:border-gray-600">
+                            className={`flex items-center justify-between px-3 py-2 ${withDarkMode(bgColors.primary, darkModeBgColors.tertiary)} rounded border ${withDarkMode(borderColors.subtle, darkModeBorderColors.thick)}`}>
                             <div>
-                              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">{agent.name}</span>
+                              <span className={`text-xs font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{agent.name}</span>
                               {agent.role && (
-                                <span className="ml-2 text-xs text-gray-400">{agent.role}</span>
+                                <span className={`ml-2 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`}>{agent.role}</span>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
                               <Link
                                 to="/agents"
-                                className="text-xs text-blue-600 hover:underline"
+                                className={`text-xs ${withDarkMode(accentColors.text, darkModeAccentColors.text)} hover:underline`}
                               >
                                 {t('pages.projects.agents.view')} →
                               </Link>
                               <button
                                 onClick={() => handleUnlinkAgent(project.id, agent.path)}
-                                className="text-gray-400 hover:text-red-500"
+                                className={`${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${withDarkMode('hover:text-red-500', 'dark:hover:text-red-400')}`}
                                 title="Unlink agent"
                               >
                                 <Trash2 size={14} />
@@ -690,7 +702,7 @@ export default function ProjectsPage() {
                   </div>
 
                   {/* Pipeline Settings Section */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4">
+                  <div className={`border-t ${withDarkMode(borderColors.default, darkModeBorderColors.default)} mt-4 pt-4`}>
                     <button
                       onClick={() => {
                         setShowSettings(prev => {
@@ -705,8 +717,8 @@ export default function ProjectsPage() {
                       }}
                       className="flex items-center justify-between w-full text-left"
                     >
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('pages.projects.pipelineSettings.title')}</h4>
-                      <Settings size={14} className="text-gray-400" />
+                      <h4 className={`text-xs font-semibold ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} uppercase tracking-wide`}>{t('pages.projects.pipelineSettings.title')}</h4>
+                      <Settings size={14} className={withDarkMode(textColors.muted, darkModeTextColors.muted)} />
                     </button>
 
                     {showSettings.has(project.id) && (
@@ -714,8 +726,8 @@ export default function ProjectsPage() {
                         {/* Auto-approve toggle */}
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{t('pages.projects.pipelineSettings.autoApprove')}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{t('pages.projects.pipelineSettings.autoApproveDesc')}</p>
+                            <p className={`text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('pages.projects.pipelineSettings.autoApprove')}</p>
+                            <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`}>{t('pages.projects.pipelineSettings.autoApproveDesc')}</p>
                           </div>
                           <button
                             onClick={() => updateProjectMutation.mutate({
@@ -726,7 +738,7 @@ export default function ProjectsPage() {
                               }
                             })}
                             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                              project.settings?.auto_approve_workflows ? 'bg-gray-900' : 'bg-gray-200'
+                              project.settings?.auto_approve_workflows ? withDarkMode(bgColors.inverted, 'dark:bg-orange-600') : withDarkMode('bg-gray-200', 'dark:bg-gray-700')
                             }`}
                           >
                             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
@@ -744,7 +756,7 @@ export default function ProjectsPage() {
           })
         ) : (
           <EmptyState
-            icon={<FolderOpen size={48} className="text-gray-300" />}
+            icon={<FolderOpen size={48} className={withDarkMode(textColors.muted, darkModeTextColors.muted)} />}
             title={t('pages.projects.empty.title')}
             description={t('pages.projects.empty.description')}
             action={

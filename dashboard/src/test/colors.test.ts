@@ -27,8 +27,33 @@ import {
   borderColors,
   interactiveStates,
   colorPalette,
+  accentColors,
+  darkModeAccentColors,
+  sidebarColors,
+  darkModeSidebarColors,
+  modalColors,
+  darkModeModalColors,
+  tableColors,
+  darkModeTableColors,
+  kanbanColors,
+  darkModeKanbanColors,
+  chatColors,
+  darkModeChatColors,
+  dropdownColors,
+  darkModeDropdownColors,
+  codeBlockColors,
+  darkModeCodeBlockColors,
+  darkModeColors,
   type StatusColorScheme,
   type ButtonColorScheme,
+  type AccentColorScheme,
+  type SidebarColorScheme,
+  type ModalColorScheme,
+  type TableColorScheme,
+  type KanbanColorScheme,
+  type ChatColorScheme,
+  type DropdownColorScheme,
+  type CodeBlockColorScheme,
 } from '@/lib/colors'
 
 describe('Color Constants Exports', () => {
@@ -46,6 +71,23 @@ describe('Color Constants Exports', () => {
     expect(borderColors, 'borderColors should be exported').toBeDefined()
     expect(interactiveStates, 'interactiveStates should be exported').toBeDefined()
     expect(colorPalette, 'colorPalette should be exported').toBeDefined()
+    expect(accentColors, 'accentColors should be exported').toBeDefined()
+    expect(darkModeAccentColors, 'darkModeAccentColors should be exported').toBeDefined()
+    expect(sidebarColors, 'sidebarColors should be exported').toBeDefined()
+    expect(darkModeSidebarColors, 'darkModeSidebarColors should be exported').toBeDefined()
+    expect(modalColors, 'modalColors should be exported').toBeDefined()
+    expect(darkModeModalColors, 'darkModeModalColors should be exported').toBeDefined()
+    expect(tableColors, 'tableColors should be exported').toBeDefined()
+    expect(darkModeTableColors, 'darkModeTableColors should be exported').toBeDefined()
+    expect(kanbanColors, 'kanbanColors should be exported').toBeDefined()
+    expect(darkModeKanbanColors, 'darkModeKanbanColors should be exported').toBeDefined()
+    expect(chatColors, 'chatColors should be exported').toBeDefined()
+    expect(darkModeChatColors, 'darkModeChatColors should be exported').toBeDefined()
+    expect(dropdownColors, 'dropdownColors should be exported').toBeDefined()
+    expect(darkModeDropdownColors, 'darkModeDropdownColors should be exported').toBeDefined()
+    expect(codeBlockColors, 'codeBlockColors should be exported').toBeDefined()
+    expect(darkModeCodeBlockColors, 'darkModeCodeBlockColors should be exported').toBeDefined()
+    expect(darkModeColors, 'darkModeColors should be exported').toBeDefined()
   })
 
   test('exports have correct TypeScript types', () => {
@@ -517,6 +559,68 @@ describe('Interactive States', () => {
       'disabled should start with "disabled:"'
     ).toBeTruthy()
   })
+
+  test('focus rings use orange brand accent color', () => {
+    expect(
+      interactiveStates.focusRing,
+      'focusRing should use orange brand color'
+    ).toContain('orange')
+
+    expect(
+      interactiveStates.focusRingAlt,
+      'focusRingAlt should use amber/orange brand color'
+    ).toMatch(/orange|amber/)
+  })
+})
+
+describe('Accent / Brand Colors', () => {
+  test('accent colors are defined with all required properties', () => {
+    const requiredProps: (keyof AccentColorScheme)[] = [
+      'bg', 'text', 'border', 'solid', 'bgSubtle',
+      'textOnDark', 'borderOnDark', 'hoverBg',
+      'focusRing', 'gradientFrom', 'gradientTo',
+    ]
+
+    requiredProps.forEach((prop) => {
+      expect(
+        accentColors[prop],
+        `accentColors.${prop} should be defined`
+      ).toBeDefined()
+    })
+  })
+
+  test('accent colors use orange color family', () => {
+    const orangeFields = ['bg', 'text', 'border', 'solid', 'bgSubtle', 'hoverBg', 'focusRing']
+    orangeFields.forEach((field) => {
+      const value = accentColors[field as keyof AccentColorScheme]
+      expect(
+        value.includes('orange') || value.includes('amber'),
+        `accentColors.${field} should use orange or amber, got: ${value}`
+      ).toBeTruthy()
+    })
+  })
+
+  test('dark mode accent colors are defined', () => {
+    const requiredProps: (keyof AccentColorScheme)[] = [
+      'bg', 'text', 'border', 'solid', 'bgSubtle',
+      'textOnDark', 'borderOnDark', 'hoverBg',
+      'focusRing', 'gradientFrom', 'gradientTo',
+    ]
+
+    requiredProps.forEach((prop) => {
+      expect(
+        darkModeAccentColors[prop],
+        `darkModeAccentColors.${prop} should be defined`
+      ).toBeDefined()
+    })
+  })
+
+  test('primary button uses orange brand color', () => {
+    expect(
+      buttonVariants.primary.bg,
+      'Primary button should use orange background'
+    ).toContain('orange')
+  })
 })
 
 describe('Metric Colors', () => {
@@ -639,5 +743,336 @@ describe('Type Safety', () => {
     expect(sampleVariant.text).toBeTruthy()
     expect(sampleVariant.border).toBeTruthy()
     expect(sampleVariant.hoverBg).toBeTruthy()
+  })
+
+  test('sidebar colors have correct TypeScript interface', () => {
+    const sample: SidebarColorScheme = {
+      bg: 'bg-gray-900',
+      text: 'text-gray-300',
+      activeItem: 'bg-gray-800 text-white border-orange-500',
+      hoverItem: 'hover:bg-gray-800',
+      divider: 'border-gray-800',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.bg).toBeTruthy()
+    expect(sample.text).toBeTruthy()
+    expect(sample.activeItem).toBeTruthy()
+    expect(sample.hoverItem).toBeTruthy()
+    expect(sample.divider).toBeTruthy()
+  })
+
+  test('modal colors have correct TypeScript interface', () => {
+    const sample: ModalColorScheme = {
+      overlay: 'bg-black/50',
+      panel: 'bg-white',
+      border: 'border-gray-200',
+      header: 'text-gray-900',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.overlay).toBeTruthy()
+    expect(sample.panel).toBeTruthy()
+    expect(sample.border).toBeTruthy()
+    expect(sample.header).toBeTruthy()
+  })
+
+  test('table colors have correct TypeScript interface', () => {
+    const sample: TableColorScheme = {
+      headerBg: 'bg-gray-50',
+      headerText: 'text-gray-600',
+      rowBg: 'bg-white',
+      rowAltBg: 'bg-gray-50',
+      rowHover: 'hover:bg-gray-50',
+      border: 'border-gray-200',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.headerBg).toBeTruthy()
+    expect(sample.headerText).toBeTruthy()
+    expect(sample.rowBg).toBeTruthy()
+    expect(sample.rowAltBg).toBeTruthy()
+    expect(sample.rowHover).toBeTruthy()
+    expect(sample.border).toBeTruthy()
+  })
+
+  test('kanban colors have correct TypeScript interface', () => {
+    const sample: KanbanColorScheme = {
+      columnBg: 'bg-gray-100',
+      cardBg: 'bg-white',
+      cardBorder: 'border-gray-200',
+      columnHeader: 'text-gray-700',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.columnBg).toBeTruthy()
+    expect(sample.cardBg).toBeTruthy()
+    expect(sample.cardBorder).toBeTruthy()
+    expect(sample.columnHeader).toBeTruthy()
+  })
+
+  test('chat colors have correct TypeScript interface', () => {
+    const sample: ChatColorScheme = {
+      ownBubble: 'bg-orange-600 text-white',
+      otherBubble: 'bg-gray-100 text-gray-900',
+      inputBg: 'bg-white',
+      inputBorder: 'border-gray-200',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.ownBubble).toBeTruthy()
+    expect(sample.otherBubble).toBeTruthy()
+    expect(sample.inputBg).toBeTruthy()
+    expect(sample.inputBorder).toBeTruthy()
+  })
+
+  test('dropdown colors have correct TypeScript interface', () => {
+    const sample: DropdownColorScheme = {
+      bg: 'bg-white',
+      border: 'border-gray-200',
+      itemHover: 'hover:bg-gray-100',
+      itemText: 'text-gray-700',
+      divider: 'border-gray-100',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.bg).toBeTruthy()
+    expect(sample.border).toBeTruthy()
+    expect(sample.itemHover).toBeTruthy()
+    expect(sample.itemText).toBeTruthy()
+    expect(sample.divider).toBeTruthy()
+  })
+
+  test('code block colors have correct TypeScript interface', () => {
+    const sample: CodeBlockColorScheme = {
+      bg: 'bg-gray-900',
+      text: 'text-gray-100',
+    }
+
+    expect(sample).toBeDefined()
+    expect(sample.bg).toBeTruthy()
+    expect(sample.text).toBeTruthy()
+  })
+})
+
+describe('Sidebar Colors', () => {
+  test('light mode sidebar colors have all required properties', () => {
+    expect(sidebarColors.bg).toBeDefined()
+    expect(sidebarColors.text).toBeDefined()
+    expect(sidebarColors.activeItem).toBeDefined()
+    expect(sidebarColors.hoverItem).toBeDefined()
+    expect(sidebarColors.divider).toBeDefined()
+  })
+
+  test('light mode sidebar uses dark background', () => {
+    expect(sidebarColors.bg).toBe('bg-gray-900')
+  })
+
+  test('dark mode sidebar colors have all required properties', () => {
+    expect(darkModeSidebarColors.bg).toBeDefined()
+    expect(darkModeSidebarColors.text).toBeDefined()
+    expect(darkModeSidebarColors.activeItem).toBeDefined()
+    expect(darkModeSidebarColors.hoverItem).toBeDefined()
+    expect(darkModeSidebarColors.divider).toBeDefined()
+  })
+
+  test('dark mode sidebar uses near-black background', () => {
+    expect(darkModeSidebarColors.bg).toBe('dark:bg-gray-950')
+  })
+})
+
+describe('Modal Colors', () => {
+  test('light mode modal colors have all required properties', () => {
+    expect(modalColors.overlay).toBeDefined()
+    expect(modalColors.panel).toBeDefined()
+    expect(modalColors.border).toBeDefined()
+    expect(modalColors.header).toBeDefined()
+  })
+
+  test('light mode modal uses white panel', () => {
+    expect(modalColors.panel).toBe('bg-white')
+  })
+
+  test('dark mode modal colors have all required properties', () => {
+    expect(darkModeModalColors.overlay).toBeDefined()
+    expect(darkModeModalColors.panel).toBeDefined()
+    expect(darkModeModalColors.border).toBeDefined()
+    expect(darkModeModalColors.header).toBeDefined()
+  })
+
+  test('dark mode modal uses darker overlay', () => {
+    expect(darkModeModalColors.overlay).toBe('dark:bg-black/70')
+  })
+})
+
+describe('Table Colors', () => {
+  test('light mode table colors have all required properties', () => {
+    expect(tableColors.headerBg).toBeDefined()
+    expect(tableColors.headerText).toBeDefined()
+    expect(tableColors.rowBg).toBeDefined()
+    expect(tableColors.rowAltBg).toBeDefined()
+    expect(tableColors.rowHover).toBeDefined()
+    expect(tableColors.border).toBeDefined()
+  })
+
+  test('light mode table uses white rows', () => {
+    expect(tableColors.rowBg).toBe('bg-white')
+  })
+
+  test('dark mode table colors have all required properties', () => {
+    expect(darkModeTableColors.headerBg).toBeDefined()
+    expect(darkModeTableColors.headerText).toBeDefined()
+    expect(darkModeTableColors.rowBg).toBeDefined()
+    expect(darkModeTableColors.rowAltBg).toBeDefined()
+    expect(darkModeTableColors.rowHover).toBeDefined()
+    expect(darkModeTableColors.border).toBeDefined()
+  })
+
+  test('dark mode table uses near-black rows', () => {
+    expect(darkModeTableColors.rowBg).toBe('dark:bg-gray-950')
+  })
+})
+
+describe('Kanban Colors', () => {
+  test('light mode kanban colors have all required properties', () => {
+    expect(kanbanColors.columnBg).toBeDefined()
+    expect(kanbanColors.cardBg).toBeDefined()
+    expect(kanbanColors.cardBorder).toBeDefined()
+    expect(kanbanColors.columnHeader).toBeDefined()
+  })
+
+  test('light mode kanban uses white cards', () => {
+    expect(kanbanColors.cardBg).toBe('bg-white')
+  })
+
+  test('dark mode kanban colors have all required properties', () => {
+    expect(darkModeKanbanColors.columnBg).toBeDefined()
+    expect(darkModeKanbanColors.cardBg).toBeDefined()
+    expect(darkModeKanbanColors.cardBorder).toBeDefined()
+    expect(darkModeKanbanColors.columnHeader).toBeDefined()
+  })
+
+  test('dark mode kanban uses gray-800 cards', () => {
+    expect(darkModeKanbanColors.cardBg).toBe('dark:bg-gray-800')
+  })
+})
+
+describe('Chat Colors', () => {
+  test('light mode chat colors have all required properties', () => {
+    expect(chatColors.ownBubble).toBeDefined()
+    expect(chatColors.otherBubble).toBeDefined()
+    expect(chatColors.inputBg).toBeDefined()
+    expect(chatColors.inputBorder).toBeDefined()
+  })
+
+  test('own bubble uses orange brand color', () => {
+    expect(chatColors.ownBubble).toContain('orange')
+    expect(chatColors.ownBubble).toContain('white')
+  })
+
+  test('dark mode chat colors have all required properties', () => {
+    expect(darkModeChatColors.ownBubble).toBeDefined()
+    expect(darkModeChatColors.otherBubble).toBeDefined()
+    expect(darkModeChatColors.inputBg).toBeDefined()
+    expect(darkModeChatColors.inputBorder).toBeDefined()
+  })
+
+  test('dark mode own bubble maintains orange brand', () => {
+    expect(darkModeChatColors.ownBubble).toContain('orange')
+  })
+})
+
+describe('Dropdown Colors', () => {
+  test('light mode dropdown colors have all required properties', () => {
+    expect(dropdownColors.bg).toBeDefined()
+    expect(dropdownColors.border).toBeDefined()
+    expect(dropdownColors.itemHover).toBeDefined()
+    expect(dropdownColors.itemText).toBeDefined()
+    expect(dropdownColors.divider).toBeDefined()
+  })
+
+  test('light mode dropdown uses white background', () => {
+    expect(dropdownColors.bg).toBe('bg-white')
+  })
+
+  test('dark mode dropdown colors have all required properties', () => {
+    expect(darkModeDropdownColors.bg).toBeDefined()
+    expect(darkModeDropdownColors.border).toBeDefined()
+    expect(darkModeDropdownColors.itemHover).toBeDefined()
+    expect(darkModeDropdownColors.itemText).toBeDefined()
+    expect(darkModeDropdownColors.divider).toBeDefined()
+  })
+
+  test('dark mode dropdown uses gray-800 background', () => {
+    expect(darkModeDropdownColors.bg).toBe('dark:bg-gray-800')
+  })
+})
+
+describe('Code Block Colors', () => {
+  test('light mode code block colors have all required properties', () => {
+    expect(codeBlockColors.bg).toBeDefined()
+    expect(codeBlockColors.text).toBeDefined()
+  })
+
+  test('light mode code block uses dark background', () => {
+    expect(codeBlockColors.bg).toBe('bg-gray-900')
+  })
+
+  test('dark mode code block colors have all required properties', () => {
+    expect(darkModeCodeBlockColors.bg).toBeDefined()
+    expect(darkModeCodeBlockColors.text).toBeDefined()
+  })
+
+  test('dark mode code block uses near-black background', () => {
+    expect(darkModeCodeBlockColors.bg).toBe('dark:bg-gray-950')
+  })
+})
+
+describe('Dark Mode Colors Aggregation', () => {
+  test('darkModeColors includes all new token groups', () => {
+    const requiredKeys = [
+      'sidebar',
+      'modal',
+      'table',
+      'kanban',
+      'chat',
+      'dropdown',
+      'codeBlock',
+    ]
+
+    requiredKeys.forEach((key) => {
+      expect(
+        (darkModeColors as Record<string, unknown>)[key],
+        `darkModeColors should include "${key}"`
+      ).toBeDefined()
+    })
+  })
+
+  test('darkModeColors sidebar references darkModeSidebarColors', () => {
+    expect(darkModeColors.sidebar).toBe(darkModeSidebarColors)
+  })
+
+  test('darkModeColors modal references darkModeModalColors', () => {
+    expect(darkModeColors.modal).toBe(darkModeModalColors)
+  })
+
+  test('darkModeColors table references darkModeTableColors', () => {
+    expect(darkModeColors.table).toBe(darkModeTableColors)
+  })
+
+  test('darkModeColors kanban references darkModeKanbanColors', () => {
+    expect(darkModeColors.kanban).toBe(darkModeKanbanColors)
+  })
+
+  test('darkModeColors chat references darkModeChatColors', () => {
+    expect(darkModeColors.chat).toBe(darkModeChatColors)
+  })
+
+  test('darkModeColors dropdown references darkModeDropdownColors', () => {
+    expect(darkModeColors.dropdown).toBe(darkModeDropdownColors)
+  })
+
+  test('darkModeColors codeBlock references darkModeCodeBlockColors', () => {
+    expect(darkModeColors.codeBlock).toBe(darkModeCodeBlockColors)
   })
 })

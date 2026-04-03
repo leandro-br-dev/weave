@@ -5,6 +5,8 @@ import { useGetWorkspaces } from '@/api/workspaces';
 import { useGetProjects } from '@/api/projects';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { FileAttachmentInput, type FileAttachment } from '@/components/FileAttachmentInput';
+import { useUploadFiles, type AttachmentResponse } from '@/api/uploads';
 
 interface TaskForm {
   id: string;
@@ -17,6 +19,7 @@ interface TaskForm {
   permission_mode?: string;
   depends_on?: string[];
   tools?: string[];
+  attachments: FileAttachment[];
 }
 
 interface FormErrors {
@@ -31,6 +34,7 @@ export function CreatePlanForm() {
   const createMutation = useCreatePlan();
   const { data: projects = [] } = useGetProjects();
   const [projectId, setProjectId] = useState('');
+  const uploadFiles = useUploadFiles();
 
   // Workspaces filtered by selected project
   const { data: workspaces = [] } = useGetWorkspaces(
@@ -51,6 +55,7 @@ export function CreatePlanForm() {
     permission_mode: 'acceptEdits',
     depends_on: [],
     tools: [],
+    attachments: [],
   });
 
   const [planName, setPlanName] = useState('');
@@ -74,6 +79,7 @@ export function CreatePlanForm() {
         permission_mode: task.permission_mode || 'acceptEdits',
         depends_on: task.depends_on || [],
         tools: task.tools || [],
+        attachments: [],
         // Note: env_context and selectedEnvId are not pre-filled as they require project lookup
         env_context: undefined,
         selectedEnvId: undefined,
@@ -95,6 +101,7 @@ export function CreatePlanForm() {
       selectedEnvId: '',
       cwd: '',
       env_context: '',
+      attachments: [],
     })));
   };
 
@@ -134,12 +141,41 @@ export function CreatePlanForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validate()) return;
 
-    const tasksToCreate: Task[] = tasks.map((task) => ({
+    // Upload all pending attachments across all tasks
+    const allAttachmentIds: string[] = [];
+    const taskAttachmentIdMap = new Map<number, string[]>();
+
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const pendingFiles = task.attachments.filter(a => a.status === 'pending').map(a => a.file);
+      const alreadyUploaded = task.attachments.filter(a => a.status === 'uploaded' && a.serverData).map(a => a.serverData!.id);
+
+      if (pendingFiles.length > 0) {
+        try {
+          const uploaded = await uploadFiles.mutateAsync(pendingFiles);
+          const ids = uploaded.map(u => u.id);
+          taskAttachmentIdMap.set(i, [...alreadyUploaded, ...ids]);
+          allAttachmentIds.push(...ids);
+        } catch (err) {
+          console.error(`Failed to upload attachments for task ${i + 1}:`, err);
+          // Continue with already uploaded ones
+          if (alreadyUploaded.length > 0) {
+            taskAttachmentIdMap.set(i, alreadyUploaded);
+            allAttachmentIds.push(...alreadyUploaded);
+          }
+        }
+      } else if (alreadyUploaded.length > 0) {
+        taskAttachmentIdMap.set(i, alreadyUploaded);
+        allAttachmentIds.push(...alreadyUploaded);
+      }
+    }
+
+    const tasksToCreate: Task[] = tasks.map((task, index) => ({
       id: task.id,
       name: task.name,
       prompt: task.prompt,
@@ -149,6 +185,7 @@ export function CreatePlanForm() {
       permission_mode: task.permission_mode,
       depends_on: task.depends_on,
       tools: task.tools,
+      attachment_ids: taskAttachmentIdMap.get(index),
     }));
 
     createMutation.mutate(
@@ -171,7 +208,65 @@ export function CreatePlanForm() {
 
   const removeTask = (index: number) => {
     if (tasks.length > 1) {
+      // Clean up any object URLs for previews
+      const task = tasks[index];
+      task.attachments.forEach(a => {
+        if (a.preview) URL.revokeObjectURL(a.preview);
+      });
       setTasks(tasks.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleAttachmentsChange = (taskIndex: number, newAttachments: FileAttachment[]) => {
+    setTasks(tasks.map((t, i) => i !== taskIndex ? t : { ...t, attachments: newAttachments }));
+  };
+
+  const handleUploadAttachments = async (taskIndex: number) => {
+    const task = tasks[taskIndex];
+    const pendingFiles = task.attachments.filter(a => a.status === 'pending').map(a => a.file);
+    if (pendingFiles.length === 0) return;
+
+    // Mark all pending as uploading
+    setTasks(tasks.map((t, i) => {
+      if (i !== taskIndex) return t;
+      return {
+        ...t,
+        attachments: t.attachments.map(a => a.status === 'pending' ? { ...a, status: 'uploading' as const } : a),
+      };
+    }));
+
+    try {
+      const uploaded = await uploadFiles.mutateAsync(pendingFiles);
+      // Create a map of file name -> server data
+      const uploadMap = new Map<string, AttachmentResponse>();
+      uploaded.forEach(u => uploadMap.set(u.file_name, u));
+
+      setTasks(tasks.map((t, i) => {
+        if (i !== taskIndex) return t;
+        return {
+          ...t,
+          attachments: t.attachments.map(a => {
+            if (a.status === 'uploading') {
+              const serverData = uploadMap.get(a.file.name);
+              if (serverData) {
+                return { ...a, status: 'uploaded' as const, serverData };
+              }
+              return { ...a, status: 'error' as const };
+            }
+            return a;
+          }),
+        };
+      }));
+    } catch {
+      setTasks(tasks.map((t, i) => {
+        if (i !== taskIndex) return t;
+        return {
+          ...t,
+          attachments: t.attachments.map(a =>
+            a.status === 'uploading' ? { ...a, status: 'error' as const } : a
+          ),
+        };
+      }));
     }
   };
 
@@ -203,7 +298,7 @@ export function CreatePlanForm() {
                 id="project"
                 value={projectId}
                 onChange={(e) => handleProjectChange(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm px-3 py-2 border"
                 required
               >
                 <option value="">{t('createPlan.project.selectPlaceholder')}</option>
@@ -233,7 +328,7 @@ export function CreatePlanForm() {
                 onChange={(e) => setPlanName(e.target.value)}
                 className={cn(
                   'mt-1 block w-full rounded-md border-gray-300 shadow-sm',
-                  'focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
+                  'focus:border-orange-500 focus:ring-orange-500 sm:text-sm',
                   'px-3 py-2 border',
                   errors.name && 'border-red-500'
                 )}
@@ -251,7 +346,7 @@ export function CreatePlanForm() {
                 <button
                   type="button"
                   onClick={addTask}
-                  className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                  className="rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-500"
                 >
                   {t('createPlan.tasks.addTask')}
                 </button>
@@ -299,7 +394,7 @@ export function CreatePlanForm() {
                         onChange={(e) => updateTask(index, 'name', e.target.value)}
                         className={cn(
                           'mt-1 block w-full rounded-md border-gray-300 shadow-sm',
-                          'focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
+                          'focus:border-orange-500 focus:ring-orange-500 sm:text-sm',
                           'px-3 py-2 border',
                           errors.tasks?.[index] && 'border-red-500'
                         )}
@@ -321,7 +416,7 @@ export function CreatePlanForm() {
                         onChange={(e) => updateTask(index, 'prompt', e.target.value)}
                         className={cn(
                           'mt-1 block w-full rounded-md border-gray-300 shadow-sm',
-                          'focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
+                          'focus:border-orange-500 focus:ring-orange-500 sm:text-sm',
                           'px-3 py-2 border',
                           errors.tasks?.[index] && 'border-red-500'
                         )}
@@ -354,7 +449,7 @@ export function CreatePlanForm() {
                           }}
                           className={cn(
                             'block w-full rounded-md border-gray-300 shadow-sm',
-                            'focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm',
+                            'focus:border-orange-500 focus:ring-orange-500 sm:text-sm',
                             'px-3 py-2 border',
                             errors.tasks?.[index] && 'border-red-500'
                           )}
@@ -393,7 +488,7 @@ export function CreatePlanForm() {
                           id={`task-environment-${index}`}
                           value={task.selectedEnvId ?? ''}
                           onChange={(e) => handleEnvSelect(index, e.target.value)}
-                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                          className="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm px-3 py-2 border"
                           disabled={!projectId}
                         >
                           <option value="">{t('createPlan.tasks.environment.defaultOption')}</option>
@@ -434,6 +529,28 @@ export function CreatePlanForm() {
                         placeholder={t('createPlan.tasks.workingDirectory.placeholder')}
                       />
                     </div>
+
+                    {/* Attachments */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t('createPlan.tasks.attachments.label')}
+                      </label>
+                      <FileAttachmentInput
+                        attachments={task.attachments}
+                        onAttachmentsChange={(newAttachments) => handleAttachmentsChange(index, newAttachments)}
+                        maxFiles={5}
+                      />
+                      {task.attachments.some(a => a.status === 'pending') && (
+                        <button
+                          type="button"
+                          onClick={() => handleUploadAttachments(index)}
+                          disabled={uploadFiles.isPending}
+                          className="mt-1.5 text-xs text-orange-600 hover:text-orange-800 disabled:opacity-50"
+                        >
+                          {t('createPlan.tasks.attachments.uploadNow')}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -451,8 +568,8 @@ export function CreatePlanForm() {
                 type="submit"
                 disabled={createMutation.isPending}
                 className={cn(
-                  'rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm',
-                  'hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed'
+                  'rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm',
+                  'hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed'
                 )}
               >
                 {createMutation.isPending ? t('createPlan.actions.creating') : t('createPlan.actions.createPlan')}

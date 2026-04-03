@@ -12,6 +12,18 @@ import { useTranslation } from 'react-i18next';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { ProjectSelectDropdown } from '@/components';
 import { useToast } from '@/contexts/ToastContext';
+import {
+  bgColors, darkModeBgColors,
+  textColors, darkModeTextColors,
+  borderColors, darkModeBorderColors,
+  errorColors, darkModeErrorColors,
+  successColors, darkModeSuccessColors,
+  warningColors, darkModeWarningColors,
+  infoColors, darkModeInfoColors,
+  interactiveStates,
+  codeBlockColors,
+  withDarkMode,
+} from '@/lib/colors';
 
 function ApiStatusBadge() {
   const { t } = useTranslation();
@@ -22,16 +34,16 @@ function ApiStatusBadge() {
     refetchInterval: 30000,
   });
 
-  if (isLoading) return <span className="text-xs text-gray-400">{t('pages.settings.apiConnection.statusValues.checking')}</span>;
+  if (isLoading) return <span className={`text-xs ${textColors.muted}`}>{t('pages.settings.apiConnection.statusValues.checking')}</span>;
 
   if (isError) return (
-    <span className="inline-flex items-center gap-1 text-xs text-red-600">
+    <span className={`inline-flex items-center gap-1 text-xs ${withDarkMode(errorColors.text, darkModeErrorColors.text)}`}>
       <span className="h-2 w-2 rounded-full bg-red-500" /> {t('pages.settings.apiConnection.statusValues.unreachable')}
     </span>
   );
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-green-600">
+    <span className={`inline-flex items-center gap-1 text-xs ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`}>
       <span className="h-2 w-2 rounded-full bg-green-500" /> {t('pages.settings.apiConnection.statusValues.connected')}
     </span>
   );
@@ -181,9 +193,9 @@ function EnvironmentVariablesSection() {
   if (isLoading) {
     return (
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('pages.settings.envVars.title')}</h2>
+        <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.envVars.title')}</h2>
         <Card>
-          <p className="text-sm text-gray-600">{t('pages.settings.envVars.loading')}</p>
+          <p className={`text-sm ${textColors.secondary}`}>{t('pages.settings.envVars.loading')}</p>
         </Card>
       </section>
     );
@@ -192,9 +204,9 @@ function EnvironmentVariablesSection() {
   if (isError) {
     return (
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">{t('pages.settings.envVars.title')}</h2>
-        <Card className="bg-red-50 border-red-200">
-          <p className="text-sm text-red-600">{t('pages.settings.envVars.error')}: {(error as Error)?.message || t('pages.settings.envVars.error')}</p>
+        <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.envVars.title')}</h2>
+        <Card className={`${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} ${withDarkMode(errorColors.border, darkModeErrorColors.border)}`}>
+          <p className={`text-sm ${withDarkMode(errorColors.text, darkModeErrorColors.text)}`}>{t('pages.settings.envVars.error')}: {(error as Error)?.message || t('pages.settings.envVars.error')}</p>
         </Card>
       </section>
     );
@@ -203,7 +215,7 @@ function EnvironmentVariablesSection() {
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-gray-800">{t('pages.settings.envVars.title')}</h2>
+        <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{t('pages.settings.envVars.title')}</h2>
         <div className="flex gap-2">
           <Button
             onClick={() => initializeDefaults.mutate()}
@@ -228,10 +240,10 @@ function EnvironmentVariablesSection() {
       </div>
 
       {/* Filters and Search */}
-      <Card className="mb-4 bg-gray-50 dark:bg-gray-900">
+      <Card className={`mb-4 ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.settings.envVars.filters.search')}</label>
+            <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.filters.search')}</label>
             <Input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -240,11 +252,11 @@ function EnvironmentVariablesSection() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.settings.envVars.filters.category')}</label>
+            <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.filters.category')}</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-md text-sm focus:outline-none focus:ring-2 ${interactiveStates.focusRing}`}
             >
               <option value="all">{t('pages.settings.envVars.filters.categories.all')}</option>
               <option value="general">{t('pages.settings.envVars.filters.categories.general')}</option>
@@ -258,8 +270,8 @@ function EnvironmentVariablesSection() {
 
       {/* Common Variables Suggestions */}
       {!showForm && !editingVar && (
-        <Card className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <h3 className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">{t('pages.settings.envVars.quickAdd.title')}</h3>
+        <Card className={`mb-4 ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} ${withDarkMode(infoColors.border, darkModeInfoColors.border)}`}>
+          <h3 className={`text-xs sm:text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-2`}>{t('pages.settings.envVars.quickAdd.title')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {commonVariables.map((varInfo) => {
               const exists = envVars?.some(v => v.key === varInfo.key);
@@ -270,19 +282,19 @@ function EnvironmentVariablesSection() {
                   disabled={exists}
                   className={`text-left p-2 rounded border text-xs transition-colors ${
                     exists
-                      ? 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                      : 'bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-400'
+                      ? `${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-not-allowed`
+                      : `${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} ${withDarkMode('border-orange-300', 'dark:border-orange-700')} ${withDarkMode('hover:bg-orange-100', 'dark:hover:bg-orange-900/30')} hover:border-orange-400`
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <code className="font-semibold text-xs break-all">{varInfo.key}</code>
                     {exists ? (
-                      <span className="text-green-600 whitespace-nowrap">✓ {t('pages.settings.envVars.quickAdd.added')}</span>
+                      <span className={`${withDarkMode(successColors.text, darkModeSuccessColors.text)} whitespace-nowrap`}>✓ {t('pages.settings.envVars.quickAdd.added')}</span>
                     ) : (
-                      <Plus className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                      <Plus className={`w-3 h-3 ${withDarkMode('text-orange-600', 'dark:text-orange-500')} flex-shrink-0`} />
                     )}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400 mt-0.5 text-xs">{varInfo.description}</div>
+                  <div className={`${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-0.5 text-xs`}>{varInfo.description}</div>
                 </button>
               );
             })}
@@ -291,19 +303,19 @@ function EnvironmentVariablesSection() {
       )}
 
       {(showForm || editingVar) && (
-        <Card className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <h3 className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+        <Card className={`mb-4 ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} ${withDarkMode(infoColors.border, darkModeInfoColors.border)}`}>
+          <h3 className={`text-xs sm:text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>
             {editingVar ? t('pages.settings.envVars.form.edit') : t('pages.settings.envVars.form.new')}
           </h3>
           {submitError && (
-            <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded text-xs text-red-700 dark:text-red-400">
+            <div className={`mb-3 p-2 ${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} border ${withDarkMode(errorColors.border, darkModeErrorColors.border)} rounded text-xs ${withDarkMode(errorColors.textAlt, darkModeErrorColors.textAlt)}`}>
               {submitError}
             </div>
           )}
           <form onSubmit={editingVar ? handleUpdate : handleCreate} className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.settings.envVars.form.fields.key')}</label>
+                <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.form.fields.key')}</label>
                 <Input
                   value={formData.key}
                   onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
@@ -313,11 +325,11 @@ function EnvironmentVariablesSection() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.settings.envVars.form.fields.category')}</label>
+                <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.form.fields.category')}</label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-md text-sm focus:outline-none focus:ring-2 ${interactiveStates.focusRing}`}
                   required
                 >
                   <option value="general">{t('pages.settings.envVars.filters.categories.general')}</option>
@@ -328,7 +340,7 @@ function EnvironmentVariablesSection() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">{t('pages.settings.envVars.form.fields.value')}</label>
+              <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.form.fields.value')}</label>
               <div className="relative">
                 <Input
                   type={formData.is_secret && !isSecretVisible(editingVar?.id || 'new') ? 'password' : 'text'}
@@ -341,7 +353,7 @@ function EnvironmentVariablesSection() {
                   <button
                     type="button"
                     onClick={() => toggleSecretVisibility(editingVar?.id || 'new')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} hover:text-gray-700`}
                   >
                     {isSecretVisible(editingVar?.id || 'new') ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -349,7 +361,7 @@ function EnvironmentVariablesSection() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.settings.envVars.form.fields.description')}</label>
+              <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>{t('pages.settings.envVars.form.fields.description')}</label>
               <Input
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -362,9 +374,9 @@ function EnvironmentVariablesSection() {
                 id="is_secret"
                 checked={formData.is_secret}
                 onChange={(e) => setFormData({ ...formData, is_secret: e.target.checked })}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className={`rounded ${borderColors.thick} text-orange-600 focus:ring-orange-500`}
               />
-              <label htmlFor="is_secret" className="text-xs text-gray-700 dark:text-gray-300">{t('pages.settings.envVars.form.fields.markAsSecret')}</label>
+              <label htmlFor="is_secret" className={`text-xs ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('pages.settings.envVars.form.fields.markAsSecret')}</label>
             </div>
             <div className="flex gap-2 pt-2">
               <Button
@@ -395,8 +407,8 @@ function EnvironmentVariablesSection() {
       )}
 
       {Object.keys(groupedVars).length === 0 ? (
-        <Card className="bg-gray-50 dark:bg-gray-900">
-          <p className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">
+        <Card className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
+          <p className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} text-center py-4`}>
             {searchTerm || selectedCategory !== 'all'
               ? t('pages.settings.envVars.noResults.filtered')
               : t('pages.settings.envVars.noResults.empty')}
@@ -405,25 +417,25 @@ function EnvironmentVariablesSection() {
       ) : (
         <div className="space-y-4">
           {Object.entries(groupedVars).map(([category, vars]) => (
-            <Card key={category} className="bg-gray-50 dark:bg-gray-900">
+            <Card key={category} className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 capitalize">{category}</h3>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{vars.length} {vars.length !== 1 ? t('pages.settings.envVars.badges.variables') : t('pages.settings.envVars.badges.variable')}</span>
+                <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} capitalize`}>{category}</h3>
+                <span className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>{vars.length} {vars.length !== 1 ? t('pages.settings.envVars.badges.variables') : t('pages.settings.envVars.badges.variable')}</span>
               </div>
               <div className="space-y-2">
                 {vars.map((envVar) => (
-                  <div key={envVar.id} className="bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 p-3 hover:shadow-sm transition-shadow">
+                  <div key={envVar.id} className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} rounded border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} p-3 hover:shadow-sm transition-shadow`}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <code className="text-sm font-mono font-semibold text-gray-900 dark:text-white">{envVar.key}</code>
-                          <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded capitalize">{envVar.category}</span>
+                          <code className={`text-sm font-mono font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{envVar.key}</code>
+                          <span className={`text-xs ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} px-2 py-0.5 rounded capitalize`}>{envVar.category}</span>
                           {envVar.is_secret && (
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">{t('pages.settings.envVars.badges.secret')}</span>
+                            <span className={`text-xs ${withDarkMode(warningColors.bg, darkModeWarningColors.bg)} ${withDarkMode('text-yellow-800', 'dark:text-yellow-300')} px-2 py-0.5 rounded`}>{t('pages.settings.envVars.badges.secret')}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded break-all">
+                          <code className={`text-xs font-mono ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-2 py-1 rounded break-all`}>
                             {envVar.is_secret && !isSecretVisible(envVar.id)
                               ? '••••••••'
                               : envVar.value}
@@ -431,27 +443,27 @@ function EnvironmentVariablesSection() {
                           {envVar.is_secret && (
                             <button
                               onClick={() => toggleSecretVisibility(envVar.id)}
-                              className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+                              className={`${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} hover:text-gray-700 flex-shrink-0`}
                             >
                               {isSecretVisible(envVar.id) ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                             </button>
                           )}
                         </div>
                         {envVar.description && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{envVar.description}</p>
+                          <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>{envVar.description}</p>
                         )}
                       </div>
                       <div className="flex gap-1 flex-shrink-0 ml-2">
                         <button
                           onClick={() => handleEdit(envVar)}
-                          className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className={`p-1.5 ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} hover:text-orange-600 ${withDarkMode('hover:bg-orange-50', 'dark:hover:bg-orange-900/30')} rounded transition-colors`}
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(envVar.id)}
-                          className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className={`p-1.5 ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} hover:text-red-600 ${withDarkMode('hover:bg-red-50', 'dark:hover:bg-red-950')} rounded transition-colors`}
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -474,12 +486,12 @@ function LanguageSection() {
   const { t } = useTranslation();
   return (
     <section className="mb-8">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3 flex items-center gap-2`}>
         <Languages className="w-5 h-5" />
         {t('pages.settings.language.title')}
       </h2>
       <Card>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <p className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-4`}>
           {t('pages.settings.language.description')}
         </p>
         <div>
@@ -495,11 +507,11 @@ function AppearanceSection() {
   const { t } = useTranslation();
   return (
     <section className="mb-8">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.appearance.title')}</h2>
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.appearance.title')}</h2>
       <Card>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{t('pages.settings.appearance.description')}</p>
+        <p className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-4`}>{t('pages.settings.appearance.description')}</p>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('pages.settings.appearance.theme')}</label>
+          <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-2`}>{t('pages.settings.appearance.theme')}</label>
           <ThemeSelector layout="vertical" />
         </div>
       </Card>
@@ -530,9 +542,9 @@ function CloudflareTunnelSection() {
   if (isLoading) {
     return (
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.cloudflare.title')}</h2>
+        <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.cloudflare.title')}</h2>
         <Card>
-          <p className="text-sm text-gray-600">{t('pages.settings.cloudflare.loading')}</p>
+          <p className={`text-sm ${textColors.secondary}`}>{t('pages.settings.cloudflare.loading')}</p>
         </Card>
       </section>
     );
@@ -543,44 +555,44 @@ function CloudflareTunnelSection() {
 
   return (
     <section className="mb-8">
-      <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3 flex items-center gap-2`}>
         <Globe className="w-5 h-5" />
         {t('pages.settings.cloudflare.title')}
       </h2>
       <Card>
         {isEnabled ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-green-600">
+            <div className={`flex items-center gap-2 text-sm ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`}>
               <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
               <strong>{t('pages.settings.cloudflare.status.enabled')}</strong>
             </div>
 
             {fullDomain && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-200">
+                <div className={`flex items-center justify-between p-3 ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} rounded border ${withDarkMode(infoColors.border, darkModeInfoColors.border)}`}>
                   <div>
-                    <div className="text-xs text-gray-600">{t('pages.settings.cloudflare.urls.public')}</div>
-                    <div className="text-sm font-mono font-semibold text-gray-900">{fullDomain}</div>
+                    <div className={`text-xs ${textColors.secondary}`}>{t('pages.settings.cloudflare.urls.public')}</div>
+                    <div className={`text-sm font-mono font-semibold ${textColors.primary}`}>{fullDomain}</div>
                   </div>
                   <a
                     href={`https://${fullDomain}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700"
+                    className={`${withDarkMode('text-orange-600 hover:text-orange-700', 'dark:text-orange-500 dark:hover:text-orange-400')}`}
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                <div className={`flex items-center justify-between p-3 ${bgColors.primary} rounded border ${borderColors.default}`}>
                   <div>
-                    <div className="text-xs text-gray-600">{t('pages.settings.cloudflare.urls.api')}</div>
-                    <div className="text-sm font-mono font-semibold text-gray-900">api-{fullDomain}</div>
+                    <div className={`text-xs ${textColors.secondary}`}>{t('pages.settings.cloudflare.urls.api')}</div>
+                    <div className={`text-sm font-mono font-semibold ${textColors.primary}`}>api-{fullDomain}</div>
                   </div>
                   <a
                     href={`https://api-${fullDomain}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gray-600 hover:text-gray-700"
+                    className={`${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} ${withDarkMode('hover:text-gray-700', 'dark:hover:text-gray-200')}`}
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
@@ -599,20 +611,20 @@ function CloudflareTunnelSection() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 p-4 bg-yellow-50 rounded border border-yellow-200">
-              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className={`flex items-start gap-3 p-4 ${withDarkMode(warningColors.bg, darkModeWarningColors.bg)} rounded border ${withDarkMode(warningColors.border, darkModeWarningColors.border)}`}>
+              <AlertCircle className={`w-5 h-5 ${withDarkMode(warningColors.text, darkModeWarningColors.text)} flex-shrink-0 mt-0.5`} />
               <div className="flex-1">
-                <div className="text-sm font-semibold text-yellow-900">{t('pages.settings.cloudflare.messages.notConfigured.title')}</div>
-                <p className="text-xs text-yellow-800 mt-1">
+                <div className={`text-sm font-semibold ${withDarkMode('text-yellow-900', 'dark:text-yellow-200')}`}>{t('pages.settings.cloudflare.messages.notConfigured.title')}</div>
+                <p className={`text-xs ${withDarkMode('text-yellow-800', 'dark:text-yellow-300')} mt-1`}>
                   {t('pages.settings.cloudflare.messages.notConfigured.description')}
                 </p>
-                <code className="block mt-2 text-xs bg-yellow-100 p-2 rounded font-mono">
+                <code className={`block mt-2 text-xs ${withDarkMode('bg-yellow-100', 'dark:bg-yellow-900/30')} p-2 rounded font-mono`}>
                   {t('pages.settings.cloudflare.messages.notConfigured.script')}
                 </code>
               </div>
             </div>
 
-            <div className="text-xs text-gray-600">
+            <div className={`text-xs ${textColors.secondary}`}>
               <p className="font-semibold mb-1">{t('pages.settings.cloudflare.messages.benefits.title')}</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>{t('pages.settings.cloudflare.messages.benefits.accessAnywhere')}</li>
@@ -759,9 +771,9 @@ function WorkflowLimitsSection() {
   if (isLoading) {
     return (
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.workflowLimits.title')}</h2>
+        <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.workflowLimits.title')}</h2>
         <Card>
-          <p className="text-sm text-gray-600">{t('pages.settings.workflowLimits.title')}...</p>
+          <p className={`text-sm ${textColors.secondary}`}>{t('pages.settings.workflowLimits.title')}...</p>
         </Card>
       </section>
     );
@@ -769,12 +781,12 @@ function WorkflowLimitsSection() {
 
   return (
     <section className="mb-8">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3 flex items-center gap-2`}>
         <GitBranch className="w-5 h-5" />
         {t('pages.settings.workflowLimits.title')}
       </h2>
-      <Card className="bg-gray-50 dark:bg-gray-900">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <Card className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
+        <p className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-4`}>
           {t('pages.settings.workflowLimits.description')}
         </p>
 
@@ -791,7 +803,7 @@ function WorkflowLimitsSection() {
         {selectedProject && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('pages.settings.workflowLimits.maxConcurrentWorkflows')}
               </label>
               <Input
@@ -802,13 +814,13 @@ function WorkflowLimitsSection() {
                 placeholder="0"
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>
                 {t('pages.settings.workflowLimits.maxConcurrentWorkflowsDescription')}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('pages.settings.workflowLimits.maxPlanningTasks')}
               </label>
               <Input
@@ -819,13 +831,13 @@ function WorkflowLimitsSection() {
                 placeholder="1"
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>
                 {t('pages.settings.workflowLimits.maxPlanningTasksDescription')}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                 {t('pages.settings.workflowLimits.maxInProgressTasks')}
               </label>
               <Input
@@ -836,7 +848,7 @@ function WorkflowLimitsSection() {
                 placeholder="1"
                 className="text-sm"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>
                 {t('pages.settings.workflowLimits.maxInProgressTasksDescription')}
               </p>
             </div>
@@ -864,16 +876,16 @@ function ApiConnectionSection() {
   const { t } = useTranslation();
   return (
     <section>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.apiConnection.title')}</h2>
-      <Card className="bg-gray-50 dark:bg-gray-900">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.apiConnection.title')}</h2>
+      <Card className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
         <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{t('pages.settings.apiConnection.apiUrl')}</span>
-          <code className="text-xs sm:text-sm font-mono text-gray-900 dark:text-white break-all">
+          <span className={`text-xs sm:text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('pages.settings.apiConnection.apiUrl')}</span>
+          <code className={`text-xs sm:text-sm font-mono ${withDarkMode(textColors.primary, darkModeTextColors.primary)} break-all`}>
             {getApiUrl()}
           </code>
         </div>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 mt-2 sm:mt-3">
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{t('pages.settings.apiConnection.status')}</span>
+          <span className={`text-xs sm:text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('pages.settings.apiConnection.status')}</span>
           <ApiStatusBadge />
         </div>
       </Card>
@@ -886,12 +898,12 @@ function DaemonSection({ daemon, startDaemon, stopDaemon }: { daemon: any, start
   const { t } = useTranslation();
   return (
     <section>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.daemon.title')}</h2>
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.daemon.title')}</h2>
       <Card>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <span className={`h-2.5 w-2.5 rounded-full ${
-              daemon?.status === 'running' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
+              daemon?.status === 'running' ? 'bg-green-500 animate-pulse' : `${withDarkMode('bg-gray-300', 'dark:bg-gray-600')}`
             }`} />
             <span className="text-xs sm:text-sm font-medium">
               {daemon?.status === 'running' ? t('pages.settings.daemon.status.running', { pid: daemon.pid }) : t('pages.settings.daemon.status.stopped')}
@@ -921,7 +933,7 @@ function DaemonSection({ daemon, startDaemon, stopDaemon }: { daemon: any, start
           </div>
         </div>
         {daemon?.logs && daemon.logs.length > 0 && (
-          <pre className="bg-gray-900 text-gray-100 rounded p-2 sm:p-3 text-xs max-h-40 overflow-y-auto dark:bg-gray-900 dark:text-gray-100">
+          <pre className={`${codeBlockColors.bg} ${codeBlockColors.text} rounded p-2 sm:p-3 text-xs max-h-40 overflow-y-auto`}>
             {daemon.logs.slice(-20).join('\n')}
           </pre>
         )}
@@ -935,12 +947,12 @@ function ClientSection() {
   const { t } = useTranslation();
   return (
     <section>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">{t('pages.settings.client.title')}</h2>
-      <Card className="bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>{t('pages.settings.client.title')}</h2>
+      <Card className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
+        <p className={`text-xs sm:text-sm ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`}>
           <strong>{t('pages.settings.client.managed')}</strong> — {t('pages.settings.client.managedDescription')}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-2`}>
           {t('pages.settings.client.manualStart', { scriptPath: 'client/main.py' })}
         </p>
       </Card>

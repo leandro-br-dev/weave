@@ -33,6 +33,17 @@ export function getProjectsDir(appEnv?: string): string {
 }
 
 /**
+ * Resolve the uploads directory path.
+ * Production:  ~/.local/share/weave/uploads/
+ * Development: ~/.local/share/weave-dev/uploads/
+ *
+ * Files are organised as:  uploads/{year}/{month}/{uuid}.{ext}
+ */
+export function getUploadsDir(appEnv?: string): string {
+  return path.join(getDataDir(appEnv), 'uploads')
+}
+
+/**
  * Base path for agent workspaces.
  * Priority: DATA_DIR env > AGENTS_BASE_PATH env > default
  */

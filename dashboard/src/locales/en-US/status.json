@@ -8,6 +8,7 @@
     "approved": "Approved",
     "denied": "Denied",
     "awaitingApproval": "Awaiting Approval",
+    "awaiting_approval": "Awaiting Approval",
     "loading": "Loading...",
     "saving": "Saving...",
     "processing": "Processing...",

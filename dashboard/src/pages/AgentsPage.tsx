@@ -8,15 +8,29 @@ import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, Cla
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { useTranslation } from 'react-i18next'
+import {
+  bgColors, darkModeBgColors,
+  textColors, darkModeTextColors,
+  borderColors, darkModeBorderColors,
+  errorColors,
+  successColors,
+  warningColors,
+  infoColors, darkModeInfoColors,
+  interactiveStates,
+  modalColors, darkModeModalColors,
+  tableColors, darkModeTableColors,
+  accentColors, darkModeAccentColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 const ROLE_COLORS: Record<WorkspaceRole, { bg: string; text: string; border: string; label: string }> = {
-  planner: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', label: 'Planner' },
-  coder: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'Coder' },
-  reviewer: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Reviewer' },
-  tester: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', label: 'Tester' },
-  debugger: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Debugger' },
-  devops: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', label: 'DevOps' },
-  generic: { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200', label: 'Generic' },
+  planner: { bg: 'bg-purple-50 dark:bg-purple-950', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-900', label: 'Planner' },
+  coder: { bg: 'bg-blue-50 dark:bg-blue-950', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-900', label: 'Coder' },
+  reviewer: { bg: 'bg-amber-50 dark:bg-amber-950', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-900', label: 'Reviewer' },
+  tester: { bg: 'bg-green-50 dark:bg-green-950', text: 'text-green-700 dark:text-green-300', border: 'border-green-200 dark:border-green-900', label: 'Tester' },
+  debugger: { bg: 'bg-red-50 dark:bg-red-950', text: 'text-red-700 dark:text-red-300', border: 'border-red-200 dark:border-red-900', label: 'Debugger' },
+  devops: { bg: 'bg-gray-50 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-300', border: 'border-gray-200 dark:border-gray-700', label: 'DevOps' },
+  generic: { bg: 'bg-gray-50 dark:bg-gray-800', text: 'text-gray-500 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700', label: 'Generic' },
 }
 
 const ROLE_DEFAULT_MODEL: Record<string, string> = {
@@ -199,7 +213,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
   }
 
   if (isLoading) return <div className="p-8">Loading...</div>
-  if (error) return <div className="p-4 sm:p-8 text-red-600">Error loading agents</div>
+  if (error) return <div className={`p-4 sm:p-8 ${errorColors.text}`}>Error loading agents</div>
 
   return (
     <div className="max-w-6xl mx-auto py-4 sm:py-8 px-4 sm:px-6">
@@ -256,7 +270,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   placeholder="frontend-dev"
                 />
                 {getPathPreview() && (
-                  <p className="text-xs font-mono text-gray-400 mt-1 break-all">
+                  <p className={`text-xs font-mono ${textColors.muted} mt-1 break-all`}>
                     {getPathPreview()}
                   </p>
                 )}
@@ -296,22 +310,22 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                 ))}
               </Select>
               {newModel === 'claude-opus-4-6' && (
-                <div className="sm:col-span-2 rounded bg-amber-50 border border-amber-200 px-3 py-2">
-                  <p className="text-xs text-amber-600 font-medium">
+                <div className={`sm:col-span-2 rounded ${warningColors.bg} border ${warningColors.border} px-3 py-2`}>
+                  <p className={`text-xs ${warningColors.text} font-medium`}>
                     ⚡ Opus uses more tokens per request but provides superior reasoning
                   </p>
                 </div>
               )}
               {newModel === 'claude-haiku-4-5-20251001' && (
-                <div className="col-span-2 rounded bg-blue-50 border border-blue-200 px-3 py-2">
-                  <p className="text-xs text-blue-600 font-medium">
+                <div className={`col-span-2 rounded ${infoColors.bg} border ${infoColors.border} px-3 py-2`}>
+                  <p className={`text-xs ${infoColors.text} font-medium`}>
                     ⚡ Haiku is fast but less capable for complex tasks
                   </p>
                 </div>
               )}
               {templateId && templates.find(t => t.id === templateId) && (
-                <div className="col-span-2 rounded bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-3 py-2">
-                  <p className="text-xs text-gray-500 font-medium">
+                <div className={`col-span-2 rounded ${withDarkMode(bgColors.tertiary, darkModeBgColors.primary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} px-3 py-2`}>
+                  <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} font-medium`}>
                     {templates.find(t => t.id === templateId)?.description}
                   </p>
                 </div>
@@ -322,14 +336,14 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                 <button
                   type="button"
                   onClick={() => setShowEnvVars(!showEnvVars)}
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-500 mb-2 flex items-center gap-2"
+                  className={`text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} ${withDarkMode('hover:text-orange-600', 'dark:hover:text-orange-500')} mb-2 flex items-center gap-2`}
                 >
                   <span>{showEnvVars ? '▼' : '▶'}</span>
                   Environment Variables ({environmentVariables.length})
                 </button>
 
                 {showEnvVars && (
-                  <div className="mt-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className={`mt-2 p-4 ${withDarkMode(bgColors.tertiary, darkModeBgColors.primary)} rounded-lg border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
                     <EnvironmentVariablesForm
                       values={environmentVariables}
                       onChange={setEnvironmentVariables}
@@ -348,10 +362,10 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   placeholder="http://localhost:8083"
                 />
                 {envDefaults?.flat['ANTHROPIC_BASE_URL'] && newBaseUrl === envDefaults.flat['ANTHROPIC_BASE_URL'] && (
-                  <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                  <p className={`text-xs ${infoColors.text} mt-1 flex items-center gap-1`}>
                     <span className="font-medium">📋 Default from environment variables</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">Configure in Settings</span>
+                    <span className={textColors.muted}>•</span>
+                    <span className={textColors.tertiary}>Configure in Settings</span>
                   </p>
                 )}
               </div>
@@ -371,7 +385,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
       )}
 
       {filteredWorkspaces && (
-        <p className="text-sm text-gray-600 mb-4">
+        <p className={`text-sm ${textColors.secondary} mb-4`}>
           {filterProjectId
             ? t('pages.agents.showing.fromProject', { count: filteredWorkspaces.length, plural: filteredWorkspaces.length !== 1 ? 's' : '', project: projects?.find(p => p.id === filterProjectId)?.name || 'selected project' })
             : t('pages.agents.showing.fromAll', { count: filteredWorkspaces.length, plural: filteredWorkspaces.length !== 1 ? 's' : '' })
@@ -380,29 +394,29 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
       )}
 
       {filteredWorkspaces && filteredWorkspaces.length > 0 ? (
-        <div className="overflow-hidden bg-white dark:bg-gray-800 shadow sm:rounded-lg">
+        <div className={`overflow-hidden ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} shadow sm:rounded-lg`}>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className={withDarkMode(tableColors.headerBg, darkModeTableColors.headerBg)}>
                 <tr>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  <th scope="col" className={`px-3 py-3.5 text-left text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                     {t('pages.agents.table.agentName')}
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  <th scope="col" className={`px-3 py-3.5 text-left text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                     {t('pages.agents.table.project')}
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  <th scope="col" className={`px-3 py-3.5 text-left text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                     {t('pages.agents.table.role')}
                   </th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                  <th scope="col" className={`px-3 py-3.5 text-left text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                     {t('pages.agents.table.model')}
                   </th>
-                  <th scope="col" className="relative px-3 py-3.5 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                  <th scope="col" className={`relative px-3 py-3.5 text-right text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+              <tbody className={`divide-y ${withDarkMode(borderColors.default, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)}`}>
                 {filteredWorkspaces.map((ws: Workspace) => (
                   <WorkspaceTableRow
                     key={ws.id}
@@ -423,13 +437,13 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
       )}
 
       {showGenerateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className={`fixed inset-0 ${modalColors.overlay} flex items-center justify-center z-50 p-4`}>
           <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Generate Contextual Agent</h2>
+              <h2 className={`text-xl font-semibold ${modalColors.header}`}>Generate Contextual Agent</h2>
               <button
                 onClick={() => setShowGenerateModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className={`${textColors.muted} hover:${textColors.secondary}`}
               >
                 <X size={20} />
               </button>
@@ -437,7 +451,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                   Project *
                 </label>
                 <ProjectSelectDropdown
@@ -449,7 +463,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                   {t('pages.agents.form.title')} *
                 </label>
                 <Input
@@ -458,13 +472,13 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   placeholder="frontend-specialist"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={`text-xs ${textColors.tertiary} mt-1`}>
                   A short, memorable identifier for the agent
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                   Role *
                 </label>
                 <Select
@@ -482,14 +496,14 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   <option value="generic">Generic — general purpose agent</option>
                 </Select>
                 {agentRole && ROLE_HINTS[agentRole] && (
-                  <p className="text-xs text-gray-500 mt-1 bg-gray-50 p-2 rounded">
+                  <p className={`text-xs ${textColors.tertiary} mt-1 ${bgColors.tertiary} p-2 rounded`}>
                     {ROLE_HINTS[agentRole]}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>
                   {t('pages.agents.form.description')}
                 </label>
                 <textarea
@@ -497,12 +511,12 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   onChange={(e) => setAgentDescription(e.target.value)}
                   placeholder="What this agent specializes in and its main responsibilities..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`w-full px-3 py-2 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
                 />
               </div>
 
               {generateError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                <div className={`${errorColors.bg} border ${errorColors.border} ${errorColors.textAlt} px-3 py-2 rounded text-sm`}>
                   {generateError}
                 </div>
               )}
@@ -580,19 +594,19 @@ function WorkspaceTableRow({
 
   return (
     <>
-      <tr className={cn('hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors')}>
+      <tr className={cn(`${withDarkMode(tableColors.rowHover, darkModeTableColors.rowHover)} transition-colors`)}>
         {/* Agent Name */}
         <td className="whitespace-nowrap px-3 py-4 text-sm">
           <button
             onClick={onSelectWorkspace}
-            className="text-gray-900 dark:text-white font-medium hover:text-indigo-600 dark:hover:text-indigo-500 transition-colors"
+            className={`${withDarkMode(textColors.primary, darkModeTextColors.primary)} font-medium ${withDarkMode('hover:text-orange-600', 'dark:hover:text-orange-500')} transition-colors`}
           >
             {workspace.name}
           </button>
         </td>
 
         {/* Project */}
-        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+        <td className={`whitespace-nowrap px-3 py-4 text-sm ${textColors.tertiary}`}>
           {isEditingProject ? (
             <Select
               value={selectedProject}
@@ -617,7 +631,7 @@ function WorkspaceTableRow({
                   <span>{agentProject.name}</span>
                 </>
               ) : (
-                <span className="text-gray-400">{t('pages.agents.table.noProject')}</span>
+                <span className={textColors.muted}>{t('pages.agents.table.noProject')}</span>
               )}
             </div>
           )}
@@ -659,7 +673,7 @@ function WorkspaceTableRow({
           <select
             value={workspace.model || 'default'}
             onChange={(e) => updateWorkspaceModel.mutate({ id: workspace.id, model: e.target.value })}
-            className="text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 bg-white hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900"
+            className={`text-sm border ${borderColors.default} rounded px-2 py-1 ${textColors.secondary} ${bgColors.secondary} hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-orange-500`}
           >
             {models.map((m: AgentModel) => (
               <option key={m.id} value={m.id}>{m.label}</option>
@@ -668,7 +682,7 @@ function WorkspaceTableRow({
         </td>
 
         {/* Actions */}
-        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-right">
+        <td className={`whitespace-nowrap px-3 py-4 text-sm ${textColors.tertiary} text-right`}>
           <div className="flex items-center justify-end gap-2">
             <Button
               onClick={onSelectWorkspace}
@@ -728,13 +742,13 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
   }
 
   if (isLoading) return <div className="p-8">Loading agent...</div>
-  if (error) return <div className="p-8 text-red-600">Error loading agent</div>
+  if (error) return <div className={`p-8 ${errorColors.text}`}>Error loading agent</div>
   if (!workspace) return null
 
   return (
     <>
     <div className="max-w-4xl mx-auto py-8 px-6">
-      <button onClick={onClose} className="text-blue-600 hover:text-blue-800 text-sm mb-4">
+      <button onClick={onClose} className={`${accentColors.text} hover:text-orange-800 text-sm mb-4`}>
         ← Back to Agents
       </button>
       <div className="flex justify-between items-start mb-6">
@@ -768,7 +782,7 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-gray-900">{workspace.name}</h1>
+              <h1 className={`text-2xl font-semibold ${textColors.primary}`}>{workspace.name}</h1>
               <Button
                 variant="ghost"
                 onClick={() => setEditingName(true)}
@@ -786,11 +800,11 @@ function WorkspaceDetail({ workspaceId, onClose }: { workspaceId: string; onClos
               </Button>
             </div>
           )}
-          <p className="text-sm text-gray-500 mt-1">{workspace.path}</p>
+          <p className={`text-sm ${textColors.tertiary} mt-1`}>{workspace.path}</p>
         </div>
       </div>
 
-      <div className="border-b border-gray-200 mb-6">
+      <div className={`border-b ${borderColors.default} mb-6`}>
         <nav className="flex gap-4">
           <TabButton active={activeTab === 'claude'} onClick={() => setActiveTab('claude')}>
             <FileText size={18} />
@@ -850,8 +864,8 @@ function TabButton({
       onClick={onClick}
       className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
         active
-          ? 'border-blue-600 text-blue-600'
-          : 'border-transparent text-gray-500 hover:text-gray-700'
+          ? `${withDarkMode(accentColors.border, darkModeAccentColors.border)} ${withDarkMode(accentColors.text, darkModeAccentColors.text)}`
+          : `border-transparent ${textColors.tertiary} hover:${textColors.secondary}`
       }`}
     >
       {children}
@@ -1076,11 +1090,11 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium text-gray-900">CLAUDE.md Content</h3>
+        <h3 className={`text-lg font-medium ${textColors.primary}`}>CLAUDE.md Content</h3>
         <button
           onClick={handleImproveWithAI}
           disabled={improveClaudeMd.isPending || isImproving || !value.trim()}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-md disabled:hover:shadow-none"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-md disabled:hover:shadow-none"
         >
           {improveClaudeMd.isPending || isImproving ? (
             <>
@@ -1098,31 +1112,31 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
 
       {/* Show error message if improvement fails */}
       {improvementError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{improvementError}</p>
+        <div className={`p-3 ${errorColors.bg} border ${errorColors.border} rounded-lg`}>
+          <p className={`text-sm ${errorColors.text}`}>{improvementError}</p>
         </div>
       )}
 
       {/* Show progress indicator while improving */}
       {(improveClaudeMd.isPending || isImproving) && (
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg shadow-sm">
+        <div className={`p-4 bg-gradient-to-r from-blue-50 dark:from-blue-950 to-purple-50 dark:to-purple-950 border-2 ${withDarkMode(infoColors.border, darkModeInfoColors.border)} rounded-lg shadow-sm`}>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="animate-spin rounded-full h-6 w-6 border-3 border-blue-200"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-3 border-blue-200 dark:border-blue-800"></div>
               <div className="absolute top-0 left-0 animate-spin rounded-full h-6 w-6 border-3 border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent"></div>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-blue-700">
+              <p className={`text-sm font-semibold ${withDarkMode(infoColors.textAlt, darkModeInfoColors.textAlt)}`}>
                 {improveClaudeMd.isPending ? 'Starting AI Improvement...' : 'AI is Analyzing & Improving Your CLAUDE.md...'}
               </p>
-              <p className="text-xs text-blue-600 mt-1">
+              <p className={`text-xs ${withDarkMode(infoColors.text, darkModeInfoColors.text)} mt-1`}>
                 {improveClaudeMd.isPending ? 'Initializing workspace connection...' : 'This may take 30-60 seconds. Please wait.'}
               </p>
             </div>
             <div className="flex gap-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-75"></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse delay-150"></div>
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse delay-75"></div>
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse delay-150"></div>
             </div>
           </div>
         </div>
@@ -1131,7 +1145,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
       <textarea
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        className="w-full h-96 px-4 py-3 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className={`w-full h-96 px-4 py-3 font-mono text-sm border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
         placeholder="# CLAUDE.md content..."
       />
 
@@ -1139,7 +1153,7 @@ function ClaudeMdTab({ workspaceId, content }: { workspaceId: string; content: s
         <button
           onClick={() => saveClaudeMd.mutate(value)}
           disabled={saveClaudeMd.isPending}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className={`px-6 py-2 ${accentColors.bg} text-white rounded-lg ${accentColors.hoverBg} disabled:opacity-50`}
         >
           {saveClaudeMd.isPending ? 'Saving...' : 'Save'}
         </button>
@@ -1194,7 +1208,7 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
     <div className="space-y-6">
       {/* Env Vars */}
       <Card>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('pages.agents.settingsTab.environmentVariables')}</h3>
+        <h3 className={`text-lg font-semibold ${textColors.primary} mb-3`}>{t('pages.agents.settingsTab.environmentVariables')}</h3>
         <div className="space-y-2">
           {envVars.map((env, i) => (
             <div key={i} className="flex gap-2">
@@ -1235,9 +1249,9 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
 
       {/* Permissions */}
       <Card>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('pages.agents.settingsTab.permissions')}</h3>
+        <h3 className={`text-lg font-semibold ${textColors.primary} mb-3`}>{t('pages.agents.settingsTab.permissions')}</h3>
         <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('pages.agents.settingsTab.allow')}</label>
+          <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-2`}>{t('pages.agents.settingsTab.allow')}</label>
           <div className="flex flex-wrap gap-2">
             {permissionOptions.map((perm) => (
               <label key={perm} className="flex items-center gap-2">
@@ -1259,11 +1273,11 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{t('pages.agents.settingsTab.denyRules')}</label>
+          <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-2`}>{t('pages.agents.settingsTab.denyRules')}</label>
           <textarea
             value={permissions.deny}
             onChange={(e) => setPermissions({ ...permissions, deny: e.target.value })}
-            className="w-full h-24 px-3 py-2 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full h-24 px-3 py-2 font-mono text-sm border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
             placeholder={t('pages.agents.settingsTab.denyPlaceholder')}
           />
         </div>
@@ -1271,7 +1285,7 @@ function SettingsTab({ workspaceId, settings }: { workspaceId: string; settings:
 
       {/* Additional Directories */}
       <Card>
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('pages.agents.settingsTab.additionalDirectories')}</h3>
+        <h3 className={`text-lg font-semibold ${textColors.primary} mb-3`}>{t('pages.agents.settingsTab.additionalDirectories')}</h3>
         <div className="space-y-2">
           {additionalDirs.map((dir, i) => (
             <div key={i} className="flex gap-2 items-center">
@@ -1415,9 +1429,9 @@ description: "Descreva quando usar esta skill"
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">{t('pages.agents.skillsTab.title', { count: skills.length })}</h3>
+        <h3 className={`text-lg font-semibold ${textColors.primary}`}>{t('pages.agents.skillsTab.title', { count: skills.length })}</h3>
         <div className="flex gap-2">
-          <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-50">
+          <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border ${borderColors.thick} rounded-md text-xs ${textColors.secondary} ${interactiveStates.hoverBg}`}>
             <Upload className="h-3.5 w-3.5" />
             {t('pages.agents.skillsTab.importMd')}
             <input
@@ -1436,18 +1450,18 @@ description: "Descreva quando usar esta skill"
 
       {/* Native Skills Section */}
       <div className="mb-6">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('pages.agents.skillsTab.nativeSkills')}</h4>
+        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.skillsTab.nativeSkills')}</h4>
         <div className="space-y-2">
           {nativeSkills.map(skill => {
             const isInstalled = installedSkillNames.includes(skill.id)
             return (
-              <div key={skill.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded border border-gray-200">
+              <div key={skill.id} className={`flex items-center justify-between py-2 px-3 ${withDarkMode(bgColors.tertiary, darkModeBgColors.primary)} rounded border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
                 <div>
-                  <p className="text-sm font-medium text-gray-800">{skill.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{skill.description}</p>
+                  <p className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{skill.name}</p>
+                  <p className={`text-xs ${textColors.muted} mt-0.5`}>{skill.description}</p>
                 </div>
                 {isInstalled ? (
-                  <span className="text-xs text-green-600 font-medium">{t('pages.agents.skillsTab.installed')}</span>
+                  <span className={`text-xs ${successColors.text} font-medium`}>{t('pages.agents.skillsTab.installed')}</span>
                 ) : (
                   <Button
                     variant="secondary" size="sm"
@@ -1461,14 +1475,14 @@ description: "Descreva quando usar esta skill"
             )
           })}
           {nativeSkills.length === 0 && (
-            <div className="text-sm text-gray-500 italic">{t('pages.agents.skillsTab.noNativeSkills')}</div>
+            <div className={`text-sm ${textColors.tertiary} italic`}>{t('pages.agents.skillsTab.noNativeSkills')}</div>
           )}
         </div>
       </div>
 
       {/* Custom Skills Section */}
       <div>
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('pages.agents.skillsTab.customSkills')}</h4>
+        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.skillsTab.customSkills')}</h4>
         {(showNewForm || editingSkill) && (
           <Card>
             <div className="mb-3">
@@ -1481,11 +1495,11 @@ description: "Descreva quando usar esta skill"
               />
             </div>
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+              <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>Content</label>
               <textarea
                 value={skillContent}
                 onChange={(e) => setSkillContent(e.target.value)}
-                className="w-full h-64 px-3 py-2 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className={`w-full h-64 px-3 py-2 font-mono text-sm border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
                 placeholder={SKILL_TEMPLATE}
               />
             </div>
@@ -1503,15 +1517,15 @@ description: "Descreva quando usar esta skill"
         )}
 
         <Card padding="none">
-          <div className="divide-y divide-gray-200">
+          <div className={`divide-y ${borderColors.default}`}>
             {skills.map((skill) => (
               <div key={skill.name} className="p-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <Code size={18} className="text-gray-400" />
+                  <Code size={18} className={textColors.muted} />
                   <div>
-                    <div className="font-medium text-gray-900">{skill.name}</div>
+                    <div className={`font-medium ${textColors.primary}`}>{skill.name}</div>
                     {skill.hasSkillMd && (
-                      <span className="text-xs text-green-600">✓ SKILL.md</span>
+                      <span className={`text-xs ${successColors.text}`}>✓ SKILL.md</span>
                     )}
                   </div>
                 </div>
@@ -1637,7 +1651,7 @@ Descreva a especialidade e comportamento deste agente.
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">{t('pages.agents.agentsTab.title', { count: agents.length })}</h3>
+        <h3 className={`text-lg font-semibold ${textColors.primary}`}>{t('pages.agents.agentsTab.title', { count: agents.length })}</h3>
         <Button variant="primary" onClick={handleNewAgent}>
           <Plus size={16} /> {t('pages.agents.agentsTab.newAgent')}
         </Button>
@@ -1645,12 +1659,12 @@ Descreva a especialidade e comportamento deste agente.
 
       {/* Native Agents Section */}
       <div className="mb-6">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('pages.agents.agentsTab.nativeAgents')}</h4>
+        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.agentsTab.nativeAgents')}</h4>
         <div className="space-y-2">
           {nativeAgents.map(agent => {
             const isInstalled = installedAgentNames.includes(agent.name)
             return (
-              <div key={agent.name} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded border border-gray-200">
+              <div key={agent.name} className={`flex items-center justify-between py-2 px-3 ${withDarkMode(bgColors.tertiary, darkModeBgColors.primary)} rounded border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
                 <div className="flex items-center gap-3">
                   {agent.color && (
                     <div
@@ -1659,13 +1673,13 @@ Descreva a especialidade e comportamento deste agente.
                     />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{agent.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{agent.description}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Model: {agent.model} • Tools: {agent.tools}</p>
+                    <p className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{agent.name}</p>
+                    <p className={`text-xs ${textColors.muted} mt-0.5`}>{agent.description}</p>
+                    <p className={`text-xs ${textColors.tertiary} mt-0.5`}>Model: {agent.model} • Tools: {agent.tools}</p>
                   </div>
                 </div>
                 {isInstalled ? (
-                  <span className="text-xs text-green-600 font-medium">{t('pages.agents.agentsTab.installed')}</span>
+                  <span className={`text-xs ${successColors.text} font-medium`}>{t('pages.agents.agentsTab.installed')}</span>
                 ) : (
                   <Button
                     variant="secondary" size="sm"
@@ -1679,14 +1693,14 @@ Descreva a especialidade e comportamento deste agente.
             )
           })}
           {nativeAgents.length === 0 && (
-            <div className="text-sm text-gray-500 italic">{t('pages.agents.agentsTab.noNativeAgents')}</div>
+            <div className={`text-sm ${textColors.tertiary} italic`}>{t('pages.agents.agentsTab.noNativeAgents')}</div>
           )}
         </div>
       </div>
 
       {/* Custom Sub-Agents Section */}
       <div>
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{t('pages.agents.agentsTab.customSubAgents')}</h4>
+        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.agentsTab.customSubAgents')}</h4>
         {(showNewForm || editingAgent) && (
         <Card>
           <div className="mb-3">
@@ -1699,11 +1713,11 @@ Descreva a especialidade e comportamento deste agente.
             />
           </div>
           <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+            <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-1`}>Content</label>
             <textarea
               value={agentContent}
               onChange={(e) => setAgentContent(e.target.value)}
-              className="w-full h-64 px-3 py-2 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full h-64 px-3 py-2 font-mono text-sm border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
               placeholder={AGENT_TEMPLATE}
             />
           </div>
@@ -1721,14 +1735,14 @@ Descreva a especialidade e comportamento deste agente.
       )}
 
       <Card padding="none">
-        <div className="divide-y divide-gray-200">
+        <div className={`divide-y ${borderColors.default}`}>
           {agents.map((agent) => (
             <div key={agent.name} className="p-4 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <Users size={18} className="text-gray-400" />
+                <Users size={18} className={textColors.muted} />
                 <div>
-                  <div className="font-medium text-gray-900">{agent.name}</div>
-                  <div className="text-xs text-gray-500">{agent.file}</div>
+                  <div className={`font-medium ${textColors.primary}`}>{agent.name}</div>
+                  <div className={`text-xs ${textColors.tertiary}`}>{agent.file}</div>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1800,8 +1814,8 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{t('pages.agents.environmentsTab.linkedEnvironments')}</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <h3 className={`text-lg font-semibold ${textColors.primary}`}>{t('pages.agents.environmentsTab.linkedEnvironments')}</h3>
+          <p className={`text-sm ${textColors.tertiary} mt-1`}>
             {t('pages.agents.environmentsTab.linkDescription')}
           </p>
         </div>
@@ -1823,17 +1837,17 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
         </Card>
       ) : (
         <Card padding="none">
-          <div className="divide-y divide-gray-200">
+          <div className={`divide-y ${borderColors.default}`}>
             {linkedEnvs.map((env) => (
               <div key={env.id} className="p-4 flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-gray-900">{env.name}</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                    <span className={`font-medium ${textColors.primary}`}>{env.name}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
                       {env.type}
                     </span>
                   </div>
-                  <div className="font-mono text-xs text-gray-500">{env.project_path}</div>
+                  <div className={`font-mono text-xs ${textColors.tertiary}`}>{env.project_path}</div>
                 </div>
                 <Button
                   variant="ghost"
@@ -1852,22 +1866,22 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
 
       {linkingEnv && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setLinkingEnv(false)} />
-          <div className="relative bg-white rounded-lg border border-gray-200 p-6 max-w-md w-full mx-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">{t('pages.agents.environmentsTab.linkModalTitle')}</h3>
-            <p className="text-sm text-gray-500 mb-4">
+          <div className="absolute inset-0 bg-black/30 dark:bg-black/50" onClick={() => setLinkingEnv(false)} />
+          <div className={`relative ${withDarkMode(bgColors.secondary, darkModeModalColors.panel)} rounded-lg border ${withDarkMode(borderColors.default, darkModeModalColors.border)} p-6 max-w-md w-full mx-4 shadow-lg`}>
+            <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeModalColors.header)} mb-2`}>{t('pages.agents.environmentsTab.linkModalTitle')}</h3>
+            <p className={`text-sm ${textColors.tertiary} mb-4`}>
               {agentProjectId
                 ? t('pages.agents.environmentsTab.linkModalProjectDesc')
                 : t('pages.agents.environmentsTab.linkModalAllDesc')}
             </p>
 
             {availableEnvironments.length === 0 ? (
-              <div className="text-sm text-gray-500 mb-4">
+              <div className={`text-sm ${textColors.tertiary} mb-4`}>
                 {agentProjectId
                   ? (
                     <>
                       {t('pages.agents.environmentsTab.noEnvironmentsForProject')}
-                      <Link to="/projects" className="underline ml-1 text-blue-600 hover:text-blue-800">{t('pages.agents.environmentsTab.createInProjects')}</Link>
+                      <Link to="/projects" className={`underline ml-1 ${accentColors.text} hover:text-orange-800`}>{t('pages.agents.environmentsTab.createInProjects')}</Link>
                     </>
                   )
                   : t('pages.agents.environmentsTab.noAvailableEnvironments')}
@@ -1875,7 +1889,7 @@ function EnvironmentsTab({ workspaceId }: { workspaceId: string }) {
             ) : (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className={`block text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-2`}>
                     {agentProjectId ? t('pages.agents.environmentsTab.environmentLabel') : t('pages.agents.environmentsTab.environmentAllLabel')}
                   </label>
                   <Select

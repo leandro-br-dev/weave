@@ -49,10 +49,13 @@ export function useUpdateSession() {
 export function useSendMessage(sessionId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (content: string) =>
+    mutationFn: (data: { content: string; attachment_ids?: string[] }) =>
       apiFetch(`/api/sessions/${sessionId}/message`, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content: data.content,
+          ...(data.attachment_ids?.length ? { attachment_ids: data.attachment_ids } : {}),
+        }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
   })

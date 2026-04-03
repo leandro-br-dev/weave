@@ -9,7 +9,8 @@ const router = Router()
 function parsePlan(row: any) {
   return {
     ...row,
-    tasks: typeof row.tasks === 'string' ? JSON.parse(row.tasks) : row.tasks
+    tasks: typeof row.tasks === 'string' ? JSON.parse(row.tasks) : row.tasks,
+    attachments: typeof row.attachments === 'string' ? JSON.parse(row.attachments) : (row.attachments || []),
   }
 }
 
@@ -72,7 +73,8 @@ router.get('/', authenticateToken, (req: Request, res: Response) => {
         created_at,
         project_id,
         parent_plan_id,
-        rework_prompt
+        rework_prompt,
+        attachments
       FROM plans
       ${whereClause}
       ORDER BY created_at DESC
@@ -116,6 +118,14 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
       id: task.id || `task-${index + 1}`,
     }))
 
+    // Collect all attachment_ids from tasks into the plan-level attachments column
+    const allAttachmentIds: string[] = []
+    for (const task of sanitizedTasks) {
+      if (Array.isArray(task.attachment_ids)) {
+        allAttachmentIds.push(...task.attachment_ids)
+      }
+    }
+
     // Validate and set status (default to 'pending')
     const allowedStatuses = ['pending', 'awaiting_approval']
     const status = requestedStatus && allowedStatuses.includes(requestedStatus) ? requestedStatus : 'pending'
@@ -126,9 +136,9 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
     console.log(`[plans] Inserting plan: id=${id}, status=${status}`)
 
     db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, project_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, now)
+      INSERT INTO plans (id, name, tasks, status, project_id, attachments, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), now)
 
     const plan = db
       .prepare('SELECT * FROM plans WHERE id = ?')
@@ -162,14 +172,45 @@ router.get('/pending', authenticateToken, (req: Request, res: Response) => {
           result,
           started_at,
           completed_at,
-          created_at
+          created_at,
+          attachments
         FROM plans
         WHERE status = 'pending'
         ORDER BY created_at DESC
       `)
-      .all()
+      .all() as any[]
 
-    res.json({ data: plans.map(parsePlan), error: null })
+    // Enrich each plan with full attachment metadata
+    const enriched = plans.map((plan) => {
+      const parsed = parsePlan(plan)
+      let attachmentMetadata: any[] = []
+
+      const ids: string[] = parsed.attachments || []
+      if (Array.isArray(ids) && ids.length > 0) {
+        try {
+          const uniqueIds = [...new Set(ids)]
+          const placeholders = uniqueIds.map(() => '?').join(', ')
+          const rows = db.prepare(
+            `SELECT id, file_name, file_type, file_size, storage_path
+             FROM message_attachments WHERE id IN (${placeholders})`
+          ).all(...uniqueIds) as any[]
+
+          attachmentMetadata = rows.map((row) => ({
+            ...row,
+            download_url: `/api/uploads/${row.id}`,
+          }))
+        } catch {
+          // Skip if attachment lookup fails
+        }
+      }
+
+      return {
+        ...parsed,
+        attachment_metadata: attachmentMetadata,
+      }
+    })
+
+    res.json({ data: enriched, error: null })
   } catch (error) {
     console.error('Error fetching pending plans:', error)
     res.status(500).json({ data: null, error: 'Failed to fetch pending plans' })
@@ -414,6 +455,55 @@ router.post('/:id/approve', authenticateToken, (req: Request, res: Response) => 
     res.json({ data: updated, error: null })
   } catch (err: any) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/plans/:id/attachments - Get all attachments associated with a plan
+router.get('/:id/attachments', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Verify plan exists
+    const plan = db.prepare('SELECT id, attachments FROM plans WHERE id = ?').get(id) as any
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Parse attachment IDs from the plan's attachments column
+    let attachmentIds: string[] = []
+    try {
+      const parsed = typeof plan.attachments === 'string'
+        ? JSON.parse(plan.attachments)
+        : plan.attachments || []
+      if (Array.isArray(parsed)) {
+        attachmentIds = parsed
+      }
+    } catch {
+      // Malformed JSON, treat as empty
+    }
+
+    if (attachmentIds.length === 0) {
+      return res.json({ data: [], error: null })
+    }
+
+    // Deduplicate IDs
+    const uniqueIds = [...new Set(attachmentIds)]
+    const placeholders = uniqueIds.map(() => '?').join(', ')
+
+    const attachments = db.prepare(
+      `SELECT id, message_type, message_id, file_name, file_type, file_size, storage_path, created_at
+       FROM message_attachments WHERE id IN (${placeholders})`
+    ).all(...uniqueIds) as any[]
+
+    const enriched = attachments.map((att) => ({
+      ...att,
+      download_url: `/api/uploads/${att.id}`,
+    }))
+
+    res.json({ data: enriched, error: null })
+  } catch (error) {
+    console.error('Error fetching plan attachments:', error)
+    res.status(500).json({ data: null, error: 'Failed to fetch plan attachments' })
   }
 })
 
@@ -870,11 +960,17 @@ router.post('/:id/reset', authenticateToken, (req: Request, res: Response) => {
 router.post('/:id/rework', authenticateToken, (req: Request, res: Response) => {
   try {
     const { id: sourceId } = req.params
-    const { rework_prompt } = req.body
+    const { rework_prompt, rework_mode = 'full_workflow' } = req.body
 
     // Validate rework_prompt
     if (!rework_prompt || typeof rework_prompt !== 'string') {
       return res.status(400).json({ data: null, error: 'rework_prompt is required' })
+    }
+
+    // Validate rework_mode
+    const validModes = ['full_workflow', 'quick_action'] as const
+    if (!validModes.includes(rework_mode)) {
+      return res.status(400).json({ data: null, error: 'rework_mode must be one of: full_workflow, quick_action' })
     }
 
     // Fetch source plan
@@ -941,42 +1037,168 @@ router.post('/:id/rework', authenticateToken, (req: Request, res: Response) => {
     // Truncate result to 2000 chars
     const resultText = (sourcePlan.result || '').substring(0, 2000)
 
-    // Build the context-enhanced prompt for the first task
+    // Extract original user prompt (first task's prompt)
     const originalPrompt = sourceTasks[0]?.prompt || ''
-    let contextPrompt = `## Context from Previous Workflow\n\nThis is a rework of a previous workflow. Below is the context you need:\n\n### Original Request\n${originalPrompt}\n\n### Execution Summary\n${logSummary}\n\n### Previous Result Status\nStatus: ${sourcePlan.status}\nResult: ${resultText}`
 
-    if (sourcePlan.result_status) {
-      contextPrompt += `\nResult Evaluation: ${sourcePlan.result_status} - ${sourcePlan.result_notes || ''}`
+    // Build common context block shared by both modes
+    const commonContext = `## Context from Previous Workflow
+
+This is a rework of a previous workflow. Below is the context you need:
+
+### Original Request
+${originalPrompt}
+
+### Execution Summary
+${logSummary}
+
+### Previous Result Status
+Status: ${sourcePlan.status}
+Result: ${resultText}${sourcePlan.result_status ? `\nResult Evaluation: ${sourcePlan.result_status} - ${sourcePlan.result_notes || ''}` : ''}
+
+### New Modification Request
+${rework_prompt}`
+
+    // ── Mode-specific logic ──────────────────────────────────────────────
+
+    let newTasks: any[]
+    let planName: string
+    let planType: string
+
+    if (rework_mode === 'full_workflow') {
+      // ── FULL WORKFLOW: Use the project's planner agent ──────────────
+
+      // Find planner workspace for this project
+      const plannerRow = db.prepare(`
+        SELECT pa.workspace_path
+        FROM project_agents pa
+        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
+        LIMIT 1
+      `).get(sourcePlan.project_id) as any
+
+      if (!plannerRow?.workspace_path) {
+        return res.status(400).json({
+          data: null,
+          error: 'No planner agent found for this project. A planner is required for full_workflow rework mode.',
+        })
+      }
+
+      // Fetch all project agents with their roles for the planner prompt
+      const projectAgents = db.prepare(`
+        SELECT
+          pa.workspace_path,
+          COALESCE(wr.role, 'generic') as role
+        FROM project_agents pa
+        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        WHERE pa.project_id = ?
+      `).all(sourcePlan.project_id) as any[]
+
+      // Fetch project environments for additional context
+      const environments = db.prepare(`
+        SELECT slug, name, project_path FROM environments WHERE project_id = ?
+      `).all(sourcePlan.project_id) as any[]
+
+      const agentsList = projectAgents.length > 0
+        ? projectAgents.map(a => `- ${a.role}: ${a.workspace_path}`).join('\n')
+        : 'No agents configured.'
+
+      const envsList = environments.length > 0
+        ? environments.map(e => `- ${e.name} (${e.slug}): ${e.project_path || 'N/A'}`).join('\n')
+        : 'No environments configured.'
+
+      const plannerPrompt = `${commonContext}
+
+---
+
+IMPORTANT: You are acting as a **planner** for a rework. Your job is to analyze the context above and generate a **new execution plan** that addresses the modification request.
+
+## Available Agents
+${agentsList}
+
+## Project Environments
+${envsList}
+
+## Instructions
+1. Analyze what was previously attempted and why it needs modification
+2. Design a new plan that addresses the "New Modification Request"
+3. Generate the plan using the <plan>...</plan> format
+4. Assign each task to the appropriate agent based on their role
+5. Keep the plan focused on only what needs to change — avoid duplicating work that succeeded previously
+
+Output your plan enclosed in <plan>...</plan> tags.`
+
+      const taskId = randomUUID()
+      newTasks = [{
+        id: taskId,
+        name: 'Replan workflow for rework',
+        prompt: plannerPrompt,
+        cwd: environments[0]?.project_path || sourcePlan.workspace_id || '/root/projects/weave',
+        workspace: plannerRow.workspace_path,
+        tools: ['Read', 'Write', 'Bash', 'Glob', 'Edit', 'Grep', 'WebFetch', 'Skill'],
+        permission_mode: 'acceptEdits',
+        depends_on: [],
+      }]
+      planName = `Rework: ${sourcePlan.name}`
+      planType = 'workflow'
+
+    } else {
+      // ── QUICK ACTION: Use the project's coder agent ─────────────────
+
+      // Find coder workspace for this project
+      const coderRow = db.prepare(`
+        SELECT pa.workspace_path
+        FROM project_agents pa
+        LEFT JOIN workspace_roles wr ON wr.workspace_path = pa.workspace_path
+        WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'coder'
+        LIMIT 1
+      `).get(sourcePlan.project_id) as any
+
+      const coderWorkspace = coderRow?.workspace_path || sourcePlan.workspace_id || '/root/projects/weave'
+
+      const contextPrompt = `${commonContext}
+
+---
+
+IMPORTANT: Use the context above to understand what was previously attempted and what needs to change. The "New Modification Request" section describes the specific changes needed. Apply the changes directly and efficiently.`
+
+      const taskId = randomUUID()
+      newTasks = [{
+        id: taskId,
+        name: 'Quick fix: ' + rework_prompt.substring(0, 80),
+        prompt: contextPrompt,
+        cwd: coderWorkspace,
+        workspace: coderWorkspace,
+        tools: ['Read', 'Write', 'Bash', 'Glob', 'Edit', 'Grep'],
+        permission_mode: 'acceptEdits',
+        depends_on: [],
+      }]
+      planName = `Quick Fix: ${sourcePlan.name}`
+      planType = 'quick_action'
     }
 
-    contextPrompt += `\n\n### New Modification Request\n${rework_prompt}\n\n---\n\nIMPORTANT: Use the context above to understand what was previously attempted and what needs to change. The "New Modification Request" section describes the specific changes needed.`
-
-    // Deep-clone tasks, replace first task's prompt with context-enhanced prompt
-    const newTasks = JSON.parse(JSON.stringify(sourceTasks)) as any[]
-    if (newTasks.length > 0) {
-      newTasks[0].prompt = contextPrompt
-    }
+    // ── Create the rework plan ──────────────────────────────────────────
 
     const newId = randomUUID()
     const now = new Date().toISOString()
 
-    // Create the rework plan
     db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, project_id, workspace_id, parent_plan_id, rework_prompt, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO plans (id, name, tasks, status, type, project_id, workspace_id, parent_plan_id, rework_prompt, rework_mode, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       newId,
-      `Rework: ${sourcePlan.name}`,
+      planName,
       JSON.stringify(newTasks),
       'pending',
+      planType,
       sourcePlan.project_id,
       sourcePlan.workspace_id || null,
       sourceId,
       rework_prompt,
+      rework_mode,
       now
     )
 
-    console.log('[rework] Creating rework plan from', sourceId, '- new plan:', newId)
+    console.log(`[rework] Creating ${rework_mode} rework plan from ${sourceId} - new plan: ${newId}`)
 
     // Fetch and return the newly created plan
     const newPlan = db

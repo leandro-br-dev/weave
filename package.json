@@ -39,6 +39,7 @@
     "precommit": "npm run check:docs"
   },
   "devDependencies": {
+    "@types/multer": "^2.1.0",
     "concurrently": "^8.2.0"
   },
   "dependencies": {

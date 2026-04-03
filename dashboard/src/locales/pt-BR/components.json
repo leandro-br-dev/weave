@@ -21,7 +21,10 @@
     "timeout": "Tempo Esgotado",
     "approved": "Aprovado",
     "denied": "Negado",
-    "awaitingApproval": "Aguardando Aprovação"
+    "awaitingApproval": "Aguardando Aprovação",
+    "awaiting_approval": "Aguardando Aprovação",
+    "error": "Erro",
+    "cancelled": "Cancelado"
   },
   "emptyState": {
     "defaultTitle": "Sem Dados",
@@ -86,7 +89,8 @@
     "actionFailed": "A ação falhou. Por favor, tente novamente.",
     "reviewAndCreate": "Revisar e Criar",
     "close": "Fechar",
-    "run": "Executar"
+    "run": "Executar",
+    "attachmentsIncluded": "{{count}} anexo(s) incluído(s)"
   },
   "contextModal": {
     "title": "Contexto do Projeto",
@@ -103,5 +107,16 @@
     "languages": "Linguagens",
     "filesCount": "{{count}} arquivos",
     "close": "Fechar"
+  },
+  "fileAttachment": {
+    "addFiles": "Anexar arquivos",
+    "dragDrop": "Solte os arquivos aqui",
+    "maxFilesReached": "Número máximo de arquivos atingido",
+    "fileTooLarge": "Arquivo muito grande",
+    "invalidType": "Tipo de arquivo não suportado",
+    "uploading": "Enviando...",
+    "remove": "Remover",
+    "image": "Imagem",
+    "file": "Arquivo"
   }
 }

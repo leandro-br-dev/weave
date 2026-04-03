@@ -100,6 +100,8 @@
         "description": "Descrição",
         "descriptionPlaceholder": "Descrição da tarefa",
         "column": "Coluna",
+        "attachments": "Anexos",
+        "addAttachments": "Adicionar Anexos",
         "save": "Salvar",
         "create": "Criar"
       },
@@ -128,5 +130,10 @@
         "limitReachedMessage": "Esta coluna atingiu o máximo de {limit} tarefas.",
         "save": "Salvar",
         "cancel": "Cancelar"
+      },
+      "resultStatus": {
+        "success": "✓ Sucesso",
+        "partial": "◐ Parcial",
+        "needs_rework": "✗ Precisa Refazer"
       }
 }

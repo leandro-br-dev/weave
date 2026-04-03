@@ -77,6 +77,11 @@
     "awaitingApproval": "Aguardando Aprovação",
     "approved": "Aprovado"
   },
+  "resultStatus": {
+    "success": "✓ Sucesso",
+    "partial": "◐ Parcial",
+    "needs_rework": "↺ Precisa Refazer"
+  },
   "reworkTitle": "Refazer Fluxo de Trabalho",
   "reworkDescription": "Crie um novo fluxo de trabalho com o contexto desta execução. Você pode fornecer um novo prompt para modificar a abordagem ou corrigir problemas.",
   "reworkPromptLabel": "O que você gostaria de mudar?",
@@ -88,5 +93,10 @@
   "rework": "Refazer",
   "reworkBadge": "Refação de",
   "parentPlan": "Fluxo Original",
-  "viewParentPlan": "Ver Fluxo Original"
+  "viewParentPlan": "Ver Fluxo Original",
+  "reworkModeTitle": "Modo de Refação",
+  "reworkModeFullWorkflow": "Workflow Completo",
+  "reworkModeFullWorkflowDesc": "O planner analisará o contexto e criará um novo plano com etapas adequadas",
+  "reworkModeQuickAction": "Quick Action",
+  "reworkModeQuickActionDesc": "Execução direta em uma única etapa para correções simples"
 }

@@ -77,6 +77,11 @@
     "awaitingApproval": "Awaiting Approval",
     "approved": "Approved"
   },
+  "resultStatus": {
+    "success": "✓ Success",
+    "partial": "◐ Partial",
+    "needs_rework": "↺ Needs Rework"
+  },
   "reworkTitle": "Rework Workflow",
   "reworkDescription": "Create a new workflow with context from this run. You can provide a new prompt to modify the approach or fix issues.",
   "reworkPromptLabel": "What would you like to change?",
@@ -88,5 +93,10 @@
   "rework": "Rework",
   "reworkBadge": "Rework of",
   "parentPlan": "Parent Workflow",
-  "viewParentPlan": "View Parent Workflow"
+  "viewParentPlan": "View Parent Workflow",
+  "reworkModeTitle": "Rework Mode",
+  "reworkModeFullWorkflow": "Full Workflow",
+  "reworkModeFullWorkflowDesc": "The planner will analyze the context and create a new plan with appropriate steps",
+  "reworkModeQuickAction": "Quick Action",
+  "reworkModeQuickActionDesc": "Direct single-step execution for simple fixes"
 }

@@ -2,6 +2,18 @@ import { useState, useRef, useEffect } from 'react';
 import { Sun, Moon, Monitor, Check } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/contexts/ThemeContext';
+import {
+  darkModeDropdownColors,
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  withDarkMode,
+} from '@/lib/colors';
 
 type Layout = 'horizontal' | 'vertical' | 'compact' | 'sidebar';
 
@@ -86,12 +98,12 @@ function SidebarThemeSelector({
       {/* Selected theme button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 dark:hover:bg-gray-900 transition-colors"
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${withDarkMode('hover:text-white', 'hover:text-white')} ${withDarkMode(interactiveStates.hoverBg, 'hover:bg-gray-800')} transition-colors`}
       >
-        <div className="w-8 h-8 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0 relative">
+        <div className={`w-8 h-8 rounded-lg ${withDarkMode('bg-gray-700', darkModeBgColors.tertiary)} flex items-center justify-center flex-shrink-0 relative`}>
           <CurrentIcon className="h-4 w-4" />
           {theme === 'system' && (
-            <span className="absolute -top-1 -right-1 text-[7px] font-bold bg-blue-600 text-white rounded-full w-3 h-3 flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 text-[7px] font-bold bg-orange-600 text-white rounded-full w-3 h-3 flex items-center justify-center">
               {resolvedTheme === 'dark' ? 'D' : 'L'}
             </span>
           )}
@@ -103,7 +115,7 @@ function SidebarThemeSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50">
+        <div className={`absolute bottom-full left-0 right-0 mb-1 ${withDarkMode('bg-gray-800', darkModeBgColors.secondary)} rounded-lg border ${withDarkMode('border-gray-700', darkModeDropdownColors.border)} py-1 shadow-lg z-50`}>
           {themeOptions.map((option) => {
             const Icon = option.icon;
             const isActive = theme === option.value;
@@ -116,14 +128,14 @@ function SidebarThemeSelector({
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 transition-colors ${
                   isActive
-                    ? 'text-white bg-gray-700 dark:bg-gray-800'
-                    : 'text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-800'
+                    ? `${withDarkMode('text-white', darkModeTextColors.primary)} ${withDarkMode('bg-gray-700', darkModeBgColors.tertiary)}`
+                    : `${withDarkMode('text-gray-300', darkModeTextColors.secondary)} ${withDarkMode('hover:text-white', 'hover:text-white')} ${withDarkMode('hover:bg-gray-700', darkModeDropdownColors.itemHover)}`
                 }`}
               >
                 <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 relative">
                   <Icon className="h-3.5 w-3.5" />
                   {option.value === 'system' && theme === 'system' && (
-                    <span className="absolute -top-1 -right-1 text-[6px] font-bold bg-blue-600 text-white rounded-full w-2.5 h-2.5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 text-[6px] font-bold bg-orange-600 text-white rounded-full w-2.5 h-2.5 flex items-center justify-center">
                       {resolvedTheme === 'dark' ? 'D' : 'L'}
                     </span>
                   )}
@@ -158,15 +170,18 @@ function AllOptionsSelector({
 
   const baseButtonClass = `
     flex items-center gap-2 rounded-md border transition-all duration-150
-    focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1
+    focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:ring-offset-1
   `;
 
   const activeButtonClass = `
-    bg-gray-900 dark:bg-gray-700 text-white border-gray-900 dark:border-gray-700
+    ${bgColors.inverted} ${darkModeBgColors.tertiary} ${textColors.inverted}
+    ${withDarkMode(borderColors.transparent, darkModeBorderColors.thick)}
   `;
 
   const inactiveButtonClass = `
-    bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800
+    ${bgColors.secondary} ${darkModeBgColors.secondary} ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}
+    ${withDarkMode(borderColors.default, darkModeBorderColors.default)}
+    ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)}
   `;
 
   const horizontalButtonClass = isHorizontal ? 'flex-col gap-1 px-2.5 py-2' : 'px-3 py-2';
@@ -195,7 +210,7 @@ function AllOptionsSelector({
               <div className="relative">
                 <Icon className="h-4 w-4" />
                 {option.value === 'system' && theme === 'system' && (
-                  <span className="absolute -top-1 -right-1 text-[8px] font-bold bg-blue-600 dark:bg-blue-500 text-white rounded px-1 py-0.5 min-w-[32px] text-center">
+                  <span className={`absolute -top-1 -right-1 text-[8px] font-bold ${withDarkMode('bg-orange-600', 'dark:bg-orange-500')} ${textColors.inverted} rounded px-1 py-0.5 min-w-[32px] text-center`}>
                     {resolvedTheme === 'dark' ? 'Dark' : 'Light'}
                   </span>
                 )}

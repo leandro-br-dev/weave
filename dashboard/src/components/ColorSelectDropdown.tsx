@@ -1,6 +1,17 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronDown } from 'lucide-react'
 import { COLOR_HEX_MAP, COLOR_NAMES, DEFAULT_COLORS } from './ColorPicker'
+import {
+  dropdownColors,
+  darkModeDropdownColors,
+  bgColors,
+  darkModeBgColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface ColorSelectDropdownProps {
   value: string
@@ -33,11 +44,12 @@ export function ColorSelectDropdown({
           <button
             type="button"
             onClick={(e) => e.stopPropagation()}
-            className="
+            className={`
               inline-flex items-center gap-1.5 px-1.5 py-1 rounded-md
-              hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer
-              focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-1
-            "
+              ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)}
+              transition-colors cursor-pointer
+              focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:ring-offset-1
+            `}
             title={colorName}
             aria-label={`Color: ${colorName}`}
           >
@@ -45,24 +57,24 @@ export function ColorSelectDropdown({
               className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
               style={{ backgroundColor: value || '#9ca3af' }}
             />
-            <ChevronDown size={12} className="text-gray-400" />
+            <ChevronDown size={12} className={textColors.muted} />
           </button>
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            className="
-              z-50 min-w-[160px] bg-white dark:bg-gray-800 rounded-lg
-              shadow-lg border border-gray-200 dark:border-gray-700
+            className={`
+              z-50 min-w-[160px] ${withDarkMode(dropdownColors.bg, darkModeDropdownColors.bg)} rounded-lg
+              shadow-lg border ${withDarkMode(dropdownColors.border, darkModeDropdownColors.border)}
               p-1 overflow-hidden
-            "
+            `}
             sideOffset={5}
             align="end"
           >
-            <DropdownMenu.Label className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+            <DropdownMenu.Label className={`px-2 py-1.5 text-xs font-medium ${withDarkMode(textColors.tertiary, darkModeTextColors.muted)}`}>
               Project Color
             </DropdownMenu.Label>
-            <DropdownMenu.Separator className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+            <DropdownMenu.Separator className={`h-px ${withDarkMode(dropdownColors.divider, darkModeDropdownColors.divider)} my-1`} />
 
             {DEFAULT_COLORS.map((tailwindClasses) => {
               const hexColor = COLOR_HEX_MAP[tailwindClasses]
@@ -80,8 +92,8 @@ export function ColorSelectDropdown({
                     relative flex items-center gap-2.5 px-2.5 py-2 text-sm rounded-md
                     cursor-pointer select-none outline-none transition-colors
                     ${isSelected
-                      ? 'bg-gray-100 dark:bg-gray-700'
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      ? withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)
+                      : withDarkMode('hover:bg-gray-50', darkModeDropdownColors.itemHover)
                     }
                   `}
                 >
@@ -89,11 +101,14 @@ export function ColorSelectDropdown({
                     className="w-4 h-4 rounded-full border-2 border-white shadow-sm flex-shrink-0"
                     style={{ backgroundColor: hexColor }}
                   />
-                  <span className={`text-sm ${isSelected ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <span className={`text-sm ${isSelected
+                    ? `font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`
+                    : withDarkMode(textColors.secondary, darkModeTextColors.secondary)
+                  }`}>
                     {name}
                   </span>
                   {isSelected && (
-                    <Check size={14} className="ml-auto text-gray-900 dark:text-white" />
+                    <Check size={14} className={`ml-auto ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`} />
                   )}
                 </DropdownMenu.Item>
               )

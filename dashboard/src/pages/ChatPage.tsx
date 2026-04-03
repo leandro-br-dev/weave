@@ -1,14 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
-import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText, ImageIcon, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
-  Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown
+  Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown, FileAttachmentInput
 } from '@/components'
+import type { FileAttachment } from '@/components'
 import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession } from '@/api/sessions'
 import { useGetProjects } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/workspaces'
 import { useCreatePlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
+import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'
 import { useNavigate } from 'react-router'
 
 interface PlanData {
@@ -86,12 +88,14 @@ export default function ChatPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [showRename, setShowRename] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { data: sessions = [] } = useGetSessions()
   const { data: session } = useGetSession(selectedId ?? '')
   const sendMessage = useSendMessage(selectedId ?? '')
   const deleteSession = useDeleteSession()
+  const uploadFiles = useUploadFiles()
   const deleteMessage = useDeleteMessage()
   const clearHistory = useClearHistory()
 
@@ -125,20 +129,35 @@ export default function ChatPage() {
   }, [session?.messages, pendingPlan])
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedId || session?.status === 'running') return
+    if ((!input.trim() && attachments.length === 0) || !selectedId || session?.status === 'running') return
     const text = input.trim()
     setInput('')
     setPendingPlan(null)
-    await sendMessage.mutateAsync(text)
+
+    // Upload attachments first
+    let attachmentIds: string[] = []
+    if (attachments.length > 0) {
+      const filesToUpload = attachments.map((a) => a.file)
+      try {
+        const uploaded = await uploadFiles.mutateAsync(filesToUpload)
+        attachmentIds = uploaded.map((u) => u.id)
+      } catch {
+        // Upload failed — still send the text message without attachments
+      }
+    }
+
+    setAttachments([])
+    await sendMessage.mutateAsync({ content: text, attachment_ids: attachmentIds })
   }
 
   const isRunning = session?.status === 'running'
+  const isSending = sendMessage.isPending || uploadFiles.isPending
 
   return (
     <div className="h-full flex flex-col sm:flex-row">
       {/* Sessions sidebar - collapsible on mobile */}
-      <div className="w-full sm:w-64 border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800 max-h-[30vh] sm:max-h-full overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="w-full sm:w-64 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-800 max-h-[30vh] sm:max-h-full overflow-hidden">
+        <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-800">
           <Button variant="primary" size="sm" onClick={() => setShowNew(true)} className="w-full text-xs sm:text-sm">
             <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t('pages.chat.newChat')}</span><span className="sm:hidden">{t('pages.chat.new')}</span>
           </Button>
@@ -152,7 +171,7 @@ export default function ChatPage() {
           ) : sessions.map((s: any) => (
             <div
               key={s.id}
-              className={`group relative border-b border-gray-100 dark:border-gray-700 ${
+              className={`group relative border-b border-gray-100 dark:border-gray-800 ${
                 selectedId === s.id ? 'bg-gray-50 dark:bg-gray-700 border-l-2 border-l-gray-900' : ''
               }`}
             >
@@ -203,10 +222,10 @@ export default function ChatPage() {
       ) : (
         <div className="flex-1 flex flex-col min-h-0">
           {/* Chat header */}
-          <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">{session?.name}</span>
+              <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{session?.name}</span>
               <button
                 onClick={() => setShowRename(selectedId)}
                 className="text-gray-400 hover:text-gray-600 flex-shrink-0"
@@ -277,6 +296,48 @@ export default function ChatPage() {
                       ? 'bg-gray-900 text-white rounded-2xl rounded-br-sm px-4 py-2.5'
                       : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl rounded-bl-sm px-4 py-2.5'
                   }`}>
+                    {/* Attachment thumbnails for user messages */}
+                    {msg.role === 'user' && msg.attachment_data?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {msg.attachment_data.map((att: any) => {
+                          const isImage = att.file_type?.startsWith('image/')
+                          if (isImage) {
+                            return (
+                              <a
+                                key={att.id}
+                                href={getAttachmentUrl(att.id)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block rounded-md overflow-hidden border border-gray-700 hover:border-gray-500 transition-colors"
+                              >
+                                <img
+                                  src={getAttachmentUrl(att.id)}
+                                  alt={att.file_name}
+                                  className="h-20 w-20 object-cover"
+                                />
+                              </a>
+                            )
+                          }
+                          return (
+                            <a
+                              key={att.id}
+                              href={getAttachmentUrl(att.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-gray-500 transition-colors text-xs text-gray-300 hover:text-white"
+                            >
+                              {att.file_type === 'application/pdf' ? (
+                                <FileText className="h-4 w-4 text-red-400 flex-shrink-0" />
+                              ) : (
+                                <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              )}
+                              <span className="max-w-[120px] truncate">{att.file_name}</span>
+                            </a>
+                          )
+                        })}
+                      </div>
+                    )}
+
                     <p className={`text-sm whitespace-pre-wrap ${
                       msg.role === 'user' ? 'text-white' : 'text-gray-700 dark:text-gray-200'
                     }`}>
@@ -343,7 +404,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
             {pendingPlan && (
               <div className="mb-3 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 <div>
@@ -355,7 +416,12 @@ export default function ChatPage() {
                 </Button>
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
+              <FileAttachmentInput
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                compact
+              />
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -368,13 +434,13 @@ export default function ChatPage() {
                 placeholder={isRunning ? t('pages.chat.agentThinking') : t('pages.chat.typeMessage')}
                 disabled={isRunning}
                 rows={2}
-                className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-500"
+                className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-500"
               />
               <Button
                 variant="primary"
                 onClick={handleSend}
-                disabled={!input.trim() || isRunning}
-                loading={sendMessage.isPending}
+                disabled={(!input.trim() && attachments.length === 0) || isRunning}
+                loading={isSending}
               >
                 <Send className="h-4 w-4" />
               </Button>
@@ -476,8 +542,8 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('pages.chat.newChatSession')}</h3>
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-md w-full mx-4 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('pages.chat.newChatSession')}</h3>
 
         <ProjectSelectDropdown
           label={t('pages.chat.project')}
@@ -578,7 +644,7 @@ function PlanCreateModal({ onClose, prefillData, allPlans, onSelectPlan }: PlanC
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-3xl w-full mx-4 space-y-4 max-h-[85vh] overflow-y-auto">
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-3xl w-full mx-4 space-y-4 max-h-[85vh] overflow-y-auto">
         {allPlans.length > 1 && (
           <div className="mb-4 flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400">{t('pages.chat.plansFound', { count: allPlans.length })}</span>
@@ -601,7 +667,7 @@ function PlanCreateModal({ onClose, prefillData, allPlans, onSelectPlan }: PlanC
         )}
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{prefillData?.name || t('pages.chat.untitledPlan')}</h3>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{prefillData?.name || t('pages.chat.untitledPlan')}</h3>
             {prefillData?.summary && (
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{prefillData.summary}</p>
             )}
@@ -614,14 +680,14 @@ function PlanCreateModal({ onClose, prefillData, allPlans, onSelectPlan }: PlanC
 
         <div className="space-y-3">
           {prefillData?.tasks?.map((task: any, idx: number) => (
-            <div key={idx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors bg-white dark:bg-gray-800">
+            <div key={idx} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors bg-white dark:bg-gray-800">
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
                   {idx + 1}
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{task.name || t('pages.chat.taskNumber', { number: idx + 1 })}</h4>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{task.name || t('pages.chat.taskNumber', { number: idx + 1 })}</h4>
                     {task.cwd && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                         <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -650,7 +716,7 @@ function PlanCreateModal({ onClose, prefillData, allPlans, onSelectPlan }: PlanC
           ))}
         </div>
 
-        <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-800">
           <Button variant="secondary" size="sm" onClick={onClose}>
             {t('pages.chat.discard')}
           </Button>
@@ -687,8 +753,8 @@ function RenameChatModal({ sessionId, currentName, onClose }: { sessionId: strin
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4 space-y-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('pages.chat.renameConversation')}</h3>
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-md w-full mx-4 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('pages.chat.renameConversation')}</h3>
 
         <Input
           label={t('pages.chat.conversationName')}

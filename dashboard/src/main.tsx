@@ -1,11 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { router } from './router'
+import { router as routeConfig } from './router'
 import './index.css'
 
 // Initialize i18n
@@ -20,18 +20,25 @@ const queryClient = new QueryClient({
   },
 })
 
-const BrowserRouter = createBrowserRouter(router)
+const router = createBrowserRouter([
+  {
+    element: (
+      <StrictMode>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <Outlet />
+              </AuthProvider>
+            </ThemeProvider>
+          </ToastProvider>
+        </QueryClientProvider>
+      </StrictMode>
+    ),
+    children: routeConfig,
+  },
+])
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <ThemeProvider>
-          <AuthProvider>
-            <RouterProvider router={BrowserRouter} />
-          </AuthProvider>
-        </ThemeProvider>
-      </ToastProvider>
-    </QueryClientProvider>
-  </StrictMode>,
+  <RouterProvider router={router} />
 )

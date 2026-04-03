@@ -18,6 +18,25 @@ import {
   MessageSquare,
   Settings2,
 } from 'lucide-react'
+import {
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  successColors,
+  darkModeSuccessColors,
+  errorColors,
+  darkModeErrorColors,
+  warningColors,
+  darkModeWarningColors,
+  infoColors,
+  darkModeInfoColors,
+  modalColors,
+  darkModeModalColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 export function BackupRestoreSection() {
   const { t } = useTranslation()
@@ -111,7 +130,7 @@ export function BackupRestoreSection() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3">
+      <h2 className={`text-lg font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-3`}>
         {t('pages.settings.backup.title')}
       </h2>
 
@@ -136,21 +155,21 @@ export function BackupRestoreSection() {
         {/* Export button */}
         <Card className="flex-1">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-              <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className={`p-2 rounded-lg ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)}`}>
+              <Download className={`h-5 w-5 ${withDarkMode(infoColors.text, darkModeInfoColors.text)}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                 {t('pages.settings.backup.exportTitle')}
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>
                 {t('pages.settings.backup.exportDescription')}
               </p>
               <Button
                 onClick={handleExport}
                 disabled={exportMutation.isPending}
                 loading={exportMutation.isPending}
-                className="mt-3 bg-blue-600 hover:bg-blue-700 border-blue-600 text-xs sm:text-sm"
+                className="mt-3 bg-orange-600 hover:bg-orange-700 border-orange-600 text-xs sm:text-sm"
               >
                 <Download className="h-4 w-4 mr-1.5" />
                 {t('pages.settings.backup.exportButton')}
@@ -162,14 +181,14 @@ export function BackupRestoreSection() {
         {/* Import button */}
         <Card className="flex-1">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/30">
-              <Upload className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className={`p-2 rounded-lg ${withDarkMode(successColors.bg, darkModeSuccessColors.bg)}`}>
+              <Upload className={`h-5 w-5 ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+              <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
                 {t('pages.settings.backup.importTitle')}
               </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mt-1`}>
                 {t('pages.settings.backup.importDescription')}
               </p>
               <Button
@@ -195,7 +214,7 @@ export function BackupRestoreSection() {
 
       {/* Import error */}
       {importError && (
-        <div className="mt-3 flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+        <div className={`mt-3 flex items-center gap-2 text-sm ${withDarkMode(errorColors.text, darkModeErrorColors.text)} ${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} rounded-lg p-3`}>
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {importError}
         </div>
@@ -203,14 +222,14 @@ export function BackupRestoreSection() {
 
       {/* Import result */}
       {importResult && (
-        <div className="mt-3 bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+        <div className={`mt-3 ${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} rounded-lg p-4`}>
           <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <span className="text-sm font-semibold text-green-700 dark:text-green-300">
+            <CheckCircle2 className={`h-5 w-5 ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`} />
+            <span className={`text-sm font-semibold ${withDarkMode(successColors.textAlt, darkModeSuccessColors.textAlt)}`}>
               {t('pages.settings.backup.importResultTitle')}
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-green-600 dark:text-green-400">
+          <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs ${withDarkMode(successColors.text, darkModeSuccessColors.text)}`}>
             <span>{t('pages.settings.backup.infoItems.projects')}: {importResult.projects_imported}</span>
             <span>{t('pages.settings.backup.infoItems.environments')}: {importResult.environments_imported}</span>
             <span>{t('pages.settings.backup.infoItems.agents')}: {importResult.agents_restored}</span>
@@ -221,7 +240,7 @@ export function BackupRestoreSection() {
             <span>{t('pages.settings.backup.infoItems.envVars')}: {importResult.env_vars_imported}</span>
             <span>{t('pages.settings.backup.infoItems.templates')}: {importResult.kanban_templates_imported}</span>
           </div>
-          <p className="mt-2 text-xs text-green-500 dark:text-green-500">
+          <p className={`mt-2 text-xs ${withDarkMode('text-green-500', 'dark:text-green-500')}`}>
             {t('pages.settings.backup.backupFrom', { date: new Date(importResult.exported_at).toLocaleString() })}
           </p>
         </div>
@@ -229,20 +248,20 @@ export function BackupRestoreSection() {
 
       {/* Confirm import modal */}
       {showConfirmImport && pendingBackup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${withDarkMode(modalColors.overlay, darkModeModalColors.overlay)}`}>
+          <div className={`${withDarkMode(modalColors.panel, darkModeModalColors.panel)} rounded-xl shadow-xl p-6 max-w-md w-full mx-4`}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-full bg-amber-50 dark:bg-amber-900/30">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className={`p-2 rounded-full ${withDarkMode(warningColors.bg, darkModeWarningColors.bg)}`}>
+                <AlertTriangle className={`h-5 w-5 ${withDarkMode(warningColors.text, darkModeWarningColors.text)}`} />
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+              <h3 className={`text-lg font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>
                 {t('pages.settings.backup.confirmImportTitle')}
               </h3>
             </div>
 
-            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <div className={`space-y-2 text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-4`}>
               <p>{t('pages.settings.backup.confirmImportMessage')}</p>
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-xs space-y-1">
+              <div className={`${withDarkMode(bgColors.primary, darkModeBgColors.primary)} rounded-lg p-3 text-xs space-y-1`}>
                 <div className="flex justify-between">
                   <span>{t('pages.settings.backup.version')}:</span>
                   <span className="font-mono">{pendingBackup.version}</span>
@@ -251,7 +270,7 @@ export function BackupRestoreSection() {
                   <span>{t('pages.settings.backup.exportedAt')}:</span>
                   <span>{new Date(pendingBackup.exported_at).toLocaleString()}</span>
                 </div>
-                <hr className="border-gray-200 dark:border-gray-700" />
+                <hr className={`${withDarkMode(borderColors.default, darkModeBorderColors.default)}`} />
                 <div className="flex justify-between">
                   <span>{t('pages.settings.backup.infoItems.projects')}:</span>
                   <span className="font-semibold">{pendingBackup.metadata.projects_count}</span>
@@ -273,7 +292,7 @@ export function BackupRestoreSection() {
                   <span className="font-semibold">{pendingBackup.metadata.chat_sessions_count}</span>
                 </div>
               </div>
-              <p className="text-amber-600 dark:text-amber-400 font-medium">
+              <p className={`font-medium ${withDarkMode(warningColors.text, darkModeWarningColors.text)}`}>
                 {t('pages.settings.backup.confirmWarning')}
               </p>
             </div>
@@ -318,13 +337,13 @@ export function BackupRestoreSection() {
 
 function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 rounded-lg px-3 py-2">
-      <span className="text-gray-400 dark:text-gray-500">{icon}</span>
+    <div className={`flex items-center gap-2 ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} rounded-lg px-3 py-2`}>
+      <span className={withDarkMode(textColors.muted, darkModeTextColors.muted)}>{icon}</span>
       <div className="min-w-0">
-        <div className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight">
+        <div className={`text-lg font-bold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} leading-tight`}>
           {value}
         </div>
-        <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+        <div className={`text-[10px] ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} truncate`}>
           {label}
         </div>
       </div>

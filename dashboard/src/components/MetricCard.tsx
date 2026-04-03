@@ -1,4 +1,15 @@
 import { useTranslation } from 'react-i18next'
+import {
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  metricColors,
+  darkModeMetricColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface MetricCardProps {
   label?: string
@@ -11,20 +22,20 @@ interface MetricCardProps {
 export function MetricCard({ label, value, color = 'default', labelI18nKey }: MetricCardProps) {
   const { t } = useTranslation()
 
-  const colors = {
-    default: 'text-gray-900 dark:text-gray-100',
-    green:   'text-green-600 dark:text-green-400',
-    red:     'text-red-600 dark:text-red-400',
-    amber:   'text-amber-600 dark:text-amber-400',
+  const colorClasses = {
+    default: withDarkMode(metricColors.default.text, darkModeMetricColors.default.text),
+    green:   withDarkMode(metricColors.green.text, darkModeMetricColors.green.text),
+    red:     withDarkMode(metricColors.red.text, darkModeMetricColors.red.text),
+    amber:   withDarkMode(metricColors.amber.text, darkModeMetricColors.amber.text),
   }
 
   // Use labelI18nKey if provided, otherwise use label directly
   const displayLabel = labelI18nKey ? t(labelI18nKey, { defaultValue: label || '' }) : label
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">{displayLabel}</p>
-      <p className={`text-2xl font-semibold ${colors[color]}`}>{value}</p>
+    <div className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} rounded-lg p-5`}>
+      <p className={`text-xs font-medium ${withDarkMode(textColors.muted, darkModeTextColors.muted)} uppercase tracking-wide mb-2`}>{displayLabel}</p>
+      <p className={`text-2xl font-semibold ${colorClasses[color]}`}>{value}</p>
     </div>
   )
 }

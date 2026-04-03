@@ -20,6 +20,8 @@ export interface KanbanTask {
   error_message: string;
   workflow_status?: string;
   workflow_name?: string;
+  /** JSON array of attachment IDs */
+  attachments?: string;
   created_at: string;
   updated_at: string;
   /** @deprecated Use KanbanTemplate interface instead - templates are now stored in kanban_templates table */

@@ -1,7 +1,7 @@
 import { Router } from 'express'
-import { authenticateToken } from '../middleware/auth'
+import { authenticateToken } from '../middleware/auth.js'
 import { v4 as uuidv4 } from 'uuid'
-import { db } from '../db'
+import { db } from '../db/index.js'
 
 const router = Router()
 
@@ -31,15 +31,46 @@ router.post('/', authenticateToken, (req, res) => {
 // GET /api/sessions/pending — daemon polling (sessões running sem sdk_session_id, ou running com)
 router.get('/pending', authenticateToken, (_req, res) => {
   const sessions = db.prepare(
-    "SELECT s.*, m.content as last_user_message, e.project_path as env_project_path " +
+    "SELECT s.*, m.content as last_user_message, m.attachments as last_user_message_attachment_ids, e.project_path as env_project_path " +
     "FROM chat_sessions s " +
     "JOIN chat_messages m ON m.id = (" +
     "  SELECT id FROM chat_messages WHERE session_id = s.id AND role = 'user' ORDER BY created_at DESC LIMIT 1" +
     ") " +
     "LEFT JOIN environments e ON e.id = s.environment_id " +
     "WHERE s.status = 'running' LIMIT 5"
-  ).all()
-  return res.json({ data: sessions, error: null })
+  ).all() as any[]
+
+  // Enrich each session with attachment metadata for the last user message
+  const enriched = sessions.map((session) => {
+    let attachments: any[] = []
+    try {
+      const ids = typeof session.last_user_message_attachment_ids === 'string'
+        ? JSON.parse(session.last_user_message_attachment_ids)
+        : session.last_user_message_attachment_ids || []
+
+      if (Array.isArray(ids) && ids.length > 0) {
+        const placeholders = ids.map(() => '?').join(', ')
+        const rows = db.prepare(
+          `SELECT id, file_name, file_type, file_size, storage_path
+           FROM message_attachments WHERE id IN (${placeholders})`
+        ).all(...ids) as any[]
+
+        attachments = rows.map((row) => ({
+          ...row,
+          download_url: `/api/uploads/${row.id}`,
+        }))
+      }
+    } catch {
+      // If attachment IDs can't be parsed, skip attachments
+    }
+
+    return {
+      ...session,
+      last_user_message_attachments: attachments,
+    }
+  })
+
+  return res.json({ data: enriched, error: null })
 })
 
 // DELETE /api/sessions/:id/messages/:msgId — deletar mensagem individual
@@ -96,9 +127,57 @@ router.get('/:id', authenticateToken, (req, res) => {
 
   const messages = db.prepare(
     'SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC'
-  ).all(req.params.id)
+  ).all(req.params.id) as any[]
 
-  return res.json({ data: { ...session as any, messages }, error: null })
+  // Enrich messages with attachment metadata
+  const allAttachmentIds: string[] = []
+  for (const msg of messages) {
+    try {
+      const ids = typeof msg.attachments === 'string'
+        ? JSON.parse(msg.attachments)
+        : msg.attachments || []
+      if (Array.isArray(ids)) {
+        allAttachmentIds.push(...ids)
+      }
+    } catch {
+      // skip malformed
+    }
+  }
+
+  const attachmentMap = new Map<string, any>()
+  if (allAttachmentIds.length > 0) {
+    const uniqueIds = [...new Set(allAttachmentIds)]
+    const placeholders = uniqueIds.map(() => '?').join(', ')
+    const rows = db.prepare(
+      `SELECT id, file_name, file_type, file_size, storage_path
+       FROM message_attachments WHERE id IN (${placeholders})`
+    ).all(...uniqueIds) as any[]
+    for (const row of rows) {
+      attachmentMap.set(row.id, row)
+    }
+  }
+
+  const enrichedMessages = messages.map((msg) => {
+    let parsedAttachments: any[] = []
+    try {
+      const ids = typeof msg.attachments === 'string'
+        ? JSON.parse(msg.attachments)
+        : msg.attachments || []
+      if (Array.isArray(ids)) {
+        parsedAttachments = ids
+          .map((id: string) => {
+            const att = attachmentMap.get(id)
+            return att ? { ...att, download_url: `/api/uploads/${att.id}` } : null
+          })
+          .filter(Boolean)
+      }
+    } catch {
+      // skip
+    }
+    return { ...msg, attachment_data: parsedAttachments }
+  })
+
+  return res.json({ data: { ...session as any, messages: enrichedMessages }, error: null })
 })
 
 // PATCH /api/sessions/:id — atualizar nome da sessão
@@ -159,14 +238,34 @@ router.post('/:id/message', authenticateToken, (req, res) => {
     return res.status(409).json({ data: null, error: 'Session is already running' })
   }
 
-  const { content } = req.body
+  const { content, attachment_ids } = req.body
   if (!content?.trim()) return res.status(400).json({ data: null, error: 'content required' })
+
+  // Validate attachment_ids if provided
+  let validAttachmentIds: string[] = []
+  if (Array.isArray(attachment_ids) && attachment_ids.length > 0) {
+    const placeholders = attachment_ids.map(() => '?').join(', ')
+    const existing = db.prepare(
+      `SELECT id FROM message_attachments WHERE id IN (${placeholders})`
+    ).all(...attachment_ids) as any[]
+    validAttachmentIds = existing.map((row) => row.id)
+  }
 
   // Salvar mensagem do usuário
   const msgId = uuidv4()
   db.prepare(
-    'INSERT INTO chat_messages (id, session_id, role, content) VALUES (?, ?, ?, ?)'
-  ).run(msgId, req.params.id, 'user', content.trim())
+    'INSERT INTO chat_messages (id, session_id, role, content, attachments) VALUES (?, ?, ?, ?, ?)'
+  ).run(msgId, req.params.id, 'user', content.trim(), JSON.stringify(validAttachmentIds))
+
+  // Link attachments to this message
+  if (validAttachmentIds.length > 0) {
+    const insertStmt = db.prepare(
+      'UPDATE message_attachments SET message_id = ?, message_type = ? WHERE id = ?'
+    )
+    for (const attId of validAttachmentIds) {
+      insertStmt.run(msgId, 'chat', attId)
+    }
+  }
 
   // Marcar como running — o daemon vai pegar via polling
   db.prepare(
@@ -215,6 +314,56 @@ router.post('/:id/assistant-message', authenticateToken, (req, res) => {
   ).run(req.params.id)
 
   return res.status(201).json({ data: { message_id: msgId }, error: null })
+})
+
+// GET /api/sessions/:id/attachments — list all attachments for a session's messages
+router.get('/:id/attachments', authenticateToken, (req, res) => {
+  const { id } = req.params
+
+  // Verify session exists
+  const session = db.prepare('SELECT id FROM chat_sessions WHERE id = ?').get(id)
+  if (!session) {
+    return res.status(404).json({ data: null, error: 'Session not found' })
+  }
+
+  // Get all attachment IDs from messages in this session
+  const messages = db.prepare(
+    "SELECT attachments FROM chat_messages WHERE session_id = ? AND role = 'user'"
+  ).all(id) as any[]
+
+  const allAttachmentIds: string[] = []
+  for (const msg of messages) {
+    try {
+      const ids = typeof msg.attachments === 'string'
+        ? JSON.parse(msg.attachments)
+        : msg.attachments || []
+      if (Array.isArray(ids)) {
+        allAttachmentIds.push(...ids)
+      }
+    } catch {
+      // Skip malformed attachment arrays
+    }
+  }
+
+  if (allAttachmentIds.length === 0) {
+    return res.json({ data: [], error: null })
+  }
+
+  // Deduplicate IDs
+  const uniqueIds = [...new Set(allAttachmentIds)]
+  const placeholders = uniqueIds.map(() => '?').join(', ')
+
+  const attachments = db.prepare(
+    `SELECT id, message_type, message_id, file_name, file_type, file_size, storage_path, created_at
+     FROM message_attachments WHERE id IN (${placeholders})`
+  ).all(...uniqueIds) as any[]
+
+  const enriched = attachments.map((att) => ({
+    ...att,
+    download_url: `/api/uploads/${att.id}`,
+  }))
+
+  return res.json({ data: enriched, error: null })
 })
 
 // GET /api/sessions/:id/stream — SSE para novas mensagens em tempo real

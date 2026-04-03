@@ -35,6 +35,7 @@ from claude_agent_sdk import (
 )
 
 from orchestrator import logger
+from orchestrator.attachments import build_prompt_with_attachments
 from orchestrator.plan import Plan, Task
 
 # Cache for workflow context strings (project_path -> context string).
@@ -487,7 +488,7 @@ Your documentation directory for this workflow:
     return base_prompt
 
 
-def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None) -> str:
+def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None) -> str:
     """
     Build the final prompt for a task, injecting:
     0. Docs inventory (if docs_dir provided)
@@ -495,7 +496,8 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
     2. Environment context (if available from selected environment)
     3. Working directory (so Claude doesn't create files in /tmp)
     4. Context from upstream tasks (from saved notes if ctx_dir provided, otherwise from memory)
-    5. The task prompt itself
+    5. Attachment content (if attachment_ids provided with api_base_url and token)
+    6. The task prompt itself
 
     Skills and sub-agents are NOT injected here.
     They live natively in the project under:
@@ -512,6 +514,9 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
         ctx_dir: Context directory with saved dependency notes (takes precedence)
         workflow_context: Optional pre-generated project context string (directory tree + git info)
         docs_dir: Optional path to .agent-docs/{plan_id}/ directory for docs inventory
+        attachment_ids: Optional list of attachment UUIDs to include in the prompt
+        api_base_url: Optional API base URL for fetching attachment content
+        token: Optional auth token for fetching attachment content
 
     Returns:
         The formatted prompt string
@@ -554,9 +559,24 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
                 parts.append(f"### [{r.task_id}]\n{r.output}\n")
             parts.append("")
 
-    # 5. Task instructions
+    # 5. Attachment content (if provided)
+    # Text file contents are inlined; images and binary files are noted.
+    task_prompt = task.prompt
+    if attachment_ids and api_base_url and token:
+        try:
+            task_prompt = build_prompt_with_attachments(
+                text_prompt=task.prompt,
+                attachment_ids=attachment_ids,
+                api_base_url=api_base_url,
+                token=token,
+            )
+            logger.info(f"[{task.id}] Built prompt with {len(attachment_ids)} attachment(s)")
+        except Exception as e:
+            logger.warning(f"[{task.id}] Failed to build prompt with attachments: {e}")
+
+    # 6. Task instructions
     parts.append("## Your task")
-    parts.append(task.prompt)
+    parts.append(task_prompt)
 
     return "\n".join(parts)
 
@@ -673,6 +693,9 @@ async def run_task(
     client: Any | None = None,  # DaemonClient instance
     plan_id: str | None = None,  # Plan ID for approval requests
     project_path: str | None = None,  # Project path for workflow context generation
+    attachment_ids: list[str] | None = None,  # Attachment UUIDs for the task
+    api_base_url: str | None = None,  # API base URL for fetching attachments
+    token: str | None = None,  # Auth token for fetching attachments
 ) -> TaskResult:
     """
     Run a single task and stream output to terminal.
@@ -768,7 +791,7 @@ async def run_task(
     # Generate or retrieve cached workflow context
     workflow_context = generate_and_cache_context(project_path or task.cwd)
 
-    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir)
+    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token)
 
     # Inject agents context for planner agents
     agent_context = await build_agent_context(task, client, plan_id)
@@ -1005,6 +1028,9 @@ async def run_wave(
     client: Any | None = None,
     plan_id: str | None = None,
     project_path: str | None = None,
+    attachment_ids: list[str] | None = None,
+    api_base_url: str | None = None,
+    token: str | None = None,
 ) -> list[TaskResult]:
     """
     Run all tasks in a wave.
@@ -1028,7 +1054,7 @@ async def run_wave(
     """
     results: list[TaskResult] = []
     for task in tasks:
-        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path)
+        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token)
         results.append(result)
     return results
 
@@ -1063,9 +1089,29 @@ async def run_plan(
     if plan.tasks:
         project_path = plan.tasks[0].cwd
 
+    # Fetch plan-level attachments (if client available)
+    plan_attachment_ids: list[str] | None = None
+    if client:
+        try:
+            plan_attachment_ids = client.get_plan_attachments(plan.id)
+            if plan_attachment_ids:
+                logger.info(f"[Plan] Found {len(plan_attachment_ids)} attachment(s) for plan {plan.id[:8]}")
+        except Exception as e:
+            logger.warning(f"[Plan] Failed to fetch plan attachments: {e}")
+
+    # Resolve API base URL and token for attachment fetching
+    api_base_url: str | None = None
+    attach_token: str | None = None
+    if client and hasattr(client, 'server_url') and hasattr(client, 'token'):
+        api_base_url = client.server_url
+        attach_token = client.token
+
     for wave_index, wave in enumerate(waves):
         logger.wave_start(wave_index, [t.name for t in wave])
-        results = await run_wave(wave, context, ctx_dir, log_callback, client, plan.id, project_path)
+        results = await run_wave(
+            wave, context, ctx_dir, log_callback, client, plan.id, project_path,
+            attachment_ids=plan_attachment_ids, api_base_url=api_base_url, token=attach_token,
+        )
 
         for r in results:
             context[r.task_id] = r

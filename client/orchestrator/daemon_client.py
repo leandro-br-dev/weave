@@ -979,6 +979,118 @@ class DaemonClient:
         except Exception as e:
             return PlanResponse(data=None, error=f"Request failed: {e}")
 
+    # ── Attachment methods ──────────────────────────────────────────────
+
+    def get_message_attachments(self, session_id: str) -> list[dict[str, Any]]:
+        """
+        Fetch attachment IDs for the last user message in a chat session.
+
+        GET /api/sessions/:id — retrieves session with its messages.
+
+        The response includes chat_messages; each message may have an
+        ``attachments`` JSON column containing a list of attachment UUIDs.
+
+        Args:
+            session_id: ID of the chat session.
+
+        Returns:
+            List of attachment ID strings, or empty list on error.
+        """
+        try:
+            response = self._client.get(f"/sessions/{session_id}")
+            handled = self._handle_response(response)
+
+            if handled.error:
+                logger.warning(f"Failed to fetch session for attachments: {handled.error}")
+                return []
+
+            data = handled.data
+            if not isinstance(data, dict):
+                return []
+
+            messages = data.get("messages") or data.get("chat_messages") or []
+            if isinstance(messages, str):
+                import json
+                try:
+                    messages = json.loads(messages)
+                except (json.JSONDecodeError, TypeError):
+                    return []
+
+            # Walk messages in reverse to find the last user message
+            for msg in reversed(messages):
+                if not isinstance(msg, dict):
+                    continue
+                role = msg.get("role", "")
+                if role == "user":
+                    attachments_raw = msg.get("attachments", "[]")
+                    if isinstance(attachments_raw, str):
+                        try:
+                            import json
+                            attachment_ids = json.loads(attachments_raw)
+                        except (json.JSONDecodeError, TypeError):
+                            attachment_ids = []
+                    elif isinstance(attachments_raw, list):
+                        attachment_ids = attachments_raw
+                    else:
+                        attachment_ids = []
+
+                    return [a for a in attachment_ids if isinstance(a, str)]
+
+            return []
+
+        except httpx.HTTPError as e:
+            logger.warning(f"HTTP error fetching session attachments: {e}")
+            return []
+        except Exception as e:
+            logger.warning(f"Error fetching session attachments: {e}")
+            return []
+
+    def get_plan_attachments(self, plan_id: str) -> list[str]:
+        """
+        Fetch attachment IDs associated with a plan.
+
+        GET /api/plans/:id — retrieves plan details including the
+        ``attachments`` JSON column.
+
+        Args:
+            plan_id: ID of the plan.
+
+        Returns:
+            List of attachment ID strings, or empty list on error.
+        """
+        try:
+            response = self._client.get(f"/plans/{plan_id}")
+            handled = self._handle_response(response)
+
+            if handled.error:
+                logger.warning(f"Failed to fetch plan for attachments: {handled.error}")
+                return []
+
+            data = handled.data
+            if not isinstance(data, dict):
+                return []
+
+            attachments_raw = data.get("attachments", "[]")
+            if isinstance(attachments_raw, str):
+                import json
+                try:
+                    attachment_ids = json.loads(attachments_raw)
+                except (json.JSONDecodeError, TypeError):
+                    attachment_ids = []
+            elif isinstance(attachments_raw, list):
+                attachment_ids = attachments_raw
+            else:
+                attachment_ids = []
+
+            return [a for a in attachment_ids if isinstance(a, str)]
+
+        except httpx.HTTPError as e:
+            logger.warning(f"HTTP error fetching plan attachments: {e}")
+            return []
+        except Exception as e:
+            logger.warning(f"Error fetching plan attachments: {e}")
+            return []
+
     # Kanban pipeline methods
 
     async def _patch(self, path: str, data: dict[str, Any]) -> dict | None:

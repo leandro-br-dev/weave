@@ -1,6 +1,21 @@
 import * as Select from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { ProjectIcon } from './ProjectIcon'
+import {
+  dropdownColors,
+  darkModeDropdownColors,
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  errorColors,
+  darkModeErrorColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface Project {
   id: string
@@ -66,9 +81,9 @@ export function ProjectSelectDropdown({
   return (
     <div className={`space-y-1 ${className}`}>
       {label && (
-        <label className="block text-xs font-medium text-gray-700">
+        <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className={`ml-1 ${withDarkMode(errorColors.text, darkModeErrorColors.text)}`}>*</span>}
         </label>
       )}
 
@@ -77,11 +92,15 @@ export function ProjectSelectDropdown({
           id={id}
           className={`
             inline-flex items-center justify-between w-full min-w-[200px]
-            border border-gray-300 rounded-md px-3 py-2 text-sm bg-white
-            focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent
-            disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed
-            hover:bg-gray-50 transition-colors cursor-pointer
-            ${error ? 'border-red-400' : ''}
+            border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-md px-3 py-2 text-sm
+            ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)}
+            ${withDarkMode(textColors.primary, darkModeTextColors.primary)}
+            focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent
+            ${withDarkMode('disabled:bg-gray-50', 'dark:disabled:bg-gray-900')} ${withDarkMode('disabled:text-gray-400', 'dark:disabled:text-gray-500')}
+            disabled:cursor-not-allowed
+            ${withDarkMode('hover:bg-gray-50', darkModeInteractiveStates.hoverBg)}
+            transition-colors cursor-pointer
+            ${error ? `${errorColors.borderStrong} ${darkModeErrorColors.border}` : ''}
           `}
           aria-invalid={!!error}
         >
@@ -92,24 +111,25 @@ export function ProjectSelectDropdown({
                 <span className="font-medium">{selectedProject.name}</span>
               </div>
             ) : (
-              <span className="text-gray-500">{placeholder}</span>
+              <span className={textColors.muted}>{placeholder}</span>
             )}
           </Select.Value>
           <Select.Icon className="ml-2">
-            <ChevronDown size={16} className="text-gray-500" />
+            <ChevronDown size={16} className={textColors.tertiary} />
           </Select.Icon>
         </Select.Trigger>
 
         <Select.Portal>
           <Select.Content
             className={`
-              overflow-hidden bg-white rounded-md shadow-lg border border-gray-200
+              overflow-hidden ${withDarkMode(dropdownColors.bg, darkModeDropdownColors.bg)} rounded-md shadow-lg
+              border ${withDarkMode(dropdownColors.border, darkModeDropdownColors.border)}
               z-50 max-h-60 overflow-y-auto
             `}
             position="popper"
             sideOffset={5}
           >
-            <Select.ScrollUpButton className="flex items-center justify-center h-6 bg-gray-50 hover:bg-gray-100 cursor-pointer">
+            <Select.ScrollUpButton className={`flex items-center justify-center h-6 ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode('hover:bg-gray-100', darkModeInteractiveStates.hoverBg)} cursor-pointer`}>
               <ChevronUp size={16} />
             </Select.ScrollUpButton>
 
@@ -121,10 +141,10 @@ export function ProjectSelectDropdown({
                     className={`
                       relative flex items-center gap-2 px-3 py-2 text-sm rounded-md
                       cursor-pointer select-none
-                      data-[highlighted]:bg-gray-100
+                      ${withDarkMode(dropdownColors.itemHover, darkModeDropdownColors.itemHover)}
                       data-[highlighted]:outline-none
                       data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed
-                      data-[state=checked]:bg-gray-50
+                      ${withDarkMode('data-[state=checked]:bg-gray-50', 'data-[state=checked]:bg-gray-800')}
                       transition-colors
                     `}
                   >
@@ -133,11 +153,11 @@ export function ProjectSelectDropdown({
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
                           <span className="text-white text-xs">∞</span>
                         </div>
-                        <span>{allOptionLabel}</span>
+                        <span className={dropdownColors.itemText}>{allOptionLabel}</span>
                       </div>
                     </Select.ItemText>
                     <Select.ItemIndicator className="absolute right-2">
-                      <Check size={16} className="text-gray-900" />
+                      <Check size={16} className={textColors.primary} />
                     </Select.ItemIndicator>
                   </Select.Item>
                 )}
@@ -149,10 +169,10 @@ export function ProjectSelectDropdown({
                     className={`
                       relative flex items-center gap-2 px-3 py-2 text-sm rounded-md
                       cursor-pointer select-none
-                      data-[highlighted]:bg-gray-100
+                      ${withDarkMode(dropdownColors.itemHover, darkModeDropdownColors.itemHover)}
                       data-[highlighted]:outline-none
                       data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed
-                      data-[state=checked]:bg-gray-50
+                      ${withDarkMode('data-[state=checked]:bg-gray-50', 'data-[state=checked]:bg-gray-800')}
                       transition-colors
                     `}
                   >
@@ -160,22 +180,22 @@ export function ProjectSelectDropdown({
                       <div className="flex items-center gap-2">
                         <ProjectIcon project={project} size={16} />
                         <div className="flex flex-col">
-                          <span className="font-medium">{project.name}</span>
+                          <span className={`font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{project.name}</span>
                           {project.description && (
-                            <span className="text-xs text-gray-500">{project.description}</span>
+                            <span className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>{project.description}</span>
                           )}
                         </div>
                       </div>
                     </Select.ItemText>
                     <Select.ItemIndicator className="absolute right-2">
-                      <Check size={16} className="text-gray-900" />
+                      <Check size={16} className={withDarkMode(textColors.primary, darkModeTextColors.primary)} />
                     </Select.ItemIndicator>
                   </Select.Item>
                 ))}
               </Select.Group>
             </Select.Viewport>
 
-            <Select.ScrollDownButton className="flex items-center justify-center h-6 bg-gray-50 hover:bg-gray-100 cursor-pointer">
+            <Select.ScrollDownButton className={`flex items-center justify-center h-6 ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode('hover:bg-gray-100', darkModeInteractiveStates.hoverBg)} cursor-pointer`}>
               <ChevronDown size={16} />
             </Select.ScrollDownButton>
           </Select.Content>
@@ -183,7 +203,7 @@ export function ProjectSelectDropdown({
       </Select.Root>
 
       {error && (
-        <p className="text-xs text-red-600" role="alert">
+        <p className={`text-xs ${withDarkMode(errorColors.text, darkModeErrorColors.text)}`} role="alert">
           {error}
         </p>
       )}

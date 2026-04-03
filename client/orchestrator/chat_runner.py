@@ -21,6 +21,7 @@ from claude_agent_sdk import (
 from claude_agent_sdk._errors import ProcessError
 
 from orchestrator import logger
+from orchestrator.attachments import build_prompt_with_attachments
 from orchestrator.runner import extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir, list_agent_docs
 
 
@@ -36,6 +37,9 @@ async def run_chat_turn(
     log_callback: Callable[[list], Awaitable[None]] | None = None,
     client: Any | None = None,  # DaemonClient instance
     project_id: str | None = None,  # Project ID for fetching agents context
+    attachment_ids: list[str] | None = None,  # Attachment UUIDs from user message
+    api_base_url: str | None = None,  # API base URL for fetching attachment content
+    token: str | None = None,  # Auth token for fetching attachment content
 ) -> str | None:
     """
     Executa um turno da conversa.
@@ -53,6 +57,9 @@ async def run_chat_turn(
         log_callback: Callback para streaming de logs em tempo real
         client: Optional DaemonClient instance for fetching agents context
         project_id: Optional project ID for fetching agents context
+        attachment_ids: Optional list of attachment UUIDs associated with the message
+        api_base_url: Optional API base URL for fetching attachment content
+        token: Optional auth token for fetching attachment content
 
     Returns:
         O sdk_session_id (novo ou existente) para persistência
@@ -129,6 +136,29 @@ async def run_chat_turn(
                 logger.info(f"[ChatTurn] Injected agents context for planner agent")
         except Exception as e:
             logger.warning(f"[ChatTurn] Failed to fetch agents context: {e}")
+
+    # If no attachment IDs were passed explicitly, try to fetch them from the session
+    if not attachment_ids and client:
+        try:
+            attachment_ids = client.get_message_attachments(session_id)
+            if attachment_ids:
+                logger.info(f"[ChatTurn] Found {len(attachment_ids)} attachment(s) for session {session_id[:8]}")
+        except Exception as e:
+            logger.warning(f"[ChatTurn] Failed to fetch message attachments: {e}")
+            attachment_ids = None
+
+    # Build prompt with attachments if present
+    if attachment_ids and api_base_url and token:
+        try:
+            full_prompt = build_prompt_with_attachments(
+                text_prompt=full_prompt,
+                attachment_ids=attachment_ids,
+                api_base_url=api_base_url,
+                token=token,
+            )
+            logger.info(f"[ChatTurn] Built prompt with {len(attachment_ids)} attachment(s)")
+        except Exception as e:
+            logger.warning(f"[ChatTurn] Failed to build prompt with attachments: {e}")
 
     # Create agent docs directory for this session and inject docs context
     docs_dir = prepare_agent_docs_dir(workspace_path, session_id, 'chat')

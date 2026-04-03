@@ -4,8 +4,8 @@ import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePla
 import { useSaveClaudeMd } from '@/api/workspaces';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
-import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, ImageIcon, FileText, Layers, Zap, ZoomIn } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
@@ -13,6 +13,28 @@ import { Input } from '@/components/Input';
 import { ClaudeMdImprovementModal } from '@/components/ClaudeMdImprovementModal';
 import { useToast } from '@/contexts/ToastContext';
 import { useTranslation } from 'react-i18next';
+import { getAttachmentUrl, type AttachmentResponse } from '@/api/uploads';
+import { getApiUrl, getActiveToken } from '@/api/client';
+import { ImageLightbox } from '@/components/ImageLightbox';
+
+// Hook to fetch plan attachment details
+function usePlanAttachments(planId: string | undefined, attachmentIds: string[] | undefined) {
+  return useQuery({
+    queryKey: ['plans', planId, 'attachment-details'],
+    queryFn: async (): Promise<AttachmentResponse[]> => {
+      if (!planId) return [];
+      const token = getActiveToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${getApiUrl()}/api/plans/${planId}/attachments`, { headers });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data ?? [];
+    },
+    enabled: !!(planId && attachmentIds && attachmentIds.length > 0),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 const statusColors = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -151,7 +173,7 @@ function EditPlanModal({ plan, onClose }: EditPlanModalProps) {
                   value={task.prompt}
                   onChange={e => updateTask(i, 'prompt', e.target.value)}
                   rows={4}
-                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               <Input label={t('planDetail.cwd')} value={task.cwd}
@@ -208,9 +230,14 @@ export function PlanDetail() {
   const [improvedContent, setImprovedContent] = useState('');
   const [hasShownImprovement, setHasShownImprovement] = useState(false);
   const reworkPlan = useReworkPlan();
+  const { data: planAttachments = [] } = usePlanAttachments(id, plan?.attachments);
   const [showReworkModal, setShowReworkModal] = useState(false);
   const [reworkPrompt, setReworkPrompt] = useState('');
+  const [reworkMode, setReworkMode] = useState<'full_workflow' | 'quick_action'>('full_workflow');
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Image lightbox state
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; fileName: string } | null>(null);
 
   // Determine back navigation from router state
   const backTo = location.state?.from || '/';
@@ -274,9 +301,10 @@ export function PlanDetail() {
   const handleRework = async () => {
     if (!id || !reworkPrompt.trim()) return;
     try {
-      const newPlan = await reworkPlan.mutateAsync({ id, rework_prompt: reworkPrompt.trim() });
+      const newPlan = await reworkPlan.mutateAsync({ id, rework_prompt: reworkPrompt.trim(), rework_mode: reworkMode });
       setShowReworkModal(false);
       setReworkPrompt('');
+      setReworkMode('full_workflow');
       showToast('success', t('planDetail.reworkSuccess'));
       navigate(`/plans/${newPlan.id}`, { state: { from: `/plans/${id}`, fromLabel: plan?.name?.substring(0, 30) } });
     } catch (error) {
@@ -398,6 +426,9 @@ export function PlanDetail() {
                   <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
                     <GitBranch className="h-3 w-3" />
                     {t('planDetail.reworkBadge')}
+                    {plan.rework_mode === 'quick_action' && (
+                      <Zap className="h-3 w-3 ml-1" />
+                    )}
                   </span>
                 )}
               </div>
@@ -459,7 +490,7 @@ export function PlanDetail() {
                   <button
                     onClick={handleCheckCompletion}
                     disabled={checkCompletion.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-blue-300 text-blue-600 text-sm rounded hover:bg-blue-50 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-300 text-orange-600 text-sm rounded hover:bg-orange-50 disabled:opacity-50"
                     title={t('planDetail.recoverStuckTasksTitle')}
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -534,7 +565,7 @@ export function PlanDetail() {
                   onClick={handleExecute}
                   disabled={executeMutation.isPending}
                   className={cn(
-                    'rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm',
+                    'rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm',
                     'hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
                   )}
                 >
@@ -646,7 +677,7 @@ export function PlanDetail() {
                         <dd className="mt-1 text-sm text-gray-900">
                           <button
                             onClick={() => navigate(`/workspaces/${plan.workspace_id}`)}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            className="text-orange-600 hover:text-orange-800 text-sm font-medium"
                           >
                             {t('planDetail.viewUpdatedClaudeMd')} →
                           </button>
@@ -661,16 +692,97 @@ export function PlanDetail() {
         </div>
       </div>
 
+      {/* Plan-level attachments (not linked to specific tasks) */}
+      {planAttachments.length > 0 && (
+        <div className="bg-white shadow sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h2 className="text-lg font-semibold leading-7 text-gray-900 mb-4 flex items-center gap-2">
+              <Paperclip className="h-5 w-5 text-gray-400" />
+              {t('planDetail.attachments', 'Anexos')}
+            </h2>
+            {(() => {
+              // Check if any task has task-level attachments
+              const tasksWithAttachments = tasks.filter((t: any) => (t.attachment_ids || []).length > 0);
+              // Plan-level attachments = all attachments minus those referenced by tasks
+              const taskReferencedIds = tasksWithAttachments.flatMap((t: any) => t.attachment_ids || []);
+              const planLevelAttachments = planAttachments.filter(a => !taskReferencedIds.includes(a.id));
+              const planImageAttachments = planLevelAttachments.filter(a => a.file_type?.startsWith('image/'));
+              const planOtherAttachments = planLevelAttachments.filter(a => !a.file_type?.startsWith('image/'));
+
+              return (
+                <>
+                  {planImageAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-3">
+                      {planImageAttachments.map(img => (
+                        <button
+                          key={img.id}
+                          type="button"
+                          onClick={() => setLightboxImage({ src: getAttachmentUrl(img.id), fileName: img.file_name })}
+                          className="group/img relative block"
+                          title={img.file_name}
+                        >
+                          <img
+                            src={getAttachmentUrl(img.id)}
+                            alt={img.file_name}
+                            className="h-24 w-24 rounded-lg object-cover border border-gray-200 dark:border-gray-600 shadow-sm group-hover/img:opacity-80 group-hover/img:ring-2 group-hover/img:ring-blue-400 transition-all"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/20 rounded-lg">
+                            <ZoomIn className="h-5 w-5 text-white drop-shadow-md" />
+                          </div>
+                          <span className="block text-xs text-gray-500 mt-1 truncate max-w-[100px] text-center">{img.file_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {planOtherAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {planOtherAttachments.map(file => (
+                        <a
+                          key={file.id}
+                          href={getAttachmentUrl(file.id)}
+                          download={file.file_name}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          title={file.file_name}
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="truncate max-w-[180px]">{file.file_name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Tasks */}
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6">
           <h2 className="text-lg font-semibold leading-7 text-gray-900 mb-4">{t('planDetail.tasks')}</h2>
           <dl className="space-y-4">
-            {tasks.map((task: any, index: number) => (
-              <div key={task.id} className="border-l-4 border-indigo-500 pl-4 py-2">
+            {tasks.map((task: any, index: number) => {
+              const taskAttachmentIds = task.attachment_ids || [];
+              const hasAttachments = taskAttachmentIds.length > 0;
+              const imageAttachments = planAttachments.filter(a =>
+                taskAttachmentIds.includes(a.id) && a.file_type?.startsWith('image/')
+              );
+              const otherAttachments = planAttachments.filter(a =>
+                taskAttachmentIds.includes(a.id) && !a.file_type?.startsWith('image/')
+              );
+
+              return (
+              <div key={task.id} className="border-l-4 border-orange-500 pl-4 py-2">
                 <div className="flex items-center justify-between mb-2">
-                  <dt className="text-sm font-medium text-gray-900">
+                  <dt className="text-sm font-medium text-gray-900 flex items-center gap-2">
                     {index + 1}. {task.name}
+                    {hasAttachments && (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        <Paperclip className="h-3 w-3" />
+                        {taskAttachmentIds.length}
+                      </span>
+                    )}
                   </dt>
                   <dd className="text-xs text-gray-500">{t('planDetail.taskId')}: {task.id}</dd>
                 </div>
@@ -681,8 +793,49 @@ export function PlanDetail() {
                   <span>{t('planDetail.cwd')}: {task.cwd}</span>
                   <span>{t('planDetail.workspace')}: {task.workspace}</span>
                 </div>
+                {/* Image previews */}
+                {imageAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {imageAttachments.map(img => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => setLightboxImage({ src: getAttachmentUrl(img.id), fileName: img.file_name })}
+                        className="group/img relative block"
+                        title={img.file_name}
+                      >
+                        <img
+                          src={getAttachmentUrl(img.id)}
+                          alt={img.file_name}
+                          className="h-16 w-16 rounded-md object-cover border border-gray-200 dark:border-gray-600 group-hover/img:opacity-80 group-hover/img:ring-2 group-hover/img:ring-blue-400 transition-all"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                          <ZoomIn className="h-4 w-4 text-white drop-shadow-md" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* Other file attachments */}
+                {otherAttachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {otherAttachments.map(file => (
+                      <a
+                        key={file.id}
+                        href={getAttachmentUrl(file.id)}
+                        download={file.file_name}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        title={file.file_name}
+                      >
+                        <Download className="h-3 w-3" />
+                        <span className="truncate max-w-[120px]">{file.file_name}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </dl>
         </div>
       </div>
@@ -712,9 +865,9 @@ export function PlanDetail() {
         const badgeClass = isSuccess ? 'bg-green-100 text-green-800' :
                            isPartial ? 'bg-amber-100 text-amber-800' :
                            'bg-red-100 text-red-800';
-        const statusLabel = isSuccess ? '✓ Success' :
-                            isPartial ? '◐ Partial' :
-                            '↺ Needs Rework';
+        const statusLabel = isSuccess ? t('planDetail.resultStatus.success') :
+                            isPartial ? t('planDetail.resultStatus.partial') :
+                            t('planDetail.resultStatus.needs_rework');
 
         return (
           <div className={`shadow sm:rounded-lg border ${bgClass}`}>
@@ -858,10 +1011,76 @@ export function PlanDetail() {
       {/* Rework Modal */}
       {showReworkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setShowReworkModal(false)} />
+          <div className="absolute inset-0 bg-black/30" onClick={() => { setShowReworkModal(false); setReworkMode('full_workflow'); }} />
           <div className="relative bg-white rounded-lg border border-gray-200 p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('planDetail.reworkTitle')}</h3>
             <p className="text-sm text-gray-500 mb-4">{t('planDetail.reworkDescription')}</p>
+
+            {/* Rework Mode Selector */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 block mb-2">{t('planDetail.reworkModeTitle')}</label>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setReworkMode('full_workflow')}
+                  className={cn(
+                    'w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-colors',
+                    reworkMode === 'full_workflow'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  )}
+                >
+                  <Layers className={cn(
+                    'w-5 h-5 mt-0.5 flex-shrink-0',
+                    reworkMode === 'full_workflow' ? 'text-purple-600' : 'text-gray-400'
+                  )} />
+                  <div className="min-w-0">
+                    <div className={cn(
+                      'text-sm font-medium',
+                      reworkMode === 'full_workflow' ? 'text-purple-900' : 'text-gray-700'
+                    )}>
+                      {reworkMode === 'full_workflow' && (
+                        <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-2 align-middle" />
+                      )}
+                      {t('planDetail.reworkModeFullWorkflow')}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {t('planDetail.reworkModeFullWorkflowDesc')}
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReworkMode('quick_action')}
+                  className={cn(
+                    'w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-colors',
+                    reworkMode === 'quick_action'
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                  )}
+                >
+                  <Zap className={cn(
+                    'w-5 h-5 mt-0.5 flex-shrink-0',
+                    reworkMode === 'quick_action' ? 'text-purple-600' : 'text-gray-400'
+                  )} />
+                  <div className="min-w-0">
+                    <div className={cn(
+                      'text-sm font-medium',
+                      reworkMode === 'quick_action' ? 'text-purple-900' : 'text-gray-700'
+                    )}>
+                      {reworkMode === 'quick_action' && (
+                        <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-2 align-middle" />
+                      )}
+                      {t('planDetail.reworkModeQuickAction')}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {t('planDetail.reworkModeQuickActionDesc')}
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <div className="mb-4">
               <label className="text-sm font-medium text-gray-700 block mb-1">{t('planDetail.reworkPromptLabel')}</label>
               <textarea
@@ -874,7 +1093,7 @@ export function PlanDetail() {
               />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
-              <Button variant="secondary" size="sm" onClick={() => { setShowReworkModal(false); setReworkPrompt(''); }}>{t('planDetail.cancel')}</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setShowReworkModal(false); setReworkPrompt(''); setReworkMode('full_workflow'); }}>{t('planDetail.cancel')}</Button>
               <Button
                 variant="primary"
                 size="sm"
@@ -887,6 +1106,15 @@ export function PlanDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxImage && (
+        <ImageLightbox
+          src={lightboxImage.src}
+          fileName={lightboxImage.fileName}
+          onClose={() => setLightboxImage(null)}
+        />
       )}
     </div>
   );

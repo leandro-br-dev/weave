@@ -2,6 +2,19 @@ import { useGetEnvironmentVariablesDefaults } from '@/api/environmentVariables';
 import { useState, useEffect } from 'react';
 import { Card, Input } from '@/components';
 import { Plus, Trash2, Eye, EyeOff } from 'lucide-react';
+import {
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  infoColors,
+  darkModeInfoColors,
+  errorColors,
+  darkModeErrorColors,
+  withDarkMode,
+} from '@/lib/colors';
 
 export interface EnvironmentVariableValue {
   key: string;
@@ -88,8 +101,8 @@ export function EnvironmentVariablesForm({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-gray-800 mb-1">{title}</h3>
-        {description && <p className="text-xs text-gray-600 mb-3">{description}</p>}
+        <h3 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-1`}>{title}</h3>
+        {description && <p className={`text-xs ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mb-3`}>{description}</p>}
 
         {/* Available Defaults */}
         {availableDefaults.length > 0 && (
@@ -97,22 +110,22 @@ export function EnvironmentVariablesForm({
             <button
               type="button"
               onClick={() => setShowAllDefaults(!showAllDefaults)}
-              className="text-xs text-blue-600 hover:text-blue-800 mb-2"
+              className={`text-xs ${withDarkMode('text-orange-600', 'dark:text-orange-400')} ${withDarkMode('hover:text-orange-800', 'dark:hover:text-orange-300')} mb-2`}
             >
               {showAllDefaults ? 'Hide' : 'Show'} available defaults ({availableDefaults.length})
             </button>
             {showAllDefaults && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-2 p-3 ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} border ${withDarkMode(infoColors.border, darkModeInfoColors.border)} rounded`}>
                 {availableDefaults.map(([key, value]) => (
                   <button
                     key={key}
                     type="button"
                     onClick={() => addDefaultVariable(key, value)}
-                    className="text-left p-2 bg-white rounded border border-blue-300 hover:bg-blue-100 transition-colors"
+                    className={`text-left p-2 ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} rounded border ${withDarkMode('border-orange-300', 'dark:border-orange-700')} ${withDarkMode('hover:bg-orange-100', 'dark:hover:bg-orange-950')} transition-colors`}
                   >
                     <div className="flex items-center justify-between">
                       <code className="text-xs font-mono font-semibold">{key}</code>
-                      <Plus className="w-3 h-3 text-blue-600" />
+                      <Plus className={`w-3 h-3 ${withDarkMode('text-orange-600', 'dark:text-orange-400')}`} />
                     </div>
                   </button>
                 ))}
@@ -125,7 +138,7 @@ export function EnvironmentVariablesForm({
       {/* Variables List */}
       <div className="space-y-2">
         {values.map((envVar, index) => (
-          <Card key={index} className="bg-white border border-gray-200">
+          <Card key={index} className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1">
@@ -140,7 +153,7 @@ export function EnvironmentVariablesForm({
                   <button
                     type="button"
                     onClick={() => removeVariable(index)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    className={`p-2 ${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${errorColors.text} ${darkModeErrorColors.text} ${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} rounded transition-colors`}
                     title="Remove variable"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -159,14 +172,14 @@ export function EnvironmentVariablesForm({
                   <button
                     type="button"
                     onClick={() => toggleSecretVisibility(index)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${withDarkMode('hover:text-gray-700', 'dark:hover:text-gray-200')}`}
                   >
                     {isSecretVisible(index) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 )}
               </div>
               {envVar.isDefault && (
-                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">
+                <span className={`text-xs ${infoColors.text} ${darkModeInfoColors.text} ${infoColors.bg} ${darkModeInfoColors.bg} px-2 py-1 rounded inline-block`}>
                   Default value
                 </span>
               )}
@@ -178,7 +191,7 @@ export function EnvironmentVariablesForm({
       <button
         type="button"
         onClick={addVariable}
-        className="w-full py-2 px-4 border-2 border-dashed border-gray-300 rounded text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+        className={`w-full py-2 px-4 border-2 border-dashed ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} ${withDarkMode('hover:border-orange-400 hover:text-orange-600', 'dark:hover:border-orange-500 dark:hover:text-orange-400')} transition-colors flex items-center justify-center gap-2`}
       >
         <Plus className="w-4 h-4" />
         Add Variable

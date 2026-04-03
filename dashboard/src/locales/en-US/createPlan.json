@@ -49,6 +49,10 @@
     "workingDirectory": {
       "label": "Working Directory",
       "placeholder": "/path/to/project"
+    },
+    "attachments": {
+      "label": "Attachments",
+      "uploadNow": "Upload now"
     }
   },
   "actions": {

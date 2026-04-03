@@ -1,6 +1,19 @@
 import { useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import {
+  successColors,
+  errorColors,
+  infoColors,
+  warningColors,
+  darkModeSuccessColors,
+  darkModeErrorColors,
+  darkModeInfoColors,
+  darkModeWarningColors,
+  textColors,
+  darkModeTextColors,
+  withDarkMode,
+} from '@/lib/colors';
 
 export type ToastType = 'success' | 'error' | 'info' | 'auto-move';
 
@@ -20,17 +33,24 @@ interface ToastProps {
 }
 
 const TOAST_ICONS = {
-  success: <CheckCircle className="h-4 w-4 text-green-600" />,
-  error: <AlertCircle className="h-4 w-4 text-red-600" />,
-  info: <Info className="h-4 w-4 text-blue-600" />,
-  'auto-move': <Zap className="h-4 w-4 text-yellow-600" />,
+  success: <CheckCircle className="h-4 w-4" />,
+  error: <AlertCircle className="h-4 w-4" />,
+  info: <Info className="h-4 w-4" />,
+  'auto-move': <Zap className="h-4 w-4" />,
 };
 
-const TOAST_STYLES = {
-  success: 'border-green-200 bg-green-50',
-  error: 'border-red-200 bg-red-50',
-  info: 'border-blue-200 bg-blue-50',
-  'auto-move': 'border-yellow-200 bg-yellow-50',
+const TOAST_ICON_COLORS = {
+  success: withDarkMode(successColors.text, darkModeSuccessColors.text),
+  error: withDarkMode(errorColors.text, darkModeErrorColors.text),
+  info: withDarkMode(infoColors.text, darkModeInfoColors.text),
+  'auto-move': withDarkMode(warningColors.text, darkModeWarningColors.text),
+};
+
+const TOAST_STYLES: Record<ToastType, string> = {
+  success: `${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} ${withDarkMode(successColors.border, darkModeSuccessColors.border)}`,
+  error: `${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} ${withDarkMode(errorColors.borderStrong, darkModeErrorColors.borderStrong)}`,
+  info: `${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} ${withDarkMode(infoColors.border, darkModeInfoColors.border)}`,
+  'auto-move': `${withDarkMode(warningColors.bg, darkModeWarningColors.bg)} ${withDarkMode(warningColors.border, darkModeWarningColors.border)}`,
 };
 
 export function ToastItem({ toast, onClose }: ToastProps) {
@@ -52,18 +72,18 @@ export function ToastItem({ toast, onClose }: ToastProps) {
       role="alert"
       aria-live="polite"
     >
-      <div className="flex-shrink-0 mt-0.5">
+      <div className={`flex-shrink-0 mt-0.5 ${TOAST_ICON_COLORS[toast.type]}`}>
         {TOAST_ICONS[toast.type]}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900">{displayTitle}</p>
+        <p className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{displayTitle}</p>
         {displayMessage && (
-          <p className="text-xs text-gray-600 mt-0.5">{displayMessage}</p>
+          <p className={`text-xs ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} mt-0.5`}>{displayMessage}</p>
         )}
       </div>
       <button
         onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        className={`flex-shrink-0 ${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} transition-colors`}
         aria-label={t('components.toast.close', { defaultValue: 'Close notification' })}
       >
         <X className="h-4 w-4" />

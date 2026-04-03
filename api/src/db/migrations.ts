@@ -375,4 +375,30 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_kanban_tasks_user_id ON kanban_tasks(user_id)`,
     ],
   },
+  {
+    version: 30,
+    description: 'Message attachments table and attachments columns',
+    up: [
+      `CREATE TABLE IF NOT EXISTS message_attachments (
+        id TEXT PRIMARY KEY,
+        message_type TEXT NOT NULL CHECK(message_type IN ('chat', 'quick_action', 'plan_task', 'kanban')),
+        message_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        storage_path TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `ALTER TABLE chat_messages ADD COLUMN attachments TEXT DEFAULT '[]'`,
+      `ALTER TABLE plans ADD COLUMN attachments TEXT DEFAULT '[]'`,
+      `ALTER TABLE kanban_tasks ADD COLUMN attachments TEXT DEFAULT '[]'`,
+    ],
+  },
+  {
+    version: 31,
+    description: 'Plans — add rework_mode column',
+    up: [
+      `ALTER TABLE plans ADD COLUMN rework_mode TEXT DEFAULT 'full_workflow' CHECK(rework_mode IN ('full_workflow', 'quick_action'))`,
+    ],
+  },
 ];

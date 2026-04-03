@@ -3,10 +3,20 @@ import { useState, useRef, useEffect } from 'react'
 import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { QuickActionModal } from '@/components/QuickActionModal'
+import NavigationRail from '@/components/NavigationRail'
 import { ThemeSelector } from '@/components/ThemeSelector'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 import weaveLogo from '@/assets/weave-logo.svg'
+import {
+  sidebarColors,
+  darkModeSidebarColors,
+  bgColors,
+  darkModeBgColors,
+  accentColors,
+  darkModeAccentColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 export default function Layout() {
   const { t } = useTranslation()
@@ -16,6 +26,7 @@ export default function Layout() {
   const [showQuickAction, setShowQuickAction] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Expose close function globally for NavItem
@@ -41,23 +52,27 @@ export default function Layout() {
   }, [location.pathname])
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className={`flex h-screen ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
       {/* Mobile menu button */}
       <button
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg shadow-lg transition-colors bg-gray-900 dark:bg-gray-800 text-white hover:bg-gray-800 dark:hover:bg-gray-700"
+        className={`lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg shadow-lg transition-colors ${withDarkMode(sidebarColors.bg, 'dark:bg-gray-800')} text-white hover:bg-gray-700 dark:hover:bg-gray-700`}
         aria-label={t('common.app.toggleMenu')}
       >
         {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Sidebar - Desktop always visible, Mobile with overlay */}
+      {/* Sidebar / Navigation Rail - Desktop only */}
+      <NavigationRail onQuickAction={() => setShowQuickAction(true)} onCollapsedChange={setSidebarCollapsed} />
+
+      {/* Sidebar - Mobile only (hidden on desktop, rail replaces it) */}
       <aside className={`
-        fixed lg:static inset-y-0 left-0 z-40
+        fixed inset-y-0 left-0 z-40
         w-64 text-white
         transform transition-transform duration-300 ease-in-out
-        bg-gray-900 dark:bg-gray-950
-        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        lg:hidden
+        ${withDarkMode(sidebarColors.bg, darkModeSidebarColors.bg)}
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-6 flex items-center gap-3">
           <img src={weaveLogo} alt="Weave" className="h-8 w-8" />
@@ -67,7 +82,7 @@ export default function Layout() {
           {/* Quick Action - First item with special highlight */}
           <button
             onClick={() => setShowQuickAction(true)}
-            className="w-full flex items-center gap-3 px-6 py-3 text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 transition-all border-l-4 border-amber-300 shadow-md"
+            className={`w-full flex items-center gap-3 px-6 py-3 text-white bg-gradient-to-r ${accentColors.gradientFrom} ${accentColors.gradientTo} ${darkModeAccentColors.gradientFrom} ${darkModeAccentColors.gradientTo} hover:from-amber-600 hover:to-orange-700 transition-all border-l-4 border-amber-300 shadow-md`}
           >
             <Zap className="h-5 w-5" fill="currentColor" />
             <span className="font-semibold">{t('common.navigation.quickAction')}</span>
@@ -95,9 +110,9 @@ export default function Layout() {
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 dark:hover:bg-gray-900 transition-colors"
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)} transition-colors`}
             >
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <div className={`w-8 h-8 rounded-full ${withDarkMode(accentColors.solid, accentColors.solid)} flex items-center justify-center flex-shrink-0`}>
                 <span className="text-xs font-bold text-white">
                   {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </span>
@@ -109,11 +124,11 @@ export default function Layout() {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50">
+              <div className={`absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50`}>
                 <Link
                   to="/users"
                   onClick={() => { setUserMenuOpen(false); setMobileMenuOpen(false) }}
-                  className="flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-800 transition-colors"
+                  className={`flex items-center gap-3 px-3 py-2 ${sidebarColors.text} hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
                 >
                   <UserCircle size={16} />
                   <span className="text-sm">{t('auth.userManagement.title')}</span>
@@ -124,7 +139,7 @@ export default function Layout() {
                     setMobileMenuOpen(false)
                     logout()
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-800 transition-colors"
+                  className={`w-full flex items-center gap-3 px-3 py-2 ${sidebarColors.text} hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
                 >
                   <LogOut size={16} />
                   <span className="text-sm">{t('auth.userManagement.logout.button')}</span>
@@ -140,7 +155,7 @@ export default function Layout() {
         {/* Mobile close button */}
         <button
           onClick={() => setMobileMenuOpen(false)}
-          className="lg:hidden absolute bottom-4 right-4 p-2 text-gray-400 hover:text-white transition-colors"
+          className={`lg:hidden absolute bottom-4 right-4 p-2 ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white transition-colors`}
           aria-label={t('common.app.closeMenu')}
         >
           <X size={20} />
@@ -156,7 +171,7 @@ export default function Layout() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto font-sans relative lg:ml-0 bg-gray-50 dark:bg-gray-900">
+      <main className={`flex-1 overflow-auto font-sans relative transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
         <div className="pt-16 lg:pt-0">
           <Outlet />
         </div>
@@ -193,8 +208,8 @@ function NavItem({
       }}
       className={`flex items-center justify-between gap-3 px-6 py-3 transition-colors ${
         isActive
-          ? 'bg-gray-800 dark:bg-gray-900 text-white border-l-4 border-white dark:border-gray-100'
-          : 'text-gray-300 dark:text-gray-200 border-l-4 border-transparent hover:bg-gray-800 dark:hover:bg-gray-900 hover:text-white'
+          ? `${withDarkMode(sidebarColors.activeItem, darkModeSidebarColors.activeItem)} border-l-4 ${withDarkMode(accentColors.border, darkModeAccentColors.border)}`
+          : `${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} border-l-4 border-transparent ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)} hover:text-white dark:hover:text-gray-200`
       }`}
     >
       <div className="flex items-center gap-3">

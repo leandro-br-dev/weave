@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw } from 'lucide-react';
-import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectIcon, ProjectSelectDropdown } from '@/components';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip } from 'lucide-react';
+import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectIcon, ProjectSelectDropdown, FileAttachmentInput } from '@/components';
+import { type FileAttachment } from '@/components';
+import { useUploadFiles, getAttachmentUrl, type AttachmentResponse } from '@/api/uploads';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { useApprovePlan } from '@/api/plans';
 import { useToast } from '@/contexts/ToastContext';
@@ -112,9 +114,12 @@ export default function KanbanPage() {
     description: '',
     priority: 3 as 1 | 2 | 3 | 4 | 5,
     column: 'backlog' as KanbanTask['column'],
+    attachment_ids: [] as string[],
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([]);
+  const uploadFiles = useUploadFiles();
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [createProjectId, setCreateProjectId] = useState<string>('');
@@ -156,7 +161,9 @@ export default function KanbanPage() {
       description: '',
       priority: 3,
       column: column || 'backlog',
+      attachment_ids: [],
     });
+    setFileAttachments([]);
     // Set the project ID for creating the task
     if (projectFilter && projectFilter !== 'all') {
       setCreateProjectId(projectFilter);
@@ -170,17 +177,40 @@ export default function KanbanPage() {
 
   const handleOpenEdit = (task: KanbanTask) => {
     setEditingTask(task);
+    let existingAttachmentIds: string[] = [];
+    try {
+      existingAttachmentIds = task.attachments ? JSON.parse(task.attachments) : [];
+    } catch {
+      existingAttachmentIds = [];
+    }
     setFormData({
       title: task.title,
       description: task.description,
       priority: task.priority,
       column: task.column,
+      attachment_ids: existingAttachmentIds,
     });
+    setFileAttachments([]); // Existing attachments are already uploaded
     setModalOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.title.trim()) return;
+
+    // Upload new files first (if any pending)
+    const pendingFiles = fileAttachments.filter(a => a.status === 'pending').map(a => a.file);
+    let uploadedIds = [...formData.attachment_ids];
+
+    if (pendingFiles.length > 0) {
+      try {
+        const results = await uploadFiles.mutateAsync(pendingFiles);
+        const newIds = results.map(r => r.id);
+        uploadedIds = [...uploadedIds, ...newIds];
+      } catch {
+        // Upload failed, still submit without new attachments
+        console.warn('Failed to upload attachments, proceeding without them');
+      }
+    }
 
     if (editingTask) {
       updateTask.mutate({
@@ -190,13 +220,20 @@ export default function KanbanPage() {
         description: formData.description,
         priority: formData.priority,
         column: formData.column,
+        attachment_ids: uploadedIds,
       });
     } else {
       // For creating tasks, use the createProjectId state
       if (!createProjectId) return;
       createTask.mutate({
         projectId: createProjectId,
-        data: formData,
+        data: {
+          title: formData.title,
+          description: formData.description,
+          priority: formData.priority,
+          column: formData.column,
+          attachment_ids: uploadedIds,
+        },
       });
     }
     setModalOpen(false);
@@ -547,7 +584,7 @@ export default function KanbanPage() {
                   : `${running}/${max} concurrent workflows`;
               return (
                 <div
-                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-md"
                   title={tooltip}
                 >
                   <Zap className={`h-3.5 sm:h-4 w-3.5 sm:w-4 ${colorClass}`} />
@@ -556,7 +593,7 @@ export default function KanbanPage() {
               );
             })()}
             {autoMoveProjectId && (
-              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
                 <Zap className={`h-3.5 sm:h-4 w-3.5 sm:w-4 ${autoMoveEnabled ? 'text-yellow-500' : 'text-gray-400'}`} />
                 <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">{t('pages.kanban.autoMove')}</span>
                 <Switch
@@ -579,7 +616,7 @@ export default function KanbanPage() {
               </div>
             )}
             {autoApproveProjectId && (
-              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-md">
                 <CheckCircle className={`h-3.5 sm:h-4 w-3.5 sm:w-4 ${autoApproveEnabled ? 'text-green-600' : 'text-gray-400'}`} />
                 <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 hidden sm:inline">{t('pages.kanban.autoApprove')}</span>
                 <Switch
@@ -637,7 +674,7 @@ export default function KanbanPage() {
                   <div className="px-2 sm:px-3 py-2 border-b border-amber-200 flex items-center justify-between">
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       <BookmarkCheck className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-amber-600" />
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t(`pages.kanban.columns.${column.id}`)}</h3>
+                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100">{t(`pages.kanban.columns.${column.id}`)}</h3>
                     </div>
                     <span className="text-xs font-mono text-amber-600 bg-white px-1.5 sm:px-2 py-0.5 rounded border border-amber-200">
                       {templates.length}
@@ -672,10 +709,10 @@ export default function KanbanPage() {
               <div key={column.id} className={`flex flex-col min-h-0 bg-gray-50 dark:bg-gray-900 rounded-lg border transition-colors ${
                 (column.id === 'planning' || column.id === 'in_progress') && isColumnLimitReached(column.id, columnTasks.length)
                   ? 'border-red-300 dark:border-red-700'
-                  : 'border-gray-200 dark:border-gray-700'
+                  : 'border-gray-200 dark:border-gray-800'
               }`}>
-                <div className="px-2 sm:px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                  <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t(`pages.kanban.columns.${column.id}`)}</h3>
+                <div className="px-2 sm:px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                  <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100">{t(`pages.kanban.columns.${column.id}`)}</h3>
                   {(column.id === 'planning' || column.id === 'in_progress') ? (
                     <div className="relative" data-limit-editor>
                       <button
@@ -690,7 +727,7 @@ export default function KanbanPage() {
                             ? 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700'
                             : isColumnLimitApproaching(column.id, columnTasks.length)
                               ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700'
-                              : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500'
+                              : 'text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-500'
                         }`}
                       >
                         {activeProjectId ? (
@@ -706,7 +743,7 @@ export default function KanbanPage() {
                       </button>
                       {editingLimit && editingLimit.columnId === column.id && (
                         <div
-                          className="absolute right-0 top-full mt-1 z-30 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg p-3 w-48"
+                          className="absolute right-0 top-full mt-1 z-30 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 shadow-lg p-3 w-48"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -722,7 +759,7 @@ export default function KanbanPage() {
                             min="0"
                             value={editingLimit.current}
                             onChange={(e) => setEditingLimit({ ...editingLimit, current: Math.max(0, parseInt(e.target.value) || 0) })}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 mb-1"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 mb-1"
                             autoFocus
                           />
                           <div className="text-xs text-gray-400 mb-2">0 = {t('pages.kanban.limits.unlimited').toLowerCase()}</div>
@@ -763,7 +800,7 @@ export default function KanbanPage() {
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                    <span className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 px-1.5 sm:px-2 py-0.5 rounded border border-gray-200 dark:border-gray-800">
                       {columnTasks.length}
                     </span>
                   )}
@@ -825,7 +862,7 @@ export default function KanbanPage() {
                     dragOverColumn === column.id
                       ? (column.id === 'planning' || column.id === 'in_progress') && isColumnLimitReached(column.id, columnTasks.length)
                         ? 'bg-red-50 dark:bg-red-900/20 ring-2 ring-inset ring-red-300 dark:ring-red-700'
-                        : 'bg-blue-50 ring-2 ring-inset ring-blue-200'
+                        : 'bg-orange-50 ring-2 ring-inset ring-orange-200'
                       : ''
                   }`}
                 >
@@ -885,8 +922,8 @@ export default function KanbanPage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-md w-full mx-4 shadow-lg">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
               {editingTask ? t('pages.kanban.modal.editTask') : t('pages.kanban.modal.createTask')}
             </h3>
 
@@ -910,7 +947,7 @@ export default function KanbanPage() {
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={t('pages.kanban.modal.titlePlaceholder')}
                   autoFocus
                 />
@@ -923,9 +960,56 @@ export default function KanbanPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                   rows={3}
                   placeholder={t('pages.kanban.modal.descriptionPlaceholder')}
+                />
+              </div>
+
+              {/* Existing attachments thumbnails (when editing) */}
+              {editingTask && formData.attachment_ids.length > 0 && (() => {
+                try {
+                  const ids: string[] = typeof formData.attachment_ids === 'string'
+                    ? JSON.parse(formData.attachment_ids)
+                    : formData.attachment_ids;
+                  if (!ids.length) return null;
+                  return (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('pages.kanban.modal.attachments')}
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {ids.map((id) => (
+                          <div key={id} className="w-10 h-10 rounded border border-gray-200 dark:border-gray-800 overflow-hidden bg-gray-50 dark:bg-gray-800">
+                            <img
+                              src={getAttachmentUrl(id)}
+                              alt="Attachment"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></div>';
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+
+              {/* File attachment input for new uploads */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('pages.kanban.modal.addAttachments')}
+                </label>
+                <FileAttachmentInput
+                  attachments={fileAttachments}
+                  onAttachmentsChange={setFileAttachments}
+                  maxFiles={5}
+                  maxSize={10 * 1024 * 1024}
                 />
               </div>
 
@@ -983,7 +1067,7 @@ export default function KanbanPage() {
                 size="sm"
                 onClick={handleSubmit}
                 disabled={!formData.title.trim() || (!editingTask && !createProjectId && (!projectFilter || projectFilter === 'all') && projects.length > 1)}
-                loading={updateTask.isPending}
+                loading={updateTask.isPending || createTask.isPending || uploadFiles.isPending}
               >
                 {editingTask ? t('pages.kanban.modal.save') : t('pages.kanban.modal.create')}
               </Button>
@@ -996,8 +1080,8 @@ export default function KanbanPage() {
       {editingRecurrence && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setEditingRecurrence(null)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-sm w-full mx-4 space-y-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Configure Schedule</h3>
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-sm w-full mx-4 space-y-4 shadow-lg">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Configure Schedule</h3>
             <p className="text-xs text-gray-500 truncate">{editingRecurrence.title}</p>
 
             <div>
@@ -1005,7 +1089,7 @@ export default function KanbanPage() {
               <select
                 value={recurrenceValue}
                 onChange={e => setRecurrenceValue(e.target.value)}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
                 {RECURRENCE_PRESETS.map(p => (
                   <option key={p.value} value={p.value}>{p.label}</option>
@@ -1030,8 +1114,8 @@ export default function KanbanPage() {
       {templateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setTemplateModalOpen(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4 shadow-lg">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-md w-full mx-4 shadow-lg">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
               {editingTemplate ? 'Edit Template' : 'Save as Template'}
             </h3>
 
@@ -1044,7 +1128,7 @@ export default function KanbanPage() {
                   type="text"
                   value={templateFormData.title}
                   onChange={(e) => setTemplateFormData({ ...templateFormData, title: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder="Template title"
                   autoFocus
                 />
@@ -1057,7 +1141,7 @@ export default function KanbanPage() {
                 <textarea
                   value={templateFormData.description}
                   onChange={(e) => setTemplateFormData({ ...templateFormData, description: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
                   rows={3}
                   placeholder="Template description"
                 />
@@ -1116,7 +1200,7 @@ export default function KanbanPage() {
                       name="templateScope"
                       checked={templateFormData.is_public}
                       onChange={() => setTemplateFormData({ ...templateFormData, is_public: true, project_id: null })}
-                      className="text-gray-900 focus:ring-gray-900"
+                      className="text-gray-900 focus:ring-orange-500"
                     />
                     <span className="text-sm text-gray-700">Public (available to all projects)</span>
                   </label>
@@ -1126,7 +1210,7 @@ export default function KanbanPage() {
                       name="templateScope"
                       checked={!templateFormData.is_public}
                       onChange={() => setTemplateFormData({ ...templateFormData, is_public: false, project_id: effectiveProjectId })}
-                      className="text-gray-900 focus:ring-gray-900"
+                      className="text-gray-900 focus:ring-orange-500"
                     />
                     <span className="text-sm text-gray-700">Project-specific</span>
                   </label>
@@ -1316,6 +1400,22 @@ function TaskCard({
         <p className="text-xs text-gray-600 mb-3 line-clamp-2">{task.description}</p>
       )}
 
+      {/* Attachment indicator */}
+      {(() => {
+        try {
+          const ids: string[] = task.attachments ? JSON.parse(task.attachments) : [];
+          if (ids.length === 0) return null;
+          return (
+            <div className="flex items-center gap-1 mb-2 text-gray-400 dark:text-gray-500">
+              <Paperclip className="h-3.5 w-3.5" />
+              <span className="text-xs">{ids.length}</span>
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
+
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={`text-xs font-medium px-2 py-0.5 rounded border ${PRIORITY_COLORS[task.priority]}`}
@@ -1344,10 +1444,10 @@ function TaskCard({
             className={`text-xs font-medium px-2 py-0.5 rounded border ${RESULT_STATUS_COLORS[task.result_status]}`}
           >
             {task.result_status === 'success'
-              ? '✓ Success'
+              ? t('pages.kanban.resultStatus.success')
               : task.result_status === 'partial'
-                ? '◐ Partial'
-                : '✗ Needs Rework'}
+                ? t('pages.kanban.resultStatus.partial')
+                : t('pages.kanban.resultStatus.needs_rework')}
           </span>
         )}
 
@@ -1363,7 +1463,7 @@ function TaskCard({
               e.stopPropagation();
               onViewWorkflow(task.workflow_id!);
             }}
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 hover:underline"
           >
             <Link2 className="h-3 w-3" />
             Workflow {task.workflow_name ? `(${task.workflow_name})` : ''}

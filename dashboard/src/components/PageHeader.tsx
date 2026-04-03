@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  textColors,
+  darkModeTextColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface PageHeaderProps {
   title?: string
@@ -18,9 +23,9 @@ export function PageHeader({ title, description, actions, i18nKey }: PageHeaderP
   return (
     <div className="flex items-start justify-between mb-8">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">{finalTitle}</h1>
+        <h1 className={`text-2xl font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} tracking-tight`}>{finalTitle}</h1>
         {finalDescription && (
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{finalDescription}</p>
+          <p className={`mt-1 text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>{finalDescription}</p>
         )}
       </div>
       {actions && <div className="flex items-center gap-2 ml-4">{actions}</div>}

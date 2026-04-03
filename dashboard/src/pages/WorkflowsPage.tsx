@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router'
-import { Plus, Upload, Loader2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { Plus, Upload, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   PageHeader,
@@ -14,6 +14,15 @@ import {
 } from '@/components'
 import { useGetPlans, useGetMetrics, useCreatePlan } from '@/api/plans'
 import { useGetProjects } from '@/api/projects'
+import {
+  bgColors, darkModeBgColors,
+  textColors, darkModeTextColors,
+  borderColors, darkModeBorderColors,
+  accentColors, darkModeAccentColors,
+  tableColors, darkModeTableColors,
+  interactiveStates, darkModeInteractiveStates,
+  withDarkMode,
+} from '@/lib/colors'
 
 const PAGE_SIZE = 15
 
@@ -162,6 +171,18 @@ export default function WorkflowsPage() {
         ? `${Math.round(s / 60)}m`
         : `${(s / 3600).toFixed(1)}h`
 
+  const countTaskAttachments = (plan: any): number => {
+    // Plan-level attachments (collected by backend from all task attachment_ids)
+    const planAttachments: string[] = Array.isArray(plan.attachments) ? plan.attachments : []
+    // Also count from individual tasks as fallback
+    const tasks = Array.isArray(plan.tasks) ? plan.tasks : []
+    const taskAttachments = tasks.reduce((sum: number, t: any) => {
+      return sum + (Array.isArray(t.attachment_ids) ? t.attachment_ids.length : 0)
+    }, 0)
+    // Use the max of both to avoid duplicates but not miss any
+    return Math.max(planAttachments.length, taskAttachments)
+  }
+
   // Helper to get project by ID
   const getProjectById = (projectId: string) =>
     projects.find(p => p.id === projectId)
@@ -169,7 +190,7 @@ export default function WorkflowsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading workflows...</div>
+        <div className={textColors.tertiary}>Loading workflows...</div>
       </div>
     )
   }
@@ -177,7 +198,7 @@ export default function WorkflowsPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">
+        <div className="text-red-500 dark:text-red-400">
           Error loading workflows: {(error as Error).message}
         </div>
       </div>
@@ -207,7 +228,7 @@ export default function WorkflowsPage() {
 
             {/* Import */}
             <label
-              className={`cursor-pointer inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border border-gray-300 rounded-md text-xs sm:text-sm text-gray-700 hover:bg-gray-50 ${
+              className={`cursor-pointer inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-md text-xs sm:text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)} ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} ${
                 importPlan.isPending ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
@@ -280,8 +301,8 @@ export default function WorkflowsPage() {
             }}
             className={`px-2 sm:px-3 py-1.5 text-xs rounded-md font-medium transition-colors ${
               statusFilter === s
-                ? 'bg-gray-900 text-white'
-                : 'text-gray-500 hover:bg-gray-100'
+                ? `${withDarkMode(bgColors.inverted, 'dark:bg-gray-100')} ${withDarkMode(textColors.inverted, 'dark:text-gray-900')}`
+                : `${textColors.tertiary} ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)}`
             }`}
           >
             {s === '' ? t('pages.workflows.filters.all') :
@@ -299,7 +320,7 @@ export default function WorkflowsPage() {
       </div>
 
       {/* Table - Responsive with card view on mobile */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} rounded-lg overflow-hidden`}>
         {paginated.length === 0 ? (
           <EmptyState
             title={
@@ -319,39 +340,39 @@ export default function WorkflowsPage() {
             <div className="hidden md:block">
               <table className="min-w-full">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                  <tr className={`${withDarkMode(tableColors.headerBg, darkModeTableColors.headerBg)} border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('name')}
                     >
                       Name{getSortIcon('name')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('status')}
                     >
                       Status{getSortIcon('status')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('tasks')}
                     >
                       Tasks{getSortIcon('tasks')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('duration')}
                     >
                       Duration{getSortIcon('duration')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('client')}
                     >
                       Client{getSortIcon('client')}
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 select-none"
+                      className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('created_at')}
                     >
                       When{getSortIcon('created_at')}
@@ -359,7 +380,7 @@ export default function WorkflowsPage() {
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className={`divide-y ${withDarkMode(borderColors.subtle, darkModeBorderColors.default)}`}>
                   {paginated.map((plan: any) => {
                     const tasks = Array.isArray(plan.tasks) ? plan.tasks : []
                     const duration =
@@ -370,10 +391,11 @@ export default function WorkflowsPage() {
                               1000
                           )
                         : null
+                    const attachmentCount = countTaskAttachments(plan)
                     return (
                       <tr
                         key={plan.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className={`${withDarkMode(tableColors.rowHover, darkModeTableColors.rowHover)} transition-colors`}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
@@ -385,25 +407,31 @@ export default function WorkflowsPage() {
                             )}
                             <Link
                               to={`/plans/${plan.id}`}
-                              className="text-sm font-medium text-gray-900 dark:text-white hover:text-gray-600 dark:hover:text-gray-300"
+                              className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}
                             >
                               {plan.name}
                             </Link>
+                            {attachmentCount > 0 && (
+                              <span className={`inline-flex items-center gap-0.5 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`} title={`${attachmentCount} attachment(s)`}>
+                                <Paperclip className="h-3 w-3" />
+                                <span>{attachmentCount}</span>
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={plan.status} animate />
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        <td className={`px-4 py-3 text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
                           {tasks.length}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        <td className={`px-4 py-3 text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
                           {duration !== null ? formatDuration(duration) : '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs font-mono text-gray-400 dark:text-gray-500">
+                        <td className={`px-4 py-3 text-xs font-mono ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`}>
                           {plan.client_id?.split('-')[0] ?? '—'}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">
+                        <td className={`px-4 py-3 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`}>
                           {new Date(plan.created_at).toLocaleDateString('pt-BR', {
                             day: '2-digit',
                             month: '2-digit',
@@ -414,7 +442,7 @@ export default function WorkflowsPage() {
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleExport(plan)}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                            className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}
                             title="Export as JSON"
                           >
                             ↓
@@ -439,10 +467,11 @@ export default function WorkflowsPage() {
                           1000
                       )
                     : null
+                const attachmentCount = countTaskAttachments(plan)
                 return (
                   <div
                     key={plan.id}
-                    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    className={`${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)} rounded-lg p-4 hover:shadow-md transition-shadow`}
                   >
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -454,29 +483,35 @@ export default function WorkflowsPage() {
                         )}
                         <Link
                           to={`/plans/${plan.id}`}
-                          className="text-sm font-medium text-gray-900 dark:text-white hover:text-gray-600 dark:hover:text-gray-300 truncate"
+                          className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} truncate`}
                         >
                           {plan.name}
                         </Link>
+                        {attachmentCount > 0 && (
+                          <span className={`inline-flex items-center gap-0.5 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`} title={`${attachmentCount} attachment(s)`}>
+                            <Paperclip className="h-3 w-3" />
+                            <span>{attachmentCount}</span>
+                          </span>
+                        )}
                       </div>
                       <StatusBadge status={plan.status} animate />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                       <div>
-                        <span className="text-gray-500 dark:text-gray-400">Tasks:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Tasks:</span>{' '}
                         <span className="font-medium">{tasks.length}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500 dark:text-gray-400">Duration:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Duration:</span>{' '}
                         <span className="font-medium">{duration !== null ? formatDuration(duration) : '—'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500 dark:text-gray-400">Client:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Client:</span>{' '}
                         <span className="font-mono">{plan.client_id?.split('-')[0] ?? '—'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500 dark:text-gray-400">Created:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Created:</span>{' '}
                         <span className="font-medium">
                           {new Date(plan.created_at).toLocaleDateString('pt-BR', {
                             day: '2-digit',
@@ -489,13 +524,13 @@ export default function WorkflowsPage() {
                     <div className="flex items-center justify-between">
                       <Link
                         to={`/plans/${plan.id}`}
-                        className="text-xs text-blue-600 hover:text-blue-800"
+                        className={`text-xs ${withDarkMode(accentColors.text, darkModeAccentColors.text)} hover:text-orange-800`}
                       >
                         View details →
                       </Link>
                       <button
                         onClick={() => handleExport(plan)}
-                        className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                        className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}
                       >
                         Export ↓
                       </button>

@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react'
 import { X, Wand2, Check, Trash2, Edit3 } from 'lucide-react'
 import { Button } from './Button'
+import {
+  modalColors,
+  darkModeModalColors,
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface ClaudeMdImprovementModalProps {
   isOpen: boolean
@@ -46,18 +59,18 @@ export function ClaudeMdImprovementModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div className={`fixed inset-0 ${withDarkMode(modalColors.overlay, darkModeModalColors.overlay)} flex items-center justify-center z-50 p-4`}>
+      <div className={`${withDarkMode(modalColors.panel, darkModeModalColors.panel)} rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col`}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className={`flex items-center justify-between p-6 border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
           <div className="flex items-center gap-3">
-            <Wand2 className="text-blue-600" size={24} />
-            <h2 className="text-xl font-semibold text-gray-900">AI-Improved CLAUDE.md</h2>
+            <Wand2 className="text-orange-600 dark:text-orange-400" size={24} />
+            <h2 className={`text-xl font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>AI-Improved CLAUDE.md</h2>
           </div>
           <button
             onClick={onDiscard}
             disabled={isLoading}
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+            className={`${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} ${withDarkMode(interactiveStates.disabled, darkModeInteractiveStates.disabled)}`}
           >
             <X size={24} />
           </button>
@@ -67,12 +80,12 @@ export function ClaudeMdImprovementModal({
         <div className="flex-1 overflow-auto p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-700">Preview</h3>
+              <h3 className={`text-sm font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>Preview</h3>
               {!isEditing && (
                 <button
                   onClick={() => setIsEditing(true)}
                   disabled={isLoading}
-                  className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1 disabled:opacity-50"
+                  className={`text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 flex items-center gap-1 ${withDarkMode(interactiveStates.disabled, darkModeInteractiveStates.disabled)}`}
                 >
                   <Edit3 size={14} />
                   Edit
@@ -84,10 +97,10 @@ export function ClaudeMdImprovementModal({
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
               disabled={!isEditing || isLoading}
-              className={`w-full h-96 px-4 py-3 font-mono text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              className={`w-full h-96 px-4 py-3 font-mono text-sm border rounded-lg focus:ring-2 ${withDarkMode(interactiveStates.focusRing, darkModeInteractiveStates.focusRing)} ${
                 isEditing
-                  ? 'border-gray-300 bg-white'
-                  : 'border-gray-200 bg-gray-50 text-gray-700'
+                  ? `${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.secondary)}`
+                  : `${withDarkMode(borderColors.default, darkModeBorderColors.default)} ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`
               }`}
             />
 
@@ -115,7 +128,7 @@ export function ClaudeMdImprovementModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+        <div className={`flex items-center justify-end gap-3 p-6 border-t ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)}`}>
           <Button
             onClick={onDiscard}
             variant="secondary"

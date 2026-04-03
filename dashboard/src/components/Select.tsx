@@ -1,6 +1,18 @@
 import type { SelectHTMLAttributes } from 'react'
 import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeErrorColors,
+  errorColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id'> {
   id?: string
@@ -21,22 +33,22 @@ export function Select({ label, error, errorI18nKey, placeholderI18nKey, classNa
   return (
     <div className="space-y-1">
       {label && (
-        <label htmlFor={selectId} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+        <label htmlFor={selectId} className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
           {label}
         </label>
       )}
       <select
         id={selectId}
         className={`
-          w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm
-          bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-          focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-500 focus:border-transparent
-          disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-400 dark:disabled:text-gray-500
-          ${error ? 'border-red-400 dark:border-red-500' : ''} ${className}
+          w-full border ${withDarkMode(borderColors.default, darkModeBorderColors.thick)} rounded-md px-3 py-2 text-sm
+          ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)}
+          focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent
+          ${withDarkMode('disabled:bg-gray-50', 'dark:disabled:bg-gray-900')} ${withDarkMode('disabled:text-gray-400', 'dark:disabled:text-gray-500')}
+          ${error ? `${borderColors.thick} ${darkModeErrorColors.border}` : ''} ${className}
         `}
         {...props}
       />
-      {displayError && <p className="text-xs text-red-600 dark:text-red-400">{displayError}</p>}
+      {displayError && <p className={`text-xs ${withDarkMode(errorColors.text, darkModeErrorColors.text)}`}>{displayError}</p>}
     </div>
   )
 }

@@ -1,12 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Zap, ChevronRight } from 'lucide-react'
+import { X, Zap, ChevronRight, Paperclip } from 'lucide-react'
 import { Button, Select } from '@/components'
+import { FileAttachmentInput, type FileAttachment } from '@/components/FileAttachmentInput'
 import { useCreateQuickAction } from '@/api/quickActions'
 import { useGetProjects } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/workspaces'
 import { useGetPlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
+import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'
 import { useTranslation } from 'react-i18next'
+import {
+  modalColors,
+  darkModeModalColors,
+  bgColors,
+  darkModeBgColors,
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  darkModeInteractiveStates,
+  successColors,
+  darkModeSuccessColors,
+  errorColors,
+  darkModeErrorColors,
+  infoColors,
+  darkModeInfoColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 interface QuickActionModalProps {
   onClose: () => void
@@ -20,12 +41,14 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
   const [environmentId, setEnvironmentId] = useState('')
   const [nativeSkill, setNativeSkill] = useState('planning')
   const [message, setMessage] = useState('')
+  const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const [planId, setPlanId] = useState<string | null>(null)
   const [logs, setLogs] = useState<Array<{ level: string; message: string; time: string }>>([])
   const [structuredOutput, setStructuredOutput] = useState<any>(null)
   const logsEndRef = useRef<HTMLDivElement>(null)
 
   const createAction = useCreateQuickAction()
+  const uploadFiles = useUploadFiles()
   const { data: projects = [] } = useGetProjects()
   const { data: allWorkspaces = [] } = useGetWorkspaces(projectId ? { project_id: projectId } : undefined)
   const selectedProject = projects.find(p => p.id === projectId)
@@ -70,12 +93,57 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
   const handleSubmit = async () => {
     if (!message.trim() || !workspaceId) return
+
+    let attachmentIds: string[] = []
+
+    // Upload attachments if any
+    if (attachments.length > 0) {
+      const pendingFiles = attachments
+        .filter(a => a.status === 'pending')
+        .map(a => a.file)
+
+      if (pendingFiles.length > 0) {
+        setAttachments(prev =>
+          prev.map(a =>
+            a.status === 'pending' ? { ...a, status: 'uploading' as const } : a
+          )
+        )
+        try {
+          const uploaded = await uploadFiles.mutateAsync(pendingFiles)
+          attachmentIds = uploaded.map(u => u.id)
+          setAttachments(prev =>
+            prev.map(a => {
+              if (a.status !== 'uploading') return a
+              const match = uploaded.find(u => u.file_name === a.file.name)
+              return match
+                ? { ...a, status: 'uploaded' as const, serverData: match }
+                : a
+            })
+          )
+        } catch {
+          setAttachments(prev =>
+            prev.map(a =>
+              a.status === 'uploading' ? { ...a, status: 'error' as const } : a
+            )
+          )
+          return
+        }
+      }
+
+      // Collect IDs from already-uploaded attachments too
+      const alreadyUploaded = attachments
+        .filter(a => a.status === 'uploaded' && a.serverData)
+        .map(a => a.serverData!.id)
+      attachmentIds = [...alreadyUploaded, ...attachmentIds]
+    }
+
     const result = await createAction.mutateAsync({
       message: message.trim(),
       workspace_id: workspaceId,
       environment_id: environmentId || undefined,
       project_id: projectId || undefined,
       native_skill: nativeSkill || undefined,
+      attachment_ids: attachmentIds.length > 0 ? attachmentIds : undefined,
     })
     setPlanId(result.id)
     setStep('running')
@@ -89,21 +157,21 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={step === 'form' ? onClose : undefined} />
-      <div className="relative bg-white rounded-lg border border-gray-200 w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]">
+      <div className={`absolute inset-0 ${withDarkMode(modalColors.overlay, darkModeModalColors.overlay)}`} onClick={step === 'form' ? onClose : undefined} />
+      <div className={`relative ${withDarkMode(modalColors.panel, darkModeModalColors.panel)} rounded-lg border ${withDarkMode(modalColors.border, darkModeModalColors.border)} w-full max-w-2xl mx-4 flex flex-col max-h-[85vh]`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
           <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-gray-500" />
-            <span className="text-sm font-semibold text-gray-900">{t('components.quickAction.title')}</span>
+            <Zap className={`h-4 w-4 ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`} />
+            <span className={`text-sm font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>{t('components.quickAction.title')}</span>
             {step === 'running' && (
-              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full animate-pulse">{t('components.quickAction.running')}</span>
+              <span className={`text-xs ${withDarkMode(infoColors.bg, darkModeInfoColors.bg)} ${withDarkMode(infoColors.text, darkModeInfoColors.text)} px-2 py-0.5 rounded-full animate-pulse`}>{t('components.quickAction.running')}</span>
             )}
             {step === 'result' && structuredOutput && (
-              <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">{t('components.quickAction.outputReady')}</span>
+              <span className={`text-xs ${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} ${withDarkMode(successColors.text, darkModeSuccessColors.text)} px-2 py-0.5 rounded-full`}>{t('components.quickAction.outputReady')}</span>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className={`${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -158,7 +226,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
               {/* Message */}
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-gray-700">{t('components.quickAction.requestRequired')}</label>
+                <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('components.quickAction.requestRequired')}</label>
                 <textarea
                   value={message}
                   onChange={e => setMessage(e.target.value)}
@@ -167,17 +235,54 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
                     : nativeSkill === 'reviewer'
                     ? t('components.quickAction.reviewPlaceholder')
                     : t('components.quickAction.debugPlaceholder')}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className={`w-full border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 ${withDarkMode(interactiveStates.focusRing, darkModeInteractiveStates.focusRing)}`}
                   rows={4}
                 />
               </div>
+
+              {/* File Attachments */}
+              <FileAttachmentInput
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                maxFiles={5}
+                maxSize={10 * 1024 * 1024}
+              />
             </>
           )}
 
           {(step === 'running' || step === 'result') && (
             <div className="space-y-3">
+              {/* Attachments indicator */}
+              {attachments.length > 0 && (
+                <div className={`flex items-center gap-2 text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
+                  <Paperclip className="h-3.5 w-3.5" />
+                  <span>
+                    {t('components.quickAction.attachmentsIncluded', { count: attachments.length })}
+                  </span>
+                  {/* Show small image previews for image attachments */}
+                  <div className="flex gap-1.5 ml-1">
+                    {attachments
+                      .filter(a => a.preview)
+                      .slice(0, 4)
+                      .map(a => (
+                        <img
+                          key={a.id}
+                          src={a.serverData ? getAttachmentUrl(a.serverData.id) : a.preview!}
+                          alt={a.file.name}
+                          className={`h-6 w-6 rounded object-cover border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}
+                        />
+                      ))}
+                    {attachments.filter(a => a.preview).length > 4 && (
+                      <span className={`text-[10px] ${withDarkMode(textColors.muted, darkModeTextColors.muted)} self-center`}>
+                        +{attachments.filter(a => a.preview).length - 4}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Live logs */}
-              <div className="bg-gray-900 rounded-lg p-4 font-mono text-xs text-gray-300 max-h-72 overflow-y-auto">
+              <div className={`${withDarkMode(bgColors.inverted, darkModeBgColors.inverted)} rounded-lg p-4 font-mono text-xs text-gray-300 max-h-72 overflow-y-auto`}>
                 {logs.length === 0 && (
                   <span className="text-gray-500">{t('components.quickAction.waitingForOutput')}</span>
                 )}
@@ -196,14 +301,14 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
 
               {/* Structured output result */}
               {step === 'result' && structuredOutput && (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <div className={`rounded-lg border ${withDarkMode(successColors.border, darkModeSuccessColors.border)} ${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} p-4`}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-green-800 capitalize">
+                      <p className={`text-sm font-semibold ${withDarkMode(successColors.textAlt, darkModeSuccessColors.textAlt)} capitalize`}>
                         {t('components.quickAction.typeReady', { type: structuredOutput.type })}
                       </p>
                       {structuredOutput.type === 'plan' && (
-                        <p className="text-xs text-green-600 mt-1">
+                        <p className={`text-xs ${withDarkMode(successColors.text, darkModeSuccessColors.text)} mt-1`}>
                           {t('components.quickAction.planInfo', {
                             count: structuredOutput.content?.tasks?.length ?? 0,
                             name: structuredOutput.content?.name ?? ''
@@ -211,7 +316,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
                         </p>
                       )}
                       {structuredOutput.type === 'review' && (
-                        <p className="text-xs text-green-600 mt-1">
+                        <p className={`text-xs ${withDarkMode(successColors.text, darkModeSuccessColors.text)} mt-1`}>
                           {t('components.quickAction.reviewInfo', {
                             status: structuredOutput.content?.status,
                             issues: structuredOutput.content?.issues?.length ?? 0
@@ -219,7 +324,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
                         </p>
                       )}
                       {structuredOutput.content?.summary && (
-                        <p className="text-xs text-green-700 mt-2 italic">
+                        <p className={`text-xs ${withDarkMode(successColors.textAlt, darkModeSuccessColors.textAlt)} mt-2 italic`}>
                           {structuredOutput.content.summary.slice(0, 200)}
                         </p>
                       )}
@@ -234,8 +339,8 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
               )}
 
               {step === 'result' && !structuredOutput && plan?.status === 'failed' && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                  <p className="text-xs text-red-700">{t('components.quickAction.actionFailed')}</p>
+                <div className={`rounded-lg border ${withDarkMode(errorColors.border, darkModeErrorColors.border)} ${withDarkMode(errorColors.bg, darkModeErrorColors.bg)} p-3`}>
+                  <p className={`text-xs ${withDarkMode(errorColors.textAlt, darkModeErrorColors.textAlt)}`}>{t('components.quickAction.actionFailed')}</p>
                 </div>
               )}
             </div>
@@ -243,14 +348,14 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+        <div className={`px-5 py-4 border-t ${withDarkMode(borderColors.default, darkModeBorderColors.default)} flex justify-end gap-2`}>
           <Button variant="secondary" size="sm" onClick={onClose}>{t('components.quickAction.close')}</Button>
           {step === 'form' && (
             <Button
               variant="primary" size="sm"
               onClick={handleSubmit}
-              disabled={!message.trim() || !workspaceId}
-              loading={createAction.isPending}
+              disabled={!message.trim() || !workspaceId || uploadFiles.isPending}
+              loading={createAction.isPending || uploadFiles.isPending}
             >
               <Zap className="h-3.5 w-3.5" /> {t('components.quickAction.run')}
             </Button>

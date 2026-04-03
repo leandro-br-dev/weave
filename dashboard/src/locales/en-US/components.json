@@ -21,7 +21,10 @@
     "timeout": "Timeout",
     "approved": "Approved",
     "denied": "Denied",
-    "awaitingApproval": "Awaiting Approval"
+    "awaitingApproval": "Awaiting Approval",
+    "awaiting_approval": "Awaiting Approval",
+    "error": "Error",
+    "cancelled": "Cancelled"
   },
   "emptyState": {
     "defaultTitle": "No Data",
@@ -86,7 +89,8 @@
     "actionFailed": "The action failed. Please check the logs above for details.",
     "reviewAndCreate": "Review & Create",
     "close": "Close",
-    "run": "Run"
+    "run": "Run",
+    "attachmentsIncluded": "{{count}} attachment(s) included"
   },
   "contextModal": {
     "title": "Project Context",
@@ -103,5 +107,16 @@
     "languages": "Languages",
     "filesCount": "{{count}} files",
     "close": "Close"
+  },
+  "fileAttachment": {
+    "addFiles": "Attach files",
+    "dragDrop": "Drop files here",
+    "maxFilesReached": "Maximum number of files reached",
+    "fileTooLarge": "File is too large",
+    "invalidType": "File type not supported",
+    "uploading": "Uploading...",
+    "remove": "Remove",
+    "image": "Image",
+    "file": "File"
   }
 }

@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* App Title / Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-600 mb-4">
             <Bot className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">
@@ -84,7 +84,7 @@ export default function LoginPage() {
                   autoFocus
                   autoComplete="current-password"
                   disabled={isLoading}
-                  className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+                  className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed pr-10"
                 />
                 <button
                   type="button"
@@ -101,7 +101,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading || !password}
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

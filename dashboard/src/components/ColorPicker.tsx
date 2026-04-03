@@ -1,5 +1,14 @@
 import { Check } from 'lucide-react'
 import { useId } from 'react'
+import {
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  accentColors,
+  withDarkMode,
+} from '@/lib/colors'
 
 // Export the color palette so it can be reused
 // These are the Tailwind class combinations for visual display
@@ -137,7 +146,7 @@ export function ColorPicker({
     return (
       <div className={`space-y-1 ${className}`}>
         {label && (
-          <label className="block text-xs font-medium text-gray-700">
+          <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
             {label}
           </label>
         )}
@@ -146,10 +155,10 @@ export function ColorPicker({
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
             className={`
-              w-full pl-3 pr-10 py-2 text-sm rounded-lg border border-gray-300
-              focus:ring-2 focus:ring-gray-900 focus:border-transparent
-              appearance-none bg-white cursor-pointer
-              hover:border-gray-400 transition-colors
+              w-full pl-3 pr-10 py-2 text-sm rounded-lg border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)}
+              focus:ring-2 ${interactiveStates.focusRing} focus:border-transparent
+              appearance-none ${withDarkMode('bg-white', 'dark:bg-gray-800')} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} cursor-pointer
+              ${withDarkMode('hover:border-gray-400', 'dark:hover:border-gray-600')} transition-colors
             `}
           >
             <option value="" disabled>Select a color...</option>
@@ -175,13 +184,13 @@ export function ColorPicker({
           </div>
           {/* Dropdown arrow */}
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
         </div>
         {hint && (
-          <p className="text-xs text-gray-500">{hint}</p>
+          <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>{hint}</p>
         )}
       </div>
     )
@@ -191,7 +200,7 @@ export function ColorPicker({
   return (
     <div className={`space-y-2 ${className}`}>
       {label && (
-        <label className="block text-xs font-medium text-gray-700">
+        <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
           {label}
         </label>
       )}
@@ -214,9 +223,9 @@ export function ColorPicker({
               tabIndex={isSelected ? 0 : -1}
               className={`
                 relative h-10 rounded-md border-2 transition-all
-                hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2
+                hover:scale-105 focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:ring-offset-2
                 ${tailwindClasses}
-                ${isSelected ? 'ring-2 ring-offset-2 ring-gray-900' : 'opacity-70 hover:opacity-100'}
+                ${isSelected ? `ring-2 ring-offset-2 ${accentColors.focusRing}` : 'opacity-70 hover:opacity-100'}
               `}
               onClick={() => onChange(hexColor)}
               onKeyDown={(e) => handleKeyDown(hexColor, index, e)}

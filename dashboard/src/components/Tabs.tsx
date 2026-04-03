@@ -1,5 +1,13 @@
 import React, { useState } from 'react'
 import type { ReactNode } from 'react'
+import {
+  borderColors,
+  darkModeBorderColors,
+  textColors,
+  darkModeTextColors,
+  interactiveStates,
+  withDarkMode,
+} from '@/lib/colors'
 
 export interface Tab {
   id: string
@@ -55,7 +63,7 @@ export function Tabs({ tabs, defaultTab, className = '' }: TabsProps) {
     <div className={className}>
       {/* Tab List */}
       <div
-        className="border-b border-gray-200 dark:border-gray-800"
+        className={`border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}
         role="tablist"
         aria-label="Tabs"
       >
@@ -76,10 +84,10 @@ export function Tabs({ tabs, defaultTab, className = '' }: TabsProps) {
                 className={`
                   inline-flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap
                   transition-all duration-150 ease-in-out
-                  border-b-2 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2
+                  border-b-2 focus:outline-none focus:ring-2 ${interactiveStates.focusRing} focus:ring-offset-2
                   ${isActive
-                    ? 'border-gray-900 dark:border-gray-100 text-gray-900 dark:text-white'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? `${withDarkMode('border-gray-900', 'dark:border-gray-100')} ${withDarkMode(textColors.primary, 'dark:text-white')}`
+                    : `border-transparent ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${withDarkMode('hover:text-gray-700', 'dark:hover:text-gray-300')} ${withDarkMode('hover:border-gray-300', 'dark:hover:border-gray-600')}`
                   }
                 `}
               >
