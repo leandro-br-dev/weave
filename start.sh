@@ -65,6 +65,39 @@ fi
 command -v node >/dev/null || { echo 'ERROR: node not found'; exit 1; }
 command -v python3 >/dev/null || { echo 'ERROR: python3 not found'; exit 1; }
 
+# ─── Ensure node_modules are up-to-date ──────────────────────────
+# Compares package.json checksum against a stored stamp file.
+# If the stamp is missing or stale, runs npm install automatically.
+ensure_deps() {
+  local dir="$1"
+  local label="$2"
+  local stamp_file="$dir/node_modules/.dep-stamp"
+
+  if [ ! -d "$dir/node_modules" ]; then
+    echo "  ⚙ Installing $label dependencies (node_modules missing)..."
+    npm install --prefix "$dir" --silent 2>/dev/null
+    echo "  ✓ $label dependencies installed"
+    return
+  fi
+
+  local current
+  current=$(md5sum "$dir/package.json" 2>/dev/null | awk '{print $1}')
+  local stored=""
+  if [ -f "$stamp_file" ]; then
+    stored=$(cat "$stamp_file" 2>/dev/null)
+  fi
+
+  if [ "$current" != "$stored" ]; then
+    echo "  ⚙ Updating $label dependencies (package.json changed)..."
+    npm install --prefix "$dir" --silent 2>/dev/null
+    echo "$current" > "$stamp_file"
+    echo "  ✓ $label dependencies updated"
+  fi
+}
+
+ensure_deps "$ROOT/api" "API"
+ensure_deps "$ROOT/dashboard" "Dashboard"
+
 # ─── Check Claude CLI ────────────────────────────────────────────
 echo '→ Checking Claude CLI authentication...'
 if command -v claude >/dev/null 2>&1; then
