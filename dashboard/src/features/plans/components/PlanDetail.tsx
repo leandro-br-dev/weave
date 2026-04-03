@@ -4,7 +4,7 @@ import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePla
 import { useSaveClaudeMd } from '@/api/workspaces';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
-import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, ImageIcon, FileText, Layers, Zap, ZoomIn } from 'lucide-react';
+import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';

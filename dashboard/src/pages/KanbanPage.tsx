@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip } from 'lucide-react';
 import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectIcon, ProjectSelectDropdown, FileAttachmentInput } from '@/components';
 import { type FileAttachment } from '@/components';
-import { useUploadFiles, getAttachmentUrl, type AttachmentResponse } from '@/api/uploads';
+import { useUploadFiles, getAttachmentUrl } from '@/api/uploads';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { useApprovePlan } from '@/api/plans';
 import { useToast } from '@/contexts/ToastContext';
@@ -220,7 +220,7 @@ export default function KanbanPage() {
         description: formData.description,
         priority: formData.priority,
         column: formData.column,
-        attachment_ids: uploadedIds,
+        attachments: JSON.stringify(uploadedIds),
       });
     } else {
       // For creating tasks, use the createProjectId state
@@ -232,7 +232,7 @@ export default function KanbanPage() {
           description: formData.description,
           priority: formData.priority,
           column: formData.column,
-          attachment_ids: uploadedIds,
+          attachments: JSON.stringify(uploadedIds),
         },
       });
     }
