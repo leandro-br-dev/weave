@@ -62,6 +62,7 @@ class Plan:
     id: str  # Plan ID from API
     name: str
     tasks: list[Task]
+    workflow_path: str | None = None  # Path to workflow directory with state.md, plan.json, errors.log
 
     def get_task(self, task_id: str) -> Task | None:
         return next((t for t in self.tasks if t.id == task_id), None)

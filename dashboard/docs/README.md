@@ -8,17 +8,17 @@
 
 ## Overview
 
-The Weave Dashboard is a modern React-based web application for managing AI agents, projects, workflows, and kanban boards. It provides a comprehensive interface for orchestrating AI agent operations with real-time updates and intuitive user experience.
+The Weave Dashboard is a modern React-based web application for managing AI teams, projects, workflows, and kanban boards. It provides a comprehensive interface for orchestrating AI agent operations with real-time updates and intuitive user experience.
 
 ### Key Features
 
-- **Agent Management**: Create, monitor, and control AI agents with real-time status updates
-- **Project Organization**: Organize agents into projects with configurable settings
-- **Workflow Automation**: Design and execute approval workflows for agent operations
+- **Team Management**: Create, monitor, and control AI teams with real-time status updates
+- **Project Organization**: Organize teams into projects with configurable settings
+- **Workflow Automation**: Design and execute approval workflows for team operations
 - **Kanban Board**: Visual task management with drag-and-drop support
 - **Real-time Updates**: Live status updates via WebSocket connections
 - **Chat Sessions**: Interactive chat interface with AI agents
-- **Native Skills Management**: Browse and install agent capabilities from marketplace
+- **Native Skills Management**: Browse and install team capabilities from marketplace
 - **Quick Actions**: One-click operations for common tasks
 
 ### Technology Stack

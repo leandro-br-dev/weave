@@ -1,11 +1,11 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
-import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp } from 'lucide-react'
+import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp, Palette, Globe, Sun, Moon, Monitor, Check } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { QuickActionModal } from '@/components/QuickActionModal'
 import NavigationRail from '@/components/NavigationRail'
-import { ThemeSelector } from '@/components/ThemeSelector'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import weaveLogo from '@/assets/weave-logo.svg'
 import {
@@ -19,15 +19,31 @@ import {
 } from '@/lib/colors'
 
 export default function Layout() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const { data: pendingApprovals = [] } = useGetPendingApprovals()
   const { user, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [showQuickAction, setShowQuickAction] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const themeMenuRef = useRef<HTMLDivElement>(null)
+  const languageMenuRef = useRef<HTMLDivElement>(null)
+
+  const themeOptions = [
+    { value: 'light' as const, icon: Sun, label: t('common.common.themeLight') },
+    { value: 'dark' as const, icon: Moon, label: t('common.common.themeDark') },
+    { value: 'system' as const, icon: Monitor, label: t('common.common.themeSystem') },
+  ]
+
+  const languageOptions = [
+    { code: 'en-US', flag: '🇺🇸', nativeName: 'English' },
+    { code: 'pt-BR', flag: '🇧🇷', nativeName: 'Português' },
+  ]
 
   // Expose close function globally for NavItem
   if (typeof window !== 'undefined') {
@@ -40,15 +56,19 @@ export default function Layout() {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false)
+        setThemeMenuOpen(false)
+        setLanguageMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [userMenuOpen])
 
-  // Close user menu on route change
+  // Close menus on route change
   useEffect(() => {
     setUserMenuOpen(false)
+    setThemeMenuOpen(false)
+    setLanguageMenuOpen(false)
   }, [location.pathname])
 
   return (
@@ -101,15 +121,17 @@ export default function Layout() {
             badge={pendingApprovals.length > 0 ? pendingApprovals.length : undefined}
           />
           <NavItem icon={<Package size={20} />} label={t('common.navigation.marketplace')} href="/marketplace" isActive={location.pathname === '/marketplace'} />
-          <NavItem icon={<Settings size={20} />} label={t('common.navigation.settings')} href="/settings" isActive={location.pathname === '/settings'} />
         </nav>
 
-        {/* Bottom section: User + Theme + Mobile close */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 space-y-1" ref={userMenuRef}>
-          {/* User Menu */}
+        {/* Bottom section: User menu (theme, language, settings) */}
+        <div className="absolute bottom-0 left-0 right-0 px-3 pb-3" ref={userMenuRef}>
           <div className="relative">
             <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              onClick={() => {
+                setUserMenuOpen(!userMenuOpen)
+                setThemeMenuOpen(false)
+                setLanguageMenuOpen(false)
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)} transition-colors`}
             >
               <div className={`w-8 h-8 rounded-full ${withDarkMode(accentColors.solid, accentColors.solid)} flex items-center justify-center flex-shrink-0`}>
@@ -125,31 +147,123 @@ export default function Layout() {
 
             {userMenuOpen && (
               <div className={`absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50`}>
+                {/* Theme sub-menu */}
+                <div className="relative" ref={themeMenuRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setThemeMenuOpen(!themeMenuOpen)
+                      setLanguageMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Palette size={16} />
+                    <span className="flex-1 text-left">{t('common.common.theme')}</span>
+                    <span className="text-xs text-gray-500">
+                      {theme === 'light' ? t('common.common.themeLight') : theme === 'dark' ? t('common.common.themeDark') : t('common.common.themeSystem')}
+                    </span>
+                  </button>
+
+                  {themeMenuOpen && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-[60]">
+                      {themeOptions.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setTheme(opt.value); setThemeMenuOpen(false) }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                            theme === opt.value
+                              ? 'text-orange-400 bg-gray-700'
+                              : 'text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700'
+                          } transition-colors`}
+                        >
+                          <opt.icon size={16} />
+                          <span>{opt.label}</span>
+                          {theme === opt.value && <Check size={14} className="ml-auto" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Language sub-menu */}
+                <div className="relative" ref={languageMenuRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLanguageMenuOpen(!languageMenuOpen)
+                      setThemeMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Globe size={16} />
+                    <span className="flex-1 text-left">{t('common.common.language')}</span>
+                    <span className="text-xs text-gray-500">
+                      {i18n.language === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
+                    </span>
+                  </button>
+
+                  {languageMenuOpen && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-[60]">
+                      {languageOptions.map((opt) => (
+                        <button
+                          key={opt.code}
+                          onClick={() => { i18n.changeLanguage(opt.code); setLanguageMenuOpen(false) }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                            i18n.language === opt.code
+                              ? 'text-orange-400 bg-gray-700'
+                              : 'text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700'
+                          } transition-colors`}
+                        >
+                          <span>{opt.flag}</span>
+                          <span>{opt.nativeName}</span>
+                          {i18n.language === opt.code && <Check size={14} className="ml-auto" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-700 dark:border-gray-800 my-1" />
+
+                {/* Settings link */}
+                <Link
+                  to="/settings"
+                  onClick={() => { setUserMenuOpen(false); setMobileMenuOpen(false) }}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm ${sidebarColors.text} hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
+                >
+                  <Settings size={16} />
+                  <span>{t('common.common.settings')}</span>
+                </Link>
+
+                {/* User management link */}
                 <Link
                   to="/users"
                   onClick={() => { setUserMenuOpen(false); setMobileMenuOpen(false) }}
-                  className={`flex items-center gap-3 px-3 py-2 ${sidebarColors.text} hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm ${sidebarColors.text} hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
                 >
                   <UserCircle size={16} />
-                  <span className="text-sm">{t('auth.userManagement.title')}</span>
+                  <span>{t('auth.userManagement.title')}</span>
                 </Link>
+
+                {/* Divider */}
+                <div className="border-t border-gray-700 dark:border-gray-800 my-1" />
+
+                {/* Logout */}
                 <button
                   onClick={() => {
                     setUserMenuOpen(false)
                     setMobileMenuOpen(false)
                     logout()
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 ${sidebarColors.text} hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${sidebarColors.text} hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors`}
                 >
                   <LogOut size={16} />
-                  <span className="text-sm">{t('auth.userManagement.logout.button')}</span>
+                  <span>{t('auth.userManagement.logout.button')}</span>
                 </button>
               </div>
             )}
           </div>
-
-          {/* Theme Selector */}
-          <ThemeSelector layout="sidebar" />
         </div>
 
         {/* Mobile close button */}
@@ -171,11 +285,16 @@ export default function Layout() {
       )}
 
       {/* Main content */}
-      <main className={`flex-1 overflow-auto font-sans relative transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
-        <div className="pt-16 lg:pt-0">
-          <Outlet />
-        </div>
-      </main>
+      {(() => {
+        const isFullHeightPage = location.pathname === '/chat' || location.pathname === '/kanban' || location.pathname === '/marketplace'
+        return (
+          <main className={`flex-1 ${isFullHeightPage ? 'overflow-hidden' : 'overflow-auto'} font-sans relative transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
+            <div className={`pt-16 lg:pt-0 ${isFullHeightPage ? 'h-full' : ''}`}>
+              <Outlet />
+            </div>
+          </main>
+        )
+      })()}
 
       {/* Quick Action Modal */}
       {showQuickAction && <QuickActionModal onClose={() => setShowQuickAction(false)} />}

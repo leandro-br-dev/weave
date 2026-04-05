@@ -4,7 +4,7 @@
     "taskNameRequired": "Task name is required",
     "taskPromptRequired": "Task prompt is required",
     "workingDirectoryRequired": "Working directory is required",
-    "agentWorkspaceRequired": "Agent team is required"
+    "agentWorkspaceRequired": "Team is required"
   },
   "backToPlans": "Back to Plans",
   "plans": "Plans",

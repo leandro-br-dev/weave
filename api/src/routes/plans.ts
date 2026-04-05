@@ -1,9 +1,50 @@
 import { Router, Request, Response } from 'express'
+import fs from 'fs'
 import { db } from '../db/index.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { randomUUID } from 'crypto'
+import { ensureWorkflowDir, writePlanJson } from '../services/workflowDir.js'
 
 const router = Router()
+
+// ───────────────────────────────────────────────────────────
+// POST /api/plans/prepare-workflow
+// Pre-create a workflow directory and return its path.
+// Called by the orchestrator BEFORE the planning agent runs,
+// so the agent can save plan.json directly to the blackboard.
+// ───────────────────────────────────────────────────────────
+router.post('/prepare-workflow', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { project_id, project_name } = req.body
+
+    if (!project_id) {
+      return res.status(400).json({ data: null, error: 'project_id is required' })
+    }
+
+    const workflowUuid = randomUUID()
+    const name = project_name || 'unknown'
+
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(name, workflowUuid)
+      console.log(`[plans] Workflow directory pre-created: ${workflowPath}`)
+    } catch (dirError) {
+      console.error(`[plans] Failed to pre-create workflow directory:`, dirError)
+      return res.status(500).json({ data: null, error: 'Failed to create workflow directory' })
+    }
+
+    // Store a placeholder so the UUID is reserved
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, workflow_path, created_at)
+      VALUES (?, '', '[]', 'draft', ?, ?, ?)
+    `).run(workflowUuid, project_id, workflowPath, new Date().toISOString())
+
+    res.json({ data: { id: workflowUuid, workflow_path: workflowPath }, error: null })
+  } catch (error) {
+    console.error('Error preparing workflow:', error)
+    res.status(500).json({ data: null, error: 'Failed to prepare workflow' })
+  }
+})
 
 // Helper function to parse tasks JSON string from SQLite
 function parsePlan(row: any) {
@@ -92,11 +133,12 @@ router.get('/', authenticateToken, (req: Request, res: Response) => {
 })
 
 // POST /api/plans - Create a new plan
+// If workflow_id is provided, reuses the pre-created workflow directory (Blackboard pattern).
 router.post('/', authenticateToken, (req: Request, res: Response) => {
   try {
-    const { name, tasks, project_id, status: requestedStatus }: CreatePlanBody & { status?: string } = req.body
+    const { name, tasks, project_id, status: requestedStatus, workflow_id }: CreatePlanBody & { status?: string; workflow_id?: string } = req.body
 
-    console.log(`[plans] Creating plan: name="${name}", project_id=${project_id}, tasks_count=${Array.isArray(tasks) ? tasks.length : 'parsed'}`)
+    console.log(`[plans] Creating plan: name="${name}", project_id=${project_id}, tasks_count=${Array.isArray(tasks) ? tasks.length : 'parsed'}, workflow_id=${workflow_id || 'none'}`)
 
     if (!name || !tasks) {
       console.error(`[plans] Missing required fields: name=${!!name}, tasks=${!!tasks}`)
@@ -130,15 +172,54 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
     const allowedStatuses = ['pending', 'awaiting_approval']
     const status = requestedStatus && allowedStatuses.includes(requestedStatus) ? requestedStatus : 'pending'
 
-    const id = randomUUID()
+    let id: string
+    let workflowPath: string | null = null
     const now = new Date().toISOString()
 
-    console.log(`[plans] Inserting plan: id=${id}, status=${status}`)
+    if (workflow_id) {
+      // ── Blackboard pattern: reuse pre-created workflow directory ──
+      id = workflow_id
+      console.log(`[plans] Reusing pre-created workflow: id=${id}`)
 
-    db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, project_id, attachments, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), now)
+      // Look up the existing draft plan to get workflow_path
+      const draft = db.prepare('SELECT workflow_path FROM plans WHERE id = ? AND status = ?').get(id, 'draft') as any
+      if (!draft) {
+        console.error(`[plans] Pre-created workflow ${id} not found or not in 'draft' status`)
+        return res.status(400).json({ data: null, error: 'Invalid or already consumed workflow_id' })
+      }
+      workflowPath = draft.workflow_path
+
+      // Update the draft plan with actual content
+      db.prepare(`
+        UPDATE plans SET name = ?, tasks = ?, status = ?, project_id = ?, attachments = ?, workflow_path = ?
+        WHERE id = ? AND status = 'draft'
+      `).run(name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), workflowPath, id)
+    } else {
+      // ── Legacy path: create new plan with new workflow directory ──
+      id = randomUUID()
+      console.log(`[plans] Inserting plan: id=${id}, status=${status}`)
+
+      // Resolve project name for workflow directory
+      let projectName = 'unknown'
+      if (project_id) {
+        const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(project_id) as any
+        if (project) projectName = project.name
+      }
+
+      // Create per-workflow directory with standard files
+      try {
+        workflowPath = ensureWorkflowDir(projectName, id)
+        console.log(`[plans] Workflow directory created: ${workflowPath}`)
+      } catch (dirError) {
+        console.error(`[plans] Failed to create workflow directory for plan ${id}:`, dirError)
+        // Non-fatal: the plan is still created, directory creation is best-effort
+      }
+
+      db.prepare(`
+        INSERT INTO plans (id, name, tasks, status, project_id, attachments, created_at, workflow_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), now, workflowPath)
+    }
 
     const plan = db
       .prepare('SELECT * FROM plans WHERE id = ?')
@@ -147,6 +228,11 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
     if (!plan) {
       console.error(`[plans] Failed to retrieve created plan ${id}`)
       return res.status(500).json({ data: null, error: 'Failed to retrieve created plan' })
+    }
+
+    // Write plan.json to the workflow directory so executor agents can read it
+    if (workflowPath) {
+      writePlanJson(workflowPath, { name, tasks: sanitizedTasks, id, status })
     }
 
     console.log(`[plans] Plan created successfully: id=${id}`)
@@ -173,7 +259,8 @@ router.get('/pending', authenticateToken, (req: Request, res: Response) => {
           started_at,
           completed_at,
           created_at,
-          attachments
+          attachments,
+          workflow_path
         FROM plans
         WHERE status = 'pending'
         ORDER BY created_at DESC
@@ -442,10 +529,10 @@ router.post('/:id/approve', authenticateToken, (req: Request, res: Response) => 
     }
     db.prepare("UPDATE plans SET status = 'pending' WHERE id = ?").run(req.params.id)
 
-    // Atualiza kanban task vinculada para in_progress
+    // Atualiza kanban task vinculada para in_dev
     db.prepare(`
       UPDATE kanban_tasks
-      SET "column" = 'in_progress',
+      SET "column" = 'in_dev',
           pipeline_status = 'running',
           updated_at = datetime('now')
       WHERE workflow_id = ?
@@ -504,6 +591,66 @@ router.get('/:id/attachments', authenticateToken, (req: Request, res: Response) 
   } catch (error) {
     console.error('Error fetching plan attachments:', error)
     res.status(500).json({ data: null, error: 'Failed to fetch plan attachments' })
+  }
+})
+
+// GET /api/plans/:id/workflow-files - Read workflow blackboard files (state.md, plan.json, errors.log)
+router.get('/:id/workflow-files', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Look up the plan and its workflow_path
+    const plan = db
+      .prepare('SELECT id, workflow_path FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    if (!plan.workflow_path) {
+      // No workflow directory — return empty files gracefully
+      return res.json({
+        data: {
+          state: null,
+          plan_json: null,
+          errors: null,
+        },
+        error: null,
+      })
+    }
+
+    const readFileSafe = (filePath: string): string | null => {
+      try {
+        if (!fs.existsSync(filePath)) return null
+        const content = fs.readFileSync(filePath, 'utf-8').trim()
+        return content.length > 0 ? content : null
+      } catch {
+        return null
+      }
+    }
+
+    const state = readFileSafe(`${plan.workflow_path}/state.md`)
+    const planJsonRaw = readFileSafe(`${plan.workflow_path}/plan.json`)
+    const errors = readFileSafe(`${plan.workflow_path}/errors.log`)
+
+    // Parse plan.json if present
+    let plan_json: any = null
+    if (planJsonRaw) {
+      try {
+        plan_json = JSON.parse(planJsonRaw)
+      } catch {
+        plan_json = planJsonRaw // return raw string if parsing fails
+      }
+    }
+
+    res.json({
+      data: { state, plan_json, errors },
+      error: null,
+    })
+  } catch (error) {
+    console.error('Error reading workflow files:', error)
+    res.status(500).json({ data: null, error: 'Failed to read workflow files' })
   }
 })
 
@@ -674,6 +821,11 @@ router.post('/:id/complete', authenticateToken, (req: Request, res: Response) =>
 
     const now = new Date().toISOString()
 
+    // Only update structured_output if explicitly provided — never overwrite
+    // previously saved structured output (e.g. from per-task save_structured_output)
+    // with NULL. Use COALESCE so a missing value preserves what's already in the DB.
+    const structured_output_json = structured_output ? JSON.stringify(structured_output) : null
+
     db.prepare(`
       UPDATE plans
       SET status = ?,
@@ -689,7 +841,7 @@ router.post('/:id/complete', authenticateToken, (req: Request, res: Response) =>
       now,
       result_status || null,
       result_notes || null,
-      structured_output ? JSON.stringify(structured_output) : null,
+      structured_output_json,
       id
     )
 
@@ -1364,13 +1516,8 @@ router.post('/:id/structured-output', authenticateToken, (req: Request, res: Res
       return res.status(404).json({ data: null, error: 'Plan not found' })
     }
 
-    // Normalize structured output format
-    // For improvement type, extract content directly to match frontend expectations
-    let normalizedOutput = output
-    if (output.type === 'improvement' && output.content) {
-      // For improvement, save content directly so frontend can access improvedContent
-      normalizedOutput = output.content
-    }
+    // Save structured output
+    const normalizedOutput = output
 
     db.prepare(
       'UPDATE plans SET structured_output = ? WHERE id = ?'
@@ -1378,7 +1525,6 @@ router.post('/:id/structured-output', authenticateToken, (req: Request, res: Res
 
     console.log(`[structured-output] Saved structured output for plan ${id}:`, {
       type: output.type,
-      hasImprovedContent: !!normalizedOutput.improvedContent
     })
 
     return res.json({ data: { saved: true }, error: null })

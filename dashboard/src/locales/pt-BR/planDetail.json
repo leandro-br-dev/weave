@@ -18,7 +18,7 @@
   "errorLoading": "Erro ao carregar plano",
   "notFound": "Plano não encontrado",
   "cannotSaveImprovements": "Não foi possível salvar melhorias",
-  "workspaceIdNotFound": "ID do time não encontrado",
+  "workspaceIdNotFound": "ID da equipe não encontrado",
   "claudeMdUpdated": "CLAUDE.md atualizado",
   "improvementsSaved": "Melhorias salvas",
   "failedToSaveImprovements": "Falha ao salvar melhorias",
@@ -98,5 +98,19 @@
   "reworkModeFullWorkflow": "Workflow Completo",
   "reworkModeFullWorkflowDesc": "O planner analisará o contexto e criará um novo plano com etapas adequadas",
   "reworkModeQuickAction": "Quick Action",
-  "reworkModeQuickActionDesc": "Execução direta em uma única etapa para correções simples"
+  "reworkModeQuickActionDesc": "Execução direta em uma única etapa para correções simples",
+  "workflowFiles": {
+    "title": "Contexto do Workflow",
+    "stateMd": "state.md",
+    "planJson": "plan.json",
+    "errorsLog": "errors.log",
+    "emptyState": "Nenhum estado registrado ainda. Os agentes ainda não começaram a escrever neste arquivo.",
+    "emptyPlan": "Nenhum dado de plano registrado ainda.",
+    "emptyErrors": "Nenhum erro registrado. Tudo limpo!",
+    "noData": "Sem dados",
+    "loading": "Carregando arquivos do workflow...",
+    "error": "Falha ao carregar arquivos do workflow.",
+    "refresh": "Atualizar",
+    "description": "Trilha de auditoria ao vivo mostrando a comunicação entre agentes: o que o Planner disse para o Coder, e o que o Coder disse para o Tester."
+  }
 }

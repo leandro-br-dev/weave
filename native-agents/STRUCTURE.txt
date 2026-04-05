@@ -7,14 +7,76 @@ native-agents/
 │                                      # - O que são sub-agentes nativos
 │                                      # - Comparativo com skills
 │                                      # - Guia para criar novos agentes
+│                                      # - Pipeline de desenvolvimento
 │
-└── explorer.md                        # Explorer Agent - Sub-agente nativo
-                                       # - Definição completa do agente em único arquivo
-                                       # - Workflow detalhado
-                                       # - Princípios chave
-                                       # - Formato de saída
-                                       # - Regras de otimização
-                                       # - Exemplos de uso
+├── explorer.md                        # Explorer Agent - Sub-agente nativo
+│                                      # - Definição completa do agente em único arquivo
+│                                      # - Workflow detalhado
+│                                      # - Princípios chave
+│                                      # - Formato de saída
+│                                      # - Regras de otimização
+│                                      # - Exemplos de uso
+│
+├── plan/                              # Sub-agentes de planejamento (pipeline)
+│   ├── analyst.md                     # Plan Analyst Agent (Haiku)
+│   │                                  # - Análise read-only do codebase
+│   │                                  # - Mapeamento de componentes
+│   │                                  # - Rastreamento de dependências
+│   │                                  # - Relatório estruturado
+│   │
+│   ├── architect.md                   # Plan Architect Agent (Sonnet/Opus)
+│   │                                  # - Avaliação de impacto
+│   │                                  # - Projeto da abordagem técnica
+│   │                                  # - Avaliação de riscos
+│   │                                  # - Especificação arquitetural
+│   │
+│   └── planner.md                     # Plan Planner Agent (Sonnet)
+│                                      # - Plano de execução JSON
+│                                      # - Decomposição de tarefas
+│                                      # - Ordenação por dependências (DAG)
+│                                      # - Identificação de paralelismo
+│
+├── dev/                               # Sub-agentes de desenvolvimento
+│   ├── backend-dev.md                 # Backend Developer Agent (Sonnet)
+│   │                                  # - Implementação de endpoints
+│   │                                  # - Lógica de negócios
+│   │                                  # - Operações de banco de dados
+│   │                                  # - Testes unitários
+│   │
+│   ├── frontend-dev.md                # Frontend Developer Agent (Sonnet)
+│   │                                  # - Componentes de UI
+│   │                                  # - Estilos e layouts responsivos
+│   │                                  # - Gerenciamento de estado
+│   │                                  # - Internacionalização
+│   │
+│   ├── tester.md                      # Quality Engineer Agent (Haiku)
+│   │                                  # - Verificação de tipos
+│   │                                  # - Linting
+│   │                                  # - Validação de qualidade
+│   │                                  # - Relatório estruturado
+│   │
+│   └── git-expert.md                  # Git Expert Agent (Haiku)
+│                                      # - Criação de branches
+│                                      # - Commits semânticos
+│                                      # - Pull requests
+│                                      # - Gerenciamento de branches
+│
+└── staging/                           # Sub-agentes de quality gates
+    ├── pr-handler.md                  # PR Handler Agent (Sonnet)
+    │                                  # - Orquestração de gates
+    │                                  # - Decisão de merge/reject
+    │                                  # - Relatório final
+    │
+    ├── code-reviewer.md               # Code Reviewer Agent (Sonnet)
+    │                                  # - Revisão de código sênior
+    │                                  # - Análise de complexidade
+    │                                  # - Detecção de débito técnico
+    │                                  # - Verificação de padrões
+    │
+    └── build-validator.md             # Build Validator Agent (Haiku)
+                                       # - Validação de build de produção
+                                       # - Tolerância zero a falhas
+                                       # - Relatório de erros exatos
 
 ================================================================================
 FORMATO DE ARQUIVO DE NATIVE AGENT
@@ -26,7 +88,7 @@ CADA NATIVE AGENT É UM ÚNICO ARQUIVO .MD COM A SEGUINTE ESTRUTURA:
    ---
    name: [nome do agente]
    description: [descrição curta]
-   model: [modelo preferido - ex: claude-3-5-sonnet]
+   model: [modelo preferido - ex: sonnet, haiku, opus]
    tools: [lista de ferramentas disponíveis]
    color: [cor para identificação visual]
    ---
@@ -43,47 +105,21 @@ CADA NATIVE AGENT É UM ÚNICO ARQUIVO .MD COM A SEGUINTE ESTRUTURA:
    - Instruções especiais
    - Tratamento de erros
 
-EXEMPLO DE ESTRUTURA:
-
-```markdown
----
-name: Explorer
-description: Fast agent specialized for exploring codebases
-model: claude-3-5-sonnet
-tools:
-  - All tools except Agent, ExitPlanMode, Edit, Write, NotebookEdit
-color: blue
----
-
-# Explorer Agent
-
-## Purpose
-[descrição do propósito]
-
-## Workflow
-[workflow detalhado]
-
-## Key Principles
-[princípios chave]
-
-...
-```
-
 ================================================================================
 COMO CRIAR NOVOS SUB-AGENTES
 ================================================================================
 
 PASSO A PASSO:
 
-1. Crie um novo arquivo .md no diretório native-agents/
-   Exemplo: debugger.md
+1. Crie um novo arquivo .md no diretório apropriado
+   Exemplo: dev/debugger.md
 
 2. Adicione o YAML frontmatter no início do arquivo:
    ```yaml
    ---
    name: [Nome do Agente]
    description: [Descrição curta em uma linha]
-   model: claude-3-5-sonnet
+   model: sonnet
    tools:
      - Liste as ferramentas disponíveis
    color: [blue/green/red/yellow/purple/orange]
@@ -116,81 +152,70 @@ PASSO A PASSO:
    - Ajuste conforme necessário
 
 ================================================================================
-GUIA RÁPIDO DE NAVEGAÇÃO
+PIPELINE DE DESENVOLVIMENTO
 ================================================================================
 
-📖 QUERO ENTENDER O SISTEMA:
-   → native-agents/README.md
-
-🔍 QUERO VER O EXPLORER AGENT:
-   → native-agents/explorer.md
-
-🚀 QUERO CRIAR NOVO AGENTE:
-   → Siga o passo a passo acima
-   → Use explorer.md como referência
-
-================================================================================
-TAMANHO DOS ARQUIVOS
-================================================================================
-
-Documentação Principal:
-  README.md (sistema)          4.2 KB  - Visão geral do sistema
-  explorer.md                 15.0 KB  - Explorer Agent completo
-  ────────────────────────────────────
-  TOTAL:                      ~19 KB   de documentação
+Task Request
+    ↓
+Plan Analyst (Haiku)
+  → Codebase Analysis Report
+    ↓
+Plan Architect (Sonnet/Opus)
+  → Architectural Specification
+    ↓
+Plan Planner (Sonnet)
+  → JSON Execution Plan
+    ↓
+Backend Dev (Sonnet) / Frontend Dev (Sonnet)
+  → Implement tasks from the plan
+    ↓
+Quality Engineer (Haiku)
+  → Type check + Linter + Validation
+    ↓
+Git Expert (Haiku)
+  → Branch → Commit → Push → PR
+    ↓
+staging-pr-handler (Sonnet)
+  → staging-build-validator (Haiku)
+  → staging-code-reviewer (Sonnet)
+  → Decision: MERGE or REJECT
+    ↓
+Review & Merge
 
 ================================================================================
 ORDEM RECOMENDADA DE LEITURA
 ================================================================================
 
-1. 📖 README.md (10 min)
+1. 📖 README.md
    Entenda o sistema de native agents
 
-2. 🔍 explorer.md (20 min)
-   Estude o exemplo completo do Explorer Agent
+2. 🔍 explorer.md
+   Estude o explorer agent
 
-3. 🚀 Crie seu próprio agente
-   Siga o formato e estrutura do Explorer
+3. 📋 plan/analyst.md → plan/architect.md → plan/planner.md
+   Entenda o pipeline de planejamento
 
-Total: ~30 minutos para entender e criar um novo agente
+4. 💻 dev/backend-dev.md / dev/frontend-dev.md
+   Entenda os agentes de implementação
 
-================================================================================
-COMO USAR NATIVE AGENTS
-================================================================================
+5. ✅ dev/tester.md / dev/git-expert.md
+   Entenda os agentes de qualidade e git
 
-Os native agents são usados através da ferramenta Agent:
-
-SINTAXE:
-
-  Agent: [nome-do-agente]
-  Task: [o que você precisa fazer]
-  Context: [contexto relevante - opcional]
-
-EXEMPLO:
-
-  Agent: Explorer
-  Task: Find all user authentication endpoints
-  Context: Working on login feature
-
-RESULTADO ESPERADO:
-
-  - Análise especializada do agente
-  - Informação formatada conforme seu tipo
-  - Alta eficiência e baixo custo
-  - Foco no objetivo específico
+6. 🚀 staging/pr-handler.md → staging/code-reviewer.md → staging/build-validator.md
+   Entenda os gates de staging
 
 ================================================================================
 MÉTRICAS DE DESEMPENHO
 ================================================================================
 
 ECONOMIA DE CUSTOS:
-  Antes (agentes gerais):  $0.15 por tarefa
-  Depois (native agents):   $0.02 por tarefa
-  Economia:                 87%
+  Antes (agentes gerais):  Custo elevado por tarefa
+  Depois (native agents):   Custo otimizado por tarefa
+  Economia:                 Significativa com uso de Haiku para tarefas simples
 
 EFICIÊNCIA:
-  Tokens:          3-5x melhor que agentes gerais
-  Velocidade:      40-60% mais rápido
+  Tokens:          Otimizados por especialização
+  Velocidade:      Mais rápido com agentes focados
   Precisão:        Alta (especializado)
   Manutenibilidade: Alta (arquivo único)
 
@@ -200,6 +225,7 @@ VANTAGENS DO FORMATO SINGLE-FILE:
   ✅ Rápido de carregar
   ✅ Auto-contido
   ✅ Fácil de compartilhar
+  ✅ Sem preconceitos tecnológicos (genérico e adaptável)
 
 ================================================================================
 STATUS DO PROJETO
@@ -207,25 +233,26 @@ STATUS DO PROJETO
 
 ✅ Estrutura single-file definida
 ✅ Explorer Agent implementado
-✅ Documentação completa (19 KB)
+✅ Pipeline de planejamento (analyst, architect, planner)
+✅ Agentes de desenvolvimento (backend, frontend, tester, git-expert)
+✅ Gates de staging (pr-handler, code-reviewer, build-validator)
+✅ Documentação completa
 ✅ Formato validado
-✅ Pronto para uso em produção
+✅ Pronto para uso
 
 ================================================================================
 PRÓXIMOS PASSOS
 ================================================================================
 
 1. Integração imediata:
-   □ Adicionar permissão Agent aos agentes principais
-   □ Incluir instruções dos native agents no CLAUDE.md
    □ Testar com cenários reais
    □ Coletar feedback
+   □ Usar "Improve with AI" para contextualizar com o projeto
 
 2. Desenvolvimento futuro:
    □ Criar Debugger Agent (debugger.md)
    □ Criar Refactorer Agent (refactorer.md)
    □ Criar Documenter Agent (documenter.md)
-   □ Criar Tester Agent (tester.md)
    □ Criar Migrator Agent (migrator.md)
 
 3. Melhorias da plataforma:

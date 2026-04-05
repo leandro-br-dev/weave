@@ -1,6 +1,6 @@
 {
   "title": "Marketplace",
-  "description": "Descubra e instale fluxos, agentes e integrações",
+  "description": "Descubra e instale fluxos, equipes e integrações",
   "searchPlaceholder": "Buscar marketplace...",
   "searching": "Buscando...",
   "noResults": "Nenhum resultado encontrado",
@@ -25,7 +25,7 @@
   "categories": {
     "all": "Todos",
     "workflows": "Fluxos de Trabalho",
-    "agents": "Agentes",
+    "agents": "Equipes",
     "integrations": "Integrações",
     "templates": "Modelos",
     "tools": "Ferramentas"

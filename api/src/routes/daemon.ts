@@ -116,6 +116,7 @@ router.post('/start', authenticateToken, (req, res) => {
       ...process.env,
       WEAVE_URL: apiUrl,
       WEAVE_TOKEN: token,
+      WEAVE_API_URL: apiUrl,
     },
   })
 

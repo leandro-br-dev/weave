@@ -49,7 +49,7 @@ export interface TestKanbanTask {
   project_id: string
   title: string
   description: string
-  column: 'backlog' | 'todo' | 'planning' | 'in_progress' | 'done'
+  column: 'backlog' | 'planning' | 'in_dev' | 'validation' | 'done'
   priority: number
   pipeline_status: 'idle' | 'running' | 'done' | 'failed'
   workflow_id: string | null
@@ -165,8 +165,8 @@ export function createTestProjects(count: number): TestProject[] {
 }
 
 export function createTestKanbanTasks(projectId: string, count: number): TestKanbanTask[] {
-  const columns: Array<'backlog' | 'todo' | 'planning' | 'in_progress' | 'done'> =
-    ['backlog', 'todo', 'planning', 'in_progress', 'done']
+  const columns: Array<'backlog' | 'planning' | 'in_dev' | 'validation' | 'done'> =
+    ['backlog', 'planning', 'in_dev', 'validation', 'done']
 
   return Array.from({ length: count }, (_, i) =>
     createTestKanbanTask(projectId, {

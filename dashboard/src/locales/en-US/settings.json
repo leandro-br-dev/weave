@@ -1,6 +1,6 @@
 {
   "title": "Settings",
-  "description": "Configure your API connection, agent daemon, and environment variables",
+  "description": "Configure your API connection, team daemon, and environment variables",
   "tabs": {
     "general": {
       "label": "General",
@@ -28,7 +28,7 @@
     },
     "system": {
       "label": "System",
-      "description": "Agent daemon and client management",
+      "description": "Team daemon and client management",
       "sections": ["daemon", "client"]
     }
   },
@@ -149,7 +149,7 @@
     }
   },
   "daemon": {
-    "title": "Agent Daemon",
+    "title": "Team Daemon",
     "status": {
       "running": "Running (PID {pid})",
       "stopped": "Stopped"
@@ -160,7 +160,7 @@
     }
   },
   "client": {
-    "title": "Agent Client",
+    "title": "Team Client",
     "managed": "✓ Managed via API",
     "managedDescription": "The daemon is now controlled through the interface above.",
     "manualStart": "If you need to start manually for debugging, the script is at: {scriptPath}"
@@ -182,14 +182,14 @@
     "title": "Backup & Restore",
     "description": "Export and import all your Weave data",
     "exportTitle": "Export Backup",
-    "exportDescription": "Download a complete backup of all projects, agents, kanban boards, chat history, and settings as a JSON file.",
+    "exportDescription": "Download a complete backup of all projects, teams, kanban boards, chat history, and settings as a JSON file.",
     "exportButton": "Download Backup",
     "exportSuccess": "Backup downloaded successfully!",
     "exportError": "Failed to export backup",
     "importTitle": "Import Backup",
     "importDescription": "Restore data from a previously exported Weave backup file. New IDs will be generated to avoid conflicts.",
     "importButton": "Select Backup File",
-    "importSuccess": "Import completed! {{projects}} projects and {{agents}} agents restored.",
+    "importSuccess": "Import completed! {{projects}} projects and {{agents}} teams restored.",
     "importError": "Failed to import backup",
     "importing": "Importing...",
     "importResultTitle": "Import completed successfully",
@@ -206,7 +206,7 @@
     "infoItems": {
       "projects": "Projects",
       "environments": "Environments",
-      "agents": "Agents",
+      "agents": "Teams",
       "kanbanTasks": "Kanban Tasks",
       "plans": "Plans/Workflows",
       "chatSessions": "Chat Sessions",

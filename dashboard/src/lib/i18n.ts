@@ -139,4 +139,17 @@ i18n
     },
   });
 
+// Keep the HTML lang attribute in sync with the selected language
+// so the browser applies correct spell-checking, hyphenation, and accessibility features
+const syncHtmlLang = (lng: string) => {
+  const normalized = lng.startsWith('pt') ? 'pt-BR' : 'en-US';
+  document.documentElement.lang = normalized;
+};
+
+// Sync on initial detection
+syncHtmlLang(i18n.language);
+
+// Sync on every language change (user switches via selector)
+i18n.on('languageChanged', syncHtmlLang);
+
 export default i18n;

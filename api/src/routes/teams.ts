@@ -9,6 +9,9 @@ import { AGENT_TEMPLATES, renderTemplate } from '../utils/claudeMdTemplates.js'
 import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { getDefaultEnvironmentVariables, mergeEnvironmentVariables } from '../utils/environmentVariables.js'
+import { TEAM_TEMPLATES, getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
+import { seedNativeAgentsForTeam } from '../services/nativeAgentsBootstrap.js'
+import { ensureWorkflowDir } from '../services/workflowDir.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -201,19 +204,67 @@ function getAgentParam(reqParams: any): string {
   return Array.isArray(agent) ? agent[0] : agent
 }
 
+/**
+ * Resolve a frontmatter agent name to the actual .md file on disk.
+ * The frontend sends the frontmatter `name` (e.g. "dev-backend"), but the
+ * file may be named differently (e.g. "backend-dev.md"). This helper
+ * first tries the direct slug, then falls back to scanning the agents
+ * directory for a matching frontmatter name.
+ */
+function resolveAgentFile(agentsDir: string, agentSlug: string): { filePath: string; fileSlug: string } | null {
+  const directPath = path.join(agentsDir, `${agentSlug}.md`)
+  if (fs.existsSync(directPath)) {
+    return { filePath: directPath, fileSlug: agentSlug }
+  }
+  if (!fs.existsSync(agentsDir)) return null
+  const mdFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+  for (const f of mdFiles) {
+    try {
+      const content = fs.readFileSync(path.join(agentsDir, f), 'utf-8')
+      const fm = parseYamlFrontmatter(content)
+      if (fm?.name === agentSlug) {
+        return { filePath: path.join(agentsDir, f), fileSlug: f.replace(/\.md$/, '') }
+      }
+    } catch { /* skip unreadable files */ }
+  }
+  return null
+}
+
 function getIdParam(reqParams: any): string {
   const id = reqParams.id
   return Array.isArray(id) ? id[0] : id
 }
 
 
-// GET /api/workspaces/templates — listar templates disponíveis
+// GET /api/teams/templates — listar templates de equipe disponíveis
 router.get('/templates', authenticateToken, (_req, res) => {
   return res.json({
     data: AGENT_TEMPLATES.map(t => ({
       id: t.id,
       label: t.label,
       description: t.description,
+    })),
+    error: null
+  })
+})
+
+// GET /api/teams/team-templates — listar templates de time pre-configurados
+router.get('/team-templates', authenticateToken, (_req, res) => {
+  return res.json({
+    data: TEAM_TEMPLATES.map(t => ({
+      id: t.id,
+      name: t.name,
+      label: t.label,
+      description: t.description,
+      role: t.role,
+      subAgents: t.subAgents.map(sa => ({
+        name: sa.name,
+        role: sa.role,
+        description: sa.description,
+        suggestedModel: sa.suggestedModel,
+      })),
+      permissions: t.permissions,
+      claudeMd: t.claudeMd,
     })),
     error: null
   })
@@ -243,22 +294,75 @@ router.get('/native-agents', authenticateToken, (_req, res) => {
   }
 
   try {
-    const files = fs.readdirSync(nativeAgentsPath)
-      .filter(f => f.endsWith('.md') && f !== 'README.md')
+    const agents: Array<{
+      name: string
+      description: string
+      model: string
+      tools: string | string[]
+      color: string
+      file: string
+      teamType: string
+      relativePath: string
+    }> = []
 
-    const agents = files.map(file => {
-      const filePath = path.join(nativeAgentsPath, file)
+    // Known team-type subdirectories to scan
+    const teamTypes = ['plan', 'dev', 'staging']
+
+    // Scan each team-type subdirectory
+    for (const teamType of teamTypes) {
+      const teamDir = path.join(nativeAgentsPath, teamType)
+      if (!fs.existsSync(teamDir)) continue
+
+      const files = fs.readdirSync(teamDir)
+        .filter(f => f.endsWith('.md') && f !== 'README.md')
+
+      for (const file of files) {
+        const filePath = path.join(teamDir, file)
+        const content = fs.readFileSync(filePath, 'utf-8')
+        const frontmatter = parseYamlFrontmatter(content)
+
+        agents.push({
+          name: frontmatter?.name || file.replace('.md', ''),
+          description: frontmatter?.description || '',
+          model: frontmatter?.model || 'unknown',
+          tools: frontmatter?.tools || [],
+          color: frontmatter?.color || 'gray',
+          file: file,
+          teamType,
+          relativePath: `${teamType}/${file}`,
+        })
+      }
+    }
+
+    // Also scan root-level .md files (excluding README, STRUCTURE, and known subdirectories)
+    const rootEntries = fs.readdirSync(nativeAgentsPath, { withFileTypes: true })
+    for (const entry of rootEntries) {
+      if (!entry.isFile()) continue
+      if (!entry.name.endsWith('.md')) continue
+      if (entry.name === 'README.md') continue
+
+      const filePath = path.join(nativeAgentsPath, entry.name)
       const content = fs.readFileSync(filePath, 'utf-8')
       const frontmatter = parseYamlFrontmatter(content)
 
-      return {
-        name: frontmatter?.name || file.replace('.md', ''),
+      agents.push({
+        name: frontmatter?.name || entry.name.replace('.md', ''),
         description: frontmatter?.description || '',
         model: frontmatter?.model || 'unknown',
         tools: frontmatter?.tools || [],
         color: frontmatter?.color || 'gray',
-        file: file
-      }
+        file: entry.name,
+        teamType: 'root',
+        relativePath: entry.name,
+      })
+    }
+
+    // Sort by teamType then name for consistent ordering
+    agents.sort((a, b) => {
+      const typeOrder: Record<string, number> = { plan: 0, dev: 1, staging: 2, root: 3 }
+      const typeCompare = (typeOrder[a.teamType] ?? 99) - (typeOrder[b.teamType] ?? 99)
+      if (typeCompare !== 0) return typeCompare
+      return a.name.localeCompare(b.name)
     })
 
     return res.json({ data: agents, error: null })
@@ -299,7 +403,14 @@ router.get('/:id', authenticateToken, (req, res) => {
   const agents = fs.existsSync(agentsPath)
     ? fs.readdirSync(agentsPath)
         .filter(f => f.endsWith('.md'))
-        .map(f => ({ name: f.replace('.md', ''), file: f }))
+        .map(f => {
+          const content = fs.readFileSync(path.join(agentsPath, f), 'utf-8')
+          const frontmatter = parseYamlFrontmatter(content)
+          return {
+            name: frontmatter?.name || f.replace('.md', ''),
+            file: f
+          }
+        })
     : []
 
   // Fetch linked environments
@@ -346,6 +457,7 @@ router.post('/', authenticateToken, (req, res) => {
     anthropic_base_url = 'http://localhost:8083',
     project_id,
     template_id,
+    team_id,
     role = 'coder',
     model = 'default',
     environment_variables: userEnvVars = {}
@@ -410,12 +522,19 @@ router.post('/', authenticateToken, (req, res) => {
   // Final merge: user vars take precedence over defaults
   const finalEnvVars = mergeEnvironmentVariables(userProvidedVars, defaultEnvVars)
 
+  // Resolve team template if team_id is provided
+  const teamTemplate = team_id ? getTeamTemplateById(team_id) : null
+
+  // Use team permissions or default
+  const permissionsAllow = teamTemplate?.permissions.allow ?? ['Read', 'Edit', 'Write', 'Bash', 'Glob']
+  const permissionsDeny = teamTemplate?.permissions.deny ?? ['Bash(git push --force)', 'Bash(sudo:*)']
+
   const settings = {
     $schema: 'https://json.schemastore.org/claude-code-settings.json',
     env: finalEnvVars,
     permissions: {
-      allow: ['Read', 'Edit', 'Write', 'Bash', 'Glob'],
-      deny: ['Bash(git push --force)', 'Bash(sudo:*)'],
+      allow: permissionsAllow,
+      deny: permissionsDeny,
       additionalDirectories: [projectTarget]
     }
   }
@@ -426,7 +545,14 @@ router.post('/', authenticateToken, (req, res) => {
 
   // Gerar conteúdo do CLAUDE.md
   let claudeMdContent: string
-  if (template_id) {
+  if (teamTemplate) {
+    // Use team template CLAUDE.md (highest priority)
+    claudeMdContent = renderTeamClaudeMd(teamTemplate, {
+      agentName: name,
+      projectName: project?.name ?? 'Unknown Project',
+      workspacePath: coderPath,
+    })
+  } else if (template_id) {
     const template = AGENT_TEMPLATES.find(t => t.id === template_id)
     if (template) {
       claudeMdContent = renderTemplate(template, {
@@ -457,6 +583,24 @@ router.post('/', authenticateToken, (req, res) => {
     db.prepare(
       'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
     ).run(coderPath, role)
+  }
+
+  // Seed native agents when a team template is used
+  if (team_id) {
+    try {
+      // Derive team type from the team template ID: 'plan-team' → 'plan', etc.
+      const teamTypeMap: Record<string, string> = {
+        'plan-team': 'plan',
+        'dev-team': 'dev',
+        'staging-team': 'staging',
+      }
+      const teamType = teamTypeMap[team_id]
+      if (teamType) {
+        seedNativeAgentsForTeam(coderPath, teamType)
+      }
+    } catch (err) {
+      console.error('[workspaces] Failed to seed native agents:', err)
+    }
   }
 
   return res.status(201).json({
@@ -789,7 +933,7 @@ router.delete('/:id', authenticateToken, (req, res) => {
   return res.json({ data: { deleted: true, workspace_path: coderPath }, error: null })
 })
 
-// PUT /api/workspaces/:id/rename — renomear workspace (agent)
+// PUT /api/workspaces/:id/rename — renomear workspace (equipe)
 router.put('/:id/rename', authenticateToken, (req, res) => {
   const id = getIdParam(req.params)
   const { name } = req.body
@@ -902,13 +1046,13 @@ router.get('/:id/agents/:agent', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Agent not found' })
   }
 
-  const agentPath = path.join(
-    workspace.path, '.claude', 'agents',
-    `${getAgentParam(req.params)}.md`
-  )
-  const content = readFileSafe(agentPath)
+  const agentSlug = getAgentParam(req.params)
+  const agentsDir = path.join(workspace.path, '.claude', 'agents')
+  const resolved = resolveAgentFile(agentsDir, agentSlug)
+  if (!resolved) return res.status(404).json({ data: null, error: 'Agent not found' })
+  const content = readFileSafe(resolved.filePath)
   if (content === null) return res.status(404).json({ data: null, error: 'Agent not found' })
-  return res.json({ data: { name: getAgentParam(req.params), content }, error: null })
+  return res.json({ data: { name: agentSlug, content }, error: null })
 })
 
 // PUT /api/workspaces/:id/agents/:agent — criar ou editar agent .md
@@ -932,7 +1076,15 @@ router.put('/:id/agents/:agent', authenticateToken, (req, res) => {
   }
   const agentsDir = path.join(coderPath, '.claude', 'agents')
   if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true })
-  fs.writeFileSync(path.join(agentsDir, `${getAgentParam(req.params)}.md`), content)
+
+  // If an existing file matches this agent name (by frontmatter), update it in place;
+  // otherwise create a new file using the slug as filename.
+  const agentSlug = getAgentParam(req.params)
+  const resolved = resolveAgentFile(agentsDir, agentSlug)
+  const destPath = resolved
+    ? resolved.filePath
+    : path.join(agentsDir, `${agentSlug}.md`)
+  fs.writeFileSync(destPath, content)
   return res.json({ data: { saved: true }, error: null })
 })
 
@@ -945,15 +1097,37 @@ router.delete('/:id/agents/:agent', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Agent not found' })
   }
 
-  const agentPath = path.join(
-    workspace.path, '.claude', 'agents',
-    `${getAgentParam(req.params)}.md`
-  )
-  if (!fs.existsSync(agentPath)) {
-    return res.status(404).json({ data: null, error: 'Agent not found' })
+  const agentSlug = getAgentParam(req.params)
+  const agentsDir = path.join(workspace.path, '.claude', 'agents')
+  const resolved = resolveAgentFile(agentsDir, agentSlug)
+
+  // Delete the file if it exists; if it's already gone, that's fine —
+  // we still proceed to clean up any database references so the agent
+  // is fully unlinked from the team.
+  let fileDeleted = false
+  if (resolved) {
+    fs.unlinkSync(resolved.filePath)
+    fileDeleted = true
   }
-  fs.unlinkSync(agentPath)
-  return res.json({ data: { deleted: true }, error: null })
+
+  // Clean up related database entries (team_native_agents, team_models)
+  // Try both the frontmatter name and the file slug to cover all cases
+  const workspacePath = workspace.path
+  db.prepare(
+    'DELETE FROM team_native_agents WHERE team_workspace_path = ? AND slug = ?'
+  ).run(workspacePath, agentSlug)
+  if (resolved) {
+    db.prepare(
+      'DELETE FROM team_native_agents WHERE team_workspace_path = ? AND slug = ?'
+    ).run(workspacePath, resolved.fileSlug)
+  }
+
+  const modelKey = `${workspacePath}::${agentSlug}`
+  db.prepare(
+    'DELETE FROM team_models WHERE workspace_path = ?'
+  ).run(modelKey)
+
+  return res.json({ data: { deleted: true, fileExisted: fileDeleted }, error: null })
 })
 
 // GET /api/workspaces/:id/environments — listar ambientes vinculados
@@ -1141,10 +1315,12 @@ function parseYamlFrontmatter(content: string): any {
   return result
 }
 
-// POST /api/workspaces/:id/native-agents/:agentName — instalar agente nativo no workspace
-router.post('/:id/native-agents/:agentName', authenticateToken, (req, res) => {
+// POST /api/workspaces/:id/native-agents/* — instalar agente nativo na equipe
+// agentName can be: "plan-analyst" (looks in plan/, dev/, staging/ subdirs) or "plan/plan-analyst" (explicit path)
+// Using wildcard (*) instead of :agentName to correctly capture paths with slashes (e.g., "dev/backend-dev.md")
+router.post('/:id/native-agents/*', authenticateToken, (req, res) => {
   const id = getIdParam(req.params)
-  const agentName = Array.isArray(req.params.agentName) ? req.params.agentName[0] : req.params.agentName
+  const agentName = (Array.isArray(req.params[0]) ? req.params[0][0] : req.params[0]) || ''
   const workspace = listAllWorkspaces().find(ws => ws.id === id)
 
   if (!workspace) {
@@ -1152,9 +1328,37 @@ router.post('/:id/native-agents/:agentName', authenticateToken, (req, res) => {
   }
 
   const nativeAgentsPath = path.join(__dirname, '../../../native-agents')
-  const agentSourceFile = path.join(nativeAgentsPath, `${agentName}.md`)
 
-  if (!fs.existsSync(agentSourceFile)) {
+  // Determine source file: support both "plan-analyst" (auto-search) and "plan/plan-analyst" (explicit)
+  // agentName may come with or without .md extension (relativePath from GET includes .md)
+  let agentSourceFile: string | null = null
+  const rawName = agentName.endsWith('.md') ? agentName.slice(0, -3) : agentName
+  let agentFileName = rawName
+
+  if (rawName.includes('/')) {
+    // Explicit relative path provided (e.g., "plan/plan-analyst")
+    agentSourceFile = path.join(nativeAgentsPath, `${rawName}.md`)
+    agentFileName = rawName.split('/').pop()!
+  } else {
+    // Auto-search in team-type subdirectories first, then root
+    const teamTypes = ['plan', 'dev', 'staging']
+    for (const teamType of teamTypes) {
+      const candidate = path.join(nativeAgentsPath, teamType, `${rawName}.md`)
+      if (fs.existsSync(candidate)) {
+        agentSourceFile = candidate
+        break
+      }
+    }
+    // Fallback to root directory
+    if (!agentSourceFile) {
+      const rootCandidate = path.join(nativeAgentsPath, `${rawName}.md`)
+      if (fs.existsSync(rootCandidate)) {
+        agentSourceFile = rootCandidate
+      }
+    }
+  }
+
+  if (!agentSourceFile || !fs.existsSync(agentSourceFile)) {
     return res.status(404).json({ data: null, error: 'Native agent not found' })
   }
 
@@ -1165,7 +1369,23 @@ router.post('/:id/native-agents/:agentName', authenticateToken, (req, res) => {
       fs.mkdirSync(agentsDir, { recursive: true })
     }
 
-    const agentDestFile = path.join(agentsDir, `${agentName}.md`)
+    // Read the frontmatter to use its name as the destination filename
+    // This ensures the installed filename matches the native agent's frontmatter name
+    const sourceContent = fs.readFileSync(agentSourceFile, 'utf-8')
+    const sourceFrontmatter = parseYamlFrontmatter(sourceContent)
+    const destName = sourceFrontmatter?.name || agentFileName
+
+    const agentDestFile = path.join(agentsDir, `${destName}.md`)
+
+    // If the old filename (from directory path) differs from the frontmatter name,
+    // remove the old file to avoid duplicates
+    if (destName !== agentFileName) {
+      const oldFile = path.join(agentsDir, `${agentFileName}.md`)
+      if (fs.existsSync(oldFile)) {
+        fs.unlinkSync(oldFile)
+      }
+    }
+
     fs.copyFileSync(agentSourceFile, agentDestFile)
 
     // Add 'Agent' to permissions.allow if not present
@@ -1246,18 +1466,32 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
       currentClaudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8')
     }
 
-    // Create the plan first (so we can use planId in the prompt)
+    // Create the plan first (so we can use planId and workflowPath in the prompt)
     const planId = uuidv4()
     const taskId = uuidv4()
 
-    // Create improvement prompt (now that we have planId)
+    // Create workflow directory for this plan
+    let projectName = 'unknown'
+    if (workspace.project_id) {
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(workspace.project_id) as any
+      if (project) projectName = project.name
+    }
+
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(projectName, planId)
+      console.log(`[teams] Workflow directory created for improvement: ${workflowPath}`)
+    } catch (dirError) {
+      console.error(`[teams] Failed to create workflow directory for improvement plan ${planId}:`, dirError)
+    }
+
+    // Create improvement prompt
     const prompt = `You are an expert at writing clear, concise, and effective CLAUDE.md files for AI coding agents. Your task is to improve the following CLAUDE.md content while maintaining its core purpose and structure.
 
 Context:
 - This CLAUDE.md is for the "${workspace.name}" agent
 - The agent workspace is located at: ${workspace.path}
 - The agent role is: ${workspace.role || 'generic'}
-- Plan ID: ${planId} (you will need this to save the result)
 
 Current CLAUDE.md file content (use as base reference):
 ${currentClaudeMdContent || '(No existing CLAUDE.md file)'}
@@ -1276,50 +1510,16 @@ Guidelines for improvement:
 8. Consider both the existing file (if any) and the user-provided content
 9. Preserve valuable information from the existing file while incorporating improvements from the user content
 
-## IMPORTANT: Save the result
+## IMPORTANT: Output format — READ CAREFULLY
 
-After improving the CLAUDE.md content, you MUST save the result by running this command using Python:
+1. Write the improved CLAUDE.md content to the file: ${workflowPath}/team-improvement.json
+   The file must contain a JSON object with the field "claudeMd" containing the full improved CLAUDE.md content.
+   Example:
+   { "claudeMd": "# Agent Name\\n\\nImproved CLAUDE.md content here..." }
 
-\`\`\`bash
-python3 -c "
-import json, urllib.request, urllib.error, sys
+2. Validate by running in the terminal: weave-validate team-improvement ${workflowPath}/team-improvement.json
 
-# The improved content - replace this with your actual improved content
-improved_content = '''PASTE_YOUR_IMPROVED_CONTENT_HERE'''
-
-# Prepare the request
-payload = json.dumps({
-    'output': {
-        'improvedContent': improved_content
-    }
-}).encode()
-
-req = urllib.request.Request(
-    'http://localhost:3000/api/plans/${planId}/structured-output',
-    data=payload,
-    headers={
-        'Authorization': 'Bearer dev-token-change-in-production',
-        'Content-Type': 'application/json'
-    },
-    method='POST'
-)
-
-try:
-    resp = urllib.request.urlopen(req)
-    result = resp.read().decode()
-    print('✅ Successfully saved improved CLAUDE.md:', result)
-except urllib.error.HTTPError as e:
-    print(f'❌ HTTP Error saving improved content: {e.code} - {e.read().decode()}')
-    sys.exit(1)
-except Exception as e:
-    print(f'❌ Error saving improved content: {e}')
-    sys.exit(1)
-"
-\`\`\`
-
-Replace the PASTE_YOUR_IMPROVED_CONTENT_HERE placeholder with your actual improved CLAUDE.md content.
-
-This step is REQUIRED for the approval flow to work. Do not skip it. The task is not complete until you have successfully saved the result.`
+3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
     const tasks = [{
       id: taskId,
@@ -1327,15 +1527,15 @@ This step is REQUIRED for the approval flow to work. Do not skip it. The task is
       prompt,
       cwd: process.cwd(),
       workspace: plannerWorkspace,
-      tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Skill'],
+      tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',
       depends_on: [],
     }]
 
     db.prepare(`
-      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id)
-      VALUES (?, ?, ?, 'pending', ?, 'improve_claude_md', ?)
-    `).run(planId, `Improve CLAUDE.md for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id)
+      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id, workflow_path)
+      VALUES (?, ?, ?, 'pending', ?, 'improve_claude_md', ?, ?)
+    `).run(planId, `Improve CLAUDE.md for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id, workflowPath)
 
     return res.status(201).json({
       data: {
@@ -1347,6 +1547,149 @@ This step is REQUIRED for the approval flow to work. Do not skip it. The task is
     })
   } catch (error) {
     console.error('Error creating improve CLAUDE.md plan:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to create improvement task'
+    })
+  }
+})
+
+// POST /api/workspaces/:id/improve-agent — melhorar agente com IA usando planner
+router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  const { agentName, currentContent } = req.body
+
+  if (!agentName || typeof agentName !== 'string') {
+    return res.status(400).json({ data: null, error: 'agentName is required' })
+  }
+
+  if (!currentContent || typeof currentContent !== 'string') {
+    return res.status(400).json({ data: null, error: 'currentContent is required' })
+  }
+
+  try {
+    // Get planner workspace for this project
+    const plannerRow = db.prepare(`
+      SELECT pa.workspace_path FROM project_agents pa
+      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
+      WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
+      LIMIT 1
+    `).get(workspace.project_id) as any
+
+    const plannerWorkspace = plannerRow?.workspace_path ||
+      path.join(AGENTS_BASE_PATH, 'weave', 'agents', 'planner')
+
+    // Read current CLAUDE.md if it exists to provide project context
+    let claudeMdContent = ''
+    const claudeMdPath = path.join(workspace.path, 'CLAUDE.md')
+    if (fs.existsSync(claudeMdPath)) {
+      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8')
+    }
+
+    // Read all agent files to provide team context
+    const agentsDir = path.join(workspace.path, '.claude', 'agents')
+    let otherAgentsContext = ''
+    if (fs.existsSync(agentsDir)) {
+      const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+      for (const af of agentFiles) {
+        const agentContent = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+        if (!af.startsWith(agentName)) {
+          otherAgentsContext += `\n--- ${af} ---\n${agentContent.substring(0, 500)}\n`
+        }
+      }
+    }
+
+    // Create the plan first (so we can use planId and workflowPath in the prompt)
+    const planId = uuidv4()
+    const taskId = uuidv4()
+
+    // Create workflow directory for this plan
+    let projectName = 'unknown'
+    if (workspace.project_id) {
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(workspace.project_id) as any
+      if (project) projectName = project.name
+    }
+
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(projectName, planId)
+      console.log(`[teams] Workflow directory created for improvement: ${workflowPath}`)
+    } catch (dirError) {
+      console.error(`[teams] Failed to create workflow directory for improvement plan ${planId}:`, dirError)
+    }
+
+    // Create improvement prompt
+    const prompt = `You are an expert at writing clear, concise, and effective agent definitions for AI coding agents (Claude Code). Your task is to improve the following agent definition while maintaining its core purpose and structure.
+
+Context:
+- This agent is named "${agentName}" and belongs to the "${workspace.name}" team
+- The team workspace is located at: ${workspace.path}
+- The team role is: ${workspace.role || 'generic'}
+
+Team CLAUDE.md (project context):
+${claudeMdContent || '(No CLAUDE.md file found)'}
+
+Other agents on this team (for coordination context):
+${otherAgentsContext || '(No other agents on this team)'}
+
+Current agent definition to improve:
+${currentContent}
+
+Guidelines for improvement:
+1. Make the agent's purpose and triggers clearer and more specific
+2. Improve YAML frontmatter (name, description, model, tools, color)
+3. Add detailed instructions for when and how to invoke this agent
+4. Improve organization, readability, and structure of the markdown content
+5. Add missing important context or behavior guidelines
+6. Remove redundant or verbose content
+7. Ensure the tone is professional and directive
+8. Consider the team's CLAUDE.md context and other agents for coordination
+9. Optimize tool selection based on the agent's responsibilities
+10. Keep any project-specific information and frontmatter structure intact
+
+## IMPORTANT: Output format — READ CAREFULLY
+
+1. Write the improved agent definition to the file: ${workflowPath}/agent-improvement.json
+   The file must contain a JSON object with the field "agentContent" containing the FULL improved agent definition (including YAML frontmatter and all markdown content).
+   Example:
+   { "agentContent": "---\\nname: agent-name\\ndescription: \\"Improved description\\"\\n---\\n\\n# Agent Name\\n\\nImproved content here..." }
+
+2. Validate by running in the terminal: weave-validate agent ${workflowPath}/agent-improvement.json
+
+3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
+
+    const tasks = [{
+      id: taskId,
+      name: `Improve agent "${agentName}" with AI`,
+      prompt,
+      cwd: process.cwd(),
+      workspace: plannerWorkspace,
+      tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
+      permission_mode: 'acceptEdits',
+      depends_on: [],
+    }]
+
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id, workflow_path)
+      VALUES (?, ?, ?, 'pending', ?, 'improve_agent', ?, ?)
+    `).run(planId, `Improve agent "${agentName}" for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id, workflowPath)
+
+    return res.status(201).json({
+      data: {
+        planId,
+        taskId,
+        message: `Agent "${agentName}" improvement task created successfully`
+      },
+      error: null
+    })
+  } catch (error) {
+    console.error('Error creating improve agent plan:', error)
     return res.status(500).json({
       data: null,
       error: error instanceof Error ? error.message : 'Failed to create improvement task'

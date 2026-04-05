@@ -1241,6 +1241,36 @@ class DaemonClient:
             logger.warning(f"Failed to update kanban pipeline: {e}")
             return {}
 
+    async def prepare_workflow(self, project_id: str, project_name: str = '') -> dict:
+        """
+        Pre-create a workflow directory and return its path.
+
+        POST /api/plans/prepare-workflow
+
+        The orchestrator calls this BEFORE the planning agent runs so that
+        the agent can save plan.json directly to the blackboard directory.
+
+        Args:
+            project_id: Project UUID
+            project_name: Project name for directory slugification
+
+        Returns:
+            dict with 'id' (workflow UUID) and 'workflow_path', or empty dict on error
+        """
+        try:
+            data = await self._post("/plans/prepare-workflow", {
+                "project_id": project_id,
+                "project_name": project_name,
+            })
+            if not isinstance(data, dict):
+                logger.error(f'[DaemonClient] prepare_workflow: unexpected response type {type(data).__name__}')
+                return {}
+            logger.info(f'[DaemonClient] Workflow prepared: id={data.get("id")}, path={data.get("workflow_path")}')
+            return data
+        except Exception as e:
+            logger.error(f'[DaemonClient] Failed to prepare workflow: {type(e).__name__}: {e}')
+            return {}
+
     async def create_plan_from_data(self, plan_data: dict) -> dict:
         """
         Cria um workflow a partir de um dict de plano.

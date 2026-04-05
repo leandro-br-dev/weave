@@ -98,5 +98,19 @@
   "reworkModeFullWorkflow": "Full Workflow",
   "reworkModeFullWorkflowDesc": "The planner will analyze the context and create a new plan with appropriate steps",
   "reworkModeQuickAction": "Quick Action",
-  "reworkModeQuickActionDesc": "Direct single-step execution for simple fixes"
+  "reworkModeQuickActionDesc": "Direct single-step execution for simple fixes",
+  "workflowFiles": {
+    "title": "Workflow Context",
+    "stateMd": "state.md",
+    "planJson": "plan.json",
+    "errorsLog": "errors.log",
+    "emptyState": "No state recorded yet. The agents have not started writing to this file.",
+    "emptyPlan": "No plan data recorded yet.",
+    "emptyErrors": "No errors recorded. Everything looks clean!",
+    "noData": "No data",
+    "loading": "Loading workflow files...",
+    "error": "Failed to load workflow files.",
+    "refresh": "Refresh",
+    "description": "Live audit trail showing communication between agents: what the Planner told the Coder, and what the Coder told the Tester."
+  }
 }

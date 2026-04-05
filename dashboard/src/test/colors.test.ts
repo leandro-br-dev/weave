@@ -832,6 +832,7 @@ describe('Type Safety', () => {
       border: 'border-gray-200',
       itemHover: 'hover:bg-gray-100',
       itemText: 'text-gray-700',
+      itemChecked: 'data-[state=checked]:bg-orange-50 data-[state=checked]:text-orange-700',
       divider: 'border-gray-100',
     }
 
@@ -840,6 +841,7 @@ describe('Type Safety', () => {
     expect(sample.border).toBeTruthy()
     expect(sample.itemHover).toBeTruthy()
     expect(sample.itemText).toBeTruthy()
+    expect(sample.itemChecked).toBeTruthy()
     expect(sample.divider).toBeTruthy()
   })
 
@@ -988,6 +990,7 @@ describe('Dropdown Colors', () => {
     expect(dropdownColors.border).toBeDefined()
     expect(dropdownColors.itemHover).toBeDefined()
     expect(dropdownColors.itemText).toBeDefined()
+    expect(dropdownColors.itemChecked).toBeDefined()
     expect(dropdownColors.divider).toBeDefined()
   })
 
@@ -1000,6 +1003,7 @@ describe('Dropdown Colors', () => {
     expect(darkModeDropdownColors.border).toBeDefined()
     expect(darkModeDropdownColors.itemHover).toBeDefined()
     expect(darkModeDropdownColors.itemText).toBeDefined()
+    expect(darkModeDropdownColors.itemChecked).toBeDefined()
     expect(darkModeDropdownColors.divider).toBeDefined()
   })
 

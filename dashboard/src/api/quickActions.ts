@@ -7,7 +7,6 @@ export interface QuickActionPayload {
   team_id: string
   environment_id?: string
   project_id?: string
-  native_skill?: string
   attachment_ids?: string[]
 }
 

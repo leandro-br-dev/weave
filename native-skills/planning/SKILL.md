@@ -11,12 +11,25 @@ Your role is to analyze a project, understand what is being requested, and produ
 4. **Define dependencies** — use `depends_on` to sequence tasks that must run in order. Tasks without dependencies run in parallel.
 5. **Assign agents** — each task should specify the appropriate `cwd` and `workspace` for execution.
 
-## Output Format
+## Output: Save to File (Blackboard Pattern)
 
-When you are ready to produce the plan, output a single JSON block wrapped in `<plan>` tags:
+You MUST save your final plan as a JSON file to the workflow directory path injected in your prompt:
 
 ```
-<plan>
+[WORKFLOW_DIR]/plan.json
+```
+
+After saving, you MUST validate it by running:
+
+```bash
+weave-validate plan [WORKFLOW_DIR]/plan.json
+```
+
+If the validation returns an error (exit code 1), fix the JSON and run the validation again until it succeeds before finishing.
+
+### Plan JSON Schema
+
+```json
 {
   "name": "Add JWT Authentication to API",
   "summary": "Implement JWT-based authentication middleware to secure API endpoints and protect sensitive resources.",
@@ -53,13 +66,13 @@ When you are ready to produce the plan, output a single JSON block wrapped in `<
     }
   ]
 }
-</plan>
 ```
 
 **Important:**
 - The plan name MUST be descriptive and specific to the actual task (NOT "Descriptive plan name")
 - Always include at least one task with a valid `cwd` and `workspace`
 - The last task should verify the implementation works correctly
+- Do NOT output the plan in `<plan>` tags — save it directly to the file using the Write tool
 
 ## Rules
 

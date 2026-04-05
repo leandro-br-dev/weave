@@ -67,7 +67,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className={`min-h-screen ${withDarkMode(bgColors.primary, darkModeBgColors.primary)}`}>
+    <div className={withDarkMode(bgColors.primary, darkModeBgColors.primary)}>
       <div className="max-w-3xl mx-auto px-4 py-8 lg:px-8">
         <PageHeader title={t('auth.userManagement.title')} />
 

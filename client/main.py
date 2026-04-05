@@ -379,6 +379,9 @@ async def on_plan_completed(plan: dict, client, success: bool) -> None:
     """
     Callback chamado quando um plano finaliza — atualiza kanban task vinculada.
 
+    Usa handle_team_completion() do team_trigger para decidir a transição
+    com base nos gates configurados no projeto.
+
     Args:
         plan: Plan data dict with id, project_id, etc.
         client: DaemonClient instance
@@ -401,22 +404,54 @@ async def on_plan_completed(plan: dict, client, success: bool) -> None:
 
         task_id = linked['id']
 
-        if success:
-            # Move para done e marca pipeline como done
-            await client._patch(f'/kanban/{project_id}/{task_id}', {
-                'column': 'done',
-                'pipeline_status': 'done'
-            })
-            logger.success(f'[KanbanPipeline] Task {task_id} moved to done')
-        else:
-            # Marca pipeline como failed mas mantém na coluna
-            await client.update_kanban_pipeline(
-                project_id, task_id,
-                pipeline_status='failed',
-                error_message='Workflow completed with failures'
-            )
+        # Busca configurações do projeto (gates)
+        project_settings = await _get_project_settings(project_id, client)
+
+        # Monta plan dict para handle_team_completion
+        plan_info = {
+            'status': 'success' if success else 'failed',
+            'result_status': plan.get('result_status'),
+            'result_notes': plan.get('result_notes', ''),
+        }
+
+        if not success:
+            plan_info['result_notes'] = 'Workflow completed with failures'
+
+        # Usa handle_team_completion para decidir transição com base nos gates
+        from orchestrator.team_trigger import handle_team_completion
+        await handle_team_completion(linked, plan_info, project_settings, project_id, client)
+
     except Exception as e:
         logger.warning(f'Failed to update kanban after plan completion: {e}')
+
+
+async def _get_project_settings(project_id: str, client) -> dict:
+    """
+    Busca as configurações do projeto (gates, limits, etc.).
+
+    Args:
+        project_id: ID do projeto
+        client: DaemonClient instance
+
+    Returns:
+        Dict com as configurações do projeto
+    """
+    try:
+        import json
+        projects = await client.get_all_projects()
+        for project in projects:
+            if project.get('id') == project_id:
+                settings = project.get('settings', {})
+                if isinstance(settings, str):
+                    try:
+                        settings = json.loads(settings)
+                    except Exception:
+                        settings = {}
+                return settings
+        return {}
+    except Exception as e:
+        logger.warning(f'Failed to fetch project settings: {e}')
+        return {}
 
 
 async def _run_plan(plan_data: dict, client: object, running_plans: set[str], running_plans_started: dict[str, float]) -> None:
@@ -473,7 +508,7 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
             )
             for t in tasks_data
         ]
-        plan = Plan(id=plan_id, name=plan_name, tasks=tasks)
+        plan = Plan(id=plan_id, name=plan_name, tasks=tasks, workflow_path=plan_data.get("workflow_path"))
 
         # Execute the plan with log collection
         try:
@@ -554,7 +589,13 @@ async def run_daemon(server_url: str, token: str) -> None:
         logger.info("Unsetting CLAUDECODE to avoid nested session detection")
         del os.environ['CLAUDECODE']
 
-    # Write PID file    
+    # Ensure WEAVE_API_URL is set in os.environ so the weave-validate script
+    # (and any subprocess spawned by the Claude Agent SDK) can reach the API.
+    if not os.environ.get('WEAVE_API_URL'):
+        os.environ['WEAVE_API_URL'] = server_url
+        logger.info(f"WEAVE_API_URL set to {server_url}")
+
+    # Write PID file
     pid_file = os.environ.get('WEAVE_DAEMON_PID_FILE', '/tmp/weave-daemon.pid')
     try:
         with open(pid_file, 'w') as f:

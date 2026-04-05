@@ -1,10 +1,11 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { useState, useRef, useMemo, useEffect } from 'react'
-import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2 } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, type EnvironmentVariableValue } from '@/components'
+import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown } from 'lucide-react'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, type EnvironmentVariableValue } from '@/components'
+import { getActiveToken, getApiUrl } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
 import { useTranslation } from 'react-i18next'
@@ -193,7 +194,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
       // Navega para o workflow gerado
       navigate(`/plans/${data.plan_id}`)
     } catch (err) {
-      setGenerateError('Failed to start agent generation. Please try again.')
+      setGenerateError('Failed to start team generation. Please try again.')
     } finally {
       setGenerating(false)
     }
@@ -213,7 +214,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
   }
 
   if (isLoading) return <div className="p-8">Loading...</div>
-  if (error) return <div className={`p-4 sm:p-8 ${errorColors.text}`}>Error loading agents</div>
+  if (error) return <div className={`p-4 sm:p-8 ${errorColors.text}`}>Error loading teams</div>
 
   return (
     <div className="max-w-6xl mx-auto py-4 sm:py-8 px-4 sm:px-6">
@@ -263,7 +264,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
               />
               <div>
                 <Input
-                  label="Agent name *"
+                  label="Team name *"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   required
@@ -348,7 +349,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                       values={environmentVariables}
                       onChange={setEnvironmentVariables}
                       title=""
-                      description="These variables will be used as defaults for this agent. You can override them when needed."
+                      description="These variables will be used as defaults for this team. You can override them when needed."
                     />
                   </div>
                 )}
@@ -376,7 +377,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                 variant="primary"
                 disabled={!canCreate || createWorkspace.isPending}
               >
-                {createWorkspace.isPending ? 'Creating...' : 'Create Agent'}
+                {createWorkspace.isPending ? 'Creating...' : 'Create Team'}
               </Button>
               <Button type="button" variant="secondary" onClick={() => setShowNewForm(false)}>Cancel</Button>
             </div>
@@ -431,8 +432,8 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
         </div>
       ) : (
         <EmptyState
-          title="No agents yet"
-          description="Create your first agent team to get started"
+          title="No teams yet"
+          description="Create your first team to get started"
         />
       )}
 
@@ -440,7 +441,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
         <div className={`fixed inset-0 ${modalColors.overlay} flex items-center justify-center z-50 p-4`}>
           <Card className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className={`text-xl font-semibold ${modalColors.header}`}>Generate Contextual Agent</h2>
+              <h2 className={`text-xl font-semibold ${modalColors.header}`}>Generate Contextual Team</h2>
               <button
                 onClick={() => setShowGenerateModal(false)}
                 className={`${textColors.muted} hover:${textColors.secondary}`}
@@ -473,7 +474,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   required
                 />
                 <p className={`text-xs ${textColors.tertiary} mt-1`}>
-                  A short, memorable identifier for the agent
+                  A short, memorable identifier for the team
                 </p>
               </div>
 
@@ -493,7 +494,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                   <option value="tester">Tester — writes and executes tests</option>
                   <option value="debugger">Debugger — diagnoses and fixes errors</option>
                   <option value="devops">DevOps — manages CI/CD and infrastructure</option>
-                  <option value="generic">Generic — general purpose agent</option>
+                  <option value="generic">Generic — general purpose team</option>
                 </Select>
                 {agentRole && ROLE_HINTS[agentRole] && (
                   <p className={`text-xs ${textColors.tertiary} mt-1 ${bgColors.tertiary} p-2 rounded`}>
@@ -509,7 +510,7 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
                 <textarea
                   value={agentDescription}
                   onChange={(e) => setAgentDescription(e.target.value)}
-                  placeholder="What this agent specializes in and its main responsibilities..."
+                  placeholder="What this team specializes in and its main responsibilities..."
                   rows={3}
                   className={`w-full px-3 py-2 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} ${withDarkMode(bgColors.secondary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
                 />
@@ -741,15 +742,15 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
     }
   }
 
-  if (isLoading) return <div className="p-8">Loading agent...</div>
-  if (error) return <div className={`p-8 ${errorColors.text}`}>Error loading agent</div>
+  if (isLoading) return <div className="p-8">Loading team...</div>
+  if (error) return <div className={`p-8 ${errorColors.text}`}>Error loading team</div>
   if (!workspace) return null
 
   return (
     <>
     <div className="max-w-4xl mx-auto py-8 px-6">
       <button onClick={onClose} className={`${accentColors.text} hover:text-orange-800 text-sm mb-4`}>
-        ← Back to Agents
+        ← Back to Teams
       </button>
       <div className="flex justify-between items-start mb-6">
         <div>
@@ -786,7 +787,7 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
               <Button
                 variant="ghost"
                 onClick={() => setEditingName(true)}
-                title="Rename agent"
+                title="Rename team"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -794,7 +795,7 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
                 variant="danger"
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
-                title="Delete agent"
+                title="Delete team"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -838,7 +839,7 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
 
     <ConfirmDialog
       open={showDeleteConfirm}
-      title="Delete Agent"
+      title="Delete Team"
       description={`Are you sure you want to delete "${workspace.name}"? This action cannot be undone.`}
       variant="danger"
       confirmLabel="Delete"
@@ -1130,7 +1131,7 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
                 {improveClaudeMd.isPending ? 'Starting AI Improvement...' : 'AI is Analyzing & Improving Your CLAUDE.md...'}
               </p>
               <p className={`text-xs ${withDarkMode(infoColors.text, darkModeInfoColors.text)} mt-1`}>
-                {improveClaudeMd.isPending ? 'Initializing team connection...' : 'This may take 30-60 seconds. Please wait.'}
+                {improveClaudeMd.isPending ? 'Initializing team connection...' : 'This may take 2-5 minutes. Please wait.'}
               </p>
             </div>
             <div className="flex gap-1">
@@ -1559,21 +1560,329 @@ description: "Descreva quando usar esta skill"
   )
 }
 
+// ---------------------------------------------------------------------------
+// Native Agents grouping helpers
+// ---------------------------------------------------------------------------
+
+interface NativeAgentItem {
+  name: string
+  description: string
+  model: string
+  tools: string | string[]
+  color: string
+  file: string
+  teamType: string
+  relativePath: string
+}
+
+interface NativeAgentGroup {
+  teamType: string
+  label: string
+  description: string
+  icon: React.ReactNode
+  agents: NativeAgentItem[]
+  accentColor: string
+}
+
+const TEAM_TYPE_META: Record<string, { labelKey: string; descKey: string; icon: React.ReactNode; accentColor: string }> = {
+  plan: {
+    labelKey: 'pages.agents.agentsTab.teamTypePlan',
+    descKey: 'pages.agents.agentsTab.teamTypePlanDesc',
+    icon: <Search size={16} />,
+    accentColor: 'purple',
+  },
+  dev: {
+    labelKey: 'pages.agents.agentsTab.teamTypeDev',
+    descKey: 'pages.agents.agentsTab.teamTypeDevDesc',
+    icon: <ClipboardList size={16} />,
+    accentColor: 'blue',
+  },
+  staging: {
+    labelKey: 'pages.agents.agentsTab.teamTypeStaging',
+    descKey: 'pages.agents.agentsTab.teamTypeStagingDesc',
+    icon: <ShieldCheck size={16} />,
+    accentColor: 'amber',
+  },
+  root: {
+    labelKey: 'pages.agents.agentsTab.teamTypeRoot',
+    descKey: 'pages.agents.agentsTab.teamTypeRootDesc',
+    icon: <Package size={16} />,
+    accentColor: 'gray',
+  },
+}
+
+function groupNativeAgentsByTeamType(agents: NativeAgentItem[]): NativeAgentGroup[] {
+  const groups = new Map<string, NativeAgentItem[]>()
+
+  for (const agent of agents) {
+    const type = agent.teamType || 'root'
+    if (!groups.has(type)) groups.set(type, [])
+    groups.get(type)!.push(agent)
+  }
+
+  const orderedTypes = ['plan', 'dev', 'staging', 'root']
+  const result: NativeAgentGroup[] = []
+
+  for (const teamType of orderedTypes) {
+    const items = groups.get(teamType)
+    if (!items || items.length === 0) continue
+    const meta = TEAM_TYPE_META[teamType]
+    result.push({
+      teamType,
+      label: meta?.labelKey || teamType,
+      description: meta?.descKey || '',
+      icon: meta?.icon || <Package size={16} />,
+      agents: items,
+      accentColor: meta?.accentColor || 'gray',
+    })
+  }
+
+  return result
+}
+
+function NativeAgentGroup({
+  group,
+  installedAgentNames,
+  onInstall,
+  isInstalling,
+  t,
+  expanded,
+  onToggle,
+}: {
+  group: NativeAgentGroup
+  installedAgentNames: string[]
+  onInstall: (agent: NativeAgentItem) => void
+  isInstalling: boolean
+  t: (key: string, opts?: any) => string
+  expanded: boolean
+  onToggle: () => void
+}) {
+  // Border / bg accent mapping
+  const accentMap: Record<string, { border: string; bg: string; iconBg: string; iconText: string }> = {
+    purple: {
+      border: 'border-purple-200 dark:border-purple-800',
+      bg: 'bg-purple-50/50 dark:bg-purple-950/30',
+      iconBg: 'bg-purple-100 dark:bg-purple-900',
+      iconText: 'text-purple-600 dark:text-purple-400',
+    },
+    blue: {
+      border: 'border-blue-200 dark:border-blue-800',
+      bg: 'bg-blue-50/50 dark:bg-blue-950/30',
+      iconBg: 'bg-blue-100 dark:bg-blue-900',
+      iconText: 'text-blue-600 dark:text-blue-400',
+    },
+    amber: {
+      border: 'border-amber-200 dark:border-amber-800',
+      bg: 'bg-amber-50/50 dark:bg-amber-950/30',
+      iconBg: 'bg-amber-100 dark:bg-amber-900',
+      iconText: 'text-amber-600 dark:text-amber-400',
+    },
+    gray: {
+      border: 'border-gray-200 dark:border-gray-700',
+      bg: 'bg-gray-50/50 dark:bg-gray-800/30',
+      iconBg: 'bg-gray-100 dark:bg-gray-800',
+      iconText: 'text-gray-600 dark:text-gray-400',
+    },
+  }
+  const accent = accentMap[group.accentColor] || accentMap.gray
+
+  return (
+    <div className={`rounded-lg border ${accent.border} ${accent.bg} overflow-hidden`}>
+      {/* Group header — clickable to expand/collapse */}
+      <button
+        className={`w-full px-4 py-3 border-b ${accent.border} flex items-center gap-3 text-left cursor-pointer hover:opacity-90 transition-opacity ${expanded ? '' : 'border-b-0'}`}
+        onClick={onToggle}
+      >
+        <div className={`flex items-center justify-center w-7 h-7 rounded-md ${accent.iconBg} ${accent.iconText}`}>
+          {group.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h5 className={`text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
+            {t(group.label)}{' '}
+            <span className={`font-normal ${textColors.tertiary}`}>
+              ({t('pages.agents.agentsTab.agentsCount', { count: group.agents.length })})
+            </span>
+          </h5>
+          <p className={`text-xs ${textColors.muted}`}>{t(group.description)}</p>
+        </div>
+        <div className={`flex-shrink-0 ${textColors.tertiary} transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+          <ChevronDown size={16} />
+        </div>
+      </button>
+
+      {/* Agent list — only visible when expanded */}
+      {expanded && (
+        <div className="divide-y divide-gray-200/60 dark:divide-gray-700/60">
+          {group.agents.map(agent => {
+            const isInstalled = installedAgentNames.includes(agent.name)
+            const toolsList = Array.isArray(agent.tools) ? agent.tools.join(', ') : agent.tools
+            return (
+              <div
+                key={agent.name}
+                className={`flex items-center justify-between px-4 py-3 ${isInstalled ? 'opacity-70' : ''}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {agent.color && (
+                    <div
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: agent.color }}
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium truncate ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
+                      {agent.name}
+                    </p>
+                    <p className={`text-xs ${textColors.muted} mt-0.5 line-clamp-2`}>
+                      {agent.description}
+                    </p>
+                    <div className={`flex items-center gap-2 mt-1`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded ${accent.iconBg} ${accent.iconText}`}>
+                        {agent.model}
+                      </span>
+                      <span className={`text-[10px] ${textColors.tertiary}`}>{toolsList}</span>
+                    </div>
+                  </div>
+                </div>
+                {isInstalled ? (
+                  <span className={`text-xs ${successColors.text} font-medium flex-shrink-0 ml-3`}>
+                    {t('pages.agents.agentsTab.installed')}
+                  </span>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-shrink-0 ml-3"
+                    onClick={() => onInstall(agent)}
+                    disabled={isInstalling}
+                  >
+                    {isInstalling ? t('pages.agents.agentsTab.installing') : t('pages.agents.agentsTab.add')}
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AgentsTab({ teamId, agents }: { teamId: string; agents: Array<{ name: string; file: string }> }) {
   const { t } = useTranslation()
+  const { showToast } = useToast()
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingAgent, setEditingAgent] = useState<string | null>(null)
   const [agentName, setAgentName] = useState('')
   const [agentContent, setAgentContent] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const importAgentRef = useRef<HTMLInputElement>(null)
+
+  // Agent improvement state
+  const [improvingAgentName, setImprovingAgentName] = useState<string | null>(null)
+  const [improvementPlanId, setImprovementPlanId] = useState<string | null>(null)
+  const [improvedAgentContent, setImprovedAgentContent] = useState('')
+  const [showAgentImprovementModal, setShowAgentImprovementModal] = useState(false)
+  const [agentImprovementError, setAgentImprovementError] = useState<string | null>(null)
+  const [showedAgentStartToast, setShowedAgentStartToast] = useState(false)
+  const hasShownAgentModalRef = useRef(false)
 
   const saveAgent = useSaveAgent(teamId)
   const deleteAgent = useDeleteAgent(teamId)
   const { data: agentData } = useGetAgent(teamId, editingAgent || '')
   const { data: nativeAgents = [] } = useGetNativeAgents()
   const installNativeAgent = useInstallNativeAgent()
+  const importCustomAgent = useImportCustomAgent()
+  const improveAgent = useImproveAgent()
 
   const installedAgentNames = agents.map((a: any) => a.name)
+
+  // Agent improvement polling
+
+  // Load improvement plan ID from localStorage on mount
+  useEffect(() => {
+    if (!improvingAgentName) return
+    try {
+      const key = `agent-improvement-${teamId}-${improvingAgentName}`
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        const data = JSON.parse(stored)
+        const oneHourAgo = Date.now() - 60 * 60 * 1000
+        if (data.timestamp && data.timestamp > oneHourAgo && data.planId) {
+          setImprovementPlanId(data.planId)
+        } else {
+          localStorage.removeItem(key)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading agent improvement state from localStorage:', error)
+    }
+  }, [teamId, improvingAgentName])
+
+  // Save improvement plan ID to localStorage when it changes
+  useEffect(() => {
+    if (!improvingAgentName) return
+    try {
+      const key = `agent-improvement-${teamId}-${improvingAgentName}`
+      if (improvementPlanId) {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            planId: improvementPlanId,
+            timestamp: Date.now(),
+          })
+        )
+      } else {
+        localStorage.removeItem(key)
+      }
+    } catch (error) {
+      console.error('Error saving agent improvement state to localStorage:', error)
+    }
+  }, [improvementPlanId, teamId, improvingAgentName])
+
+  const { improvedContent: polledAgentContent, isImproving: isAgentImproving, error: agentPollingError } = useImprovementStatus(
+    improvementPlanId,
+    improvementPlanId !== null
+  )
+
+  // Show toast when agent improvement starts
+  useEffect(() => {
+    if ((improveAgent.isPending || isAgentImproving) && !showedAgentStartToast && improvingAgentName) {
+      showToast('info', t('pages.agents.agentsTab.improvementStarted'), t('pages.agents.agentsTab.improvementStartedDesc', { name: improvingAgentName }))
+      setShowedAgentStartToast(true)
+    }
+  }, [improveAgent.isPending, isAgentImproving, showedAgentStartToast, showToast, improvingAgentName, t])
+
+  // Handle successful agent improvement completion
+  useEffect(() => {
+    if (polledAgentContent && !hasShownAgentModalRef.current && improvingAgentName) {
+      hasShownAgentModalRef.current = true
+      setImprovedAgentContent(polledAgentContent)
+      setShowAgentImprovementModal(true)
+      setImprovementPlanId(null)
+      setAgentImprovementError(null)
+      setShowedAgentStartToast(false)
+      showToast('success', t('pages.agents.agentsTab.improvementComplete'), t('pages.agents.agentsTab.improvementCompleteDesc'))
+    }
+  }, [polledAgentContent, showToast, improvingAgentName, t])
+
+  // Handle polling error
+  useEffect(() => {
+    if (agentPollingError) {
+      setAgentImprovementError(agentPollingError)
+      setShowedAgentStartToast(false)
+      showToast('error', t('pages.agents.agentsTab.improvementError'), agentPollingError)
+    }
+  }, [agentPollingError, showToast, improvingAgentName, t])
+
+  const toggleGroup = (teamType: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(teamType)) next.delete(teamType)
+      else next.add(teamType)
+      return next
+    })
+  }
 
   const handleNewAgent = () => {
     setAgentName('')
@@ -1630,6 +1939,24 @@ Descreva a especialidade e comportamento deste agente.
     }
   }
 
+  const handleAgentFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const content = await file.text()
+    // Agent name = filename without extension
+    const importedAgentName = file.name.replace(/\.(md|txt|markdown)$/, '')
+
+    await importCustomAgent.mutateAsync({
+      teamId,
+      agentName: importedAgentName,
+      content,
+    })
+    if (importAgentRef.current) {
+      importAgentRef.current.value = ''
+    }
+  }
+
   // Update content when editing agent data loads
   if (editingAgent && agentData && agentContent === '') {
     setAgentContent(agentData.content)
@@ -1648,57 +1975,151 @@ color: blue
 Descreva a especialidade e comportamento deste agente.
 `
 
+  const handleImproveAgent = async (agentNameToImprove: string) => {
+    setImprovingAgentName(agentNameToImprove)
+    setAgentImprovementError(null)
+    hasShownAgentModalRef.current = false
+
+    try {
+      // Fetch the current agent content
+      const agentResponse = await fetch(`${getApiUrl()}/api/teams/${teamId}/agents/${encodeURIComponent(agentNameToImprove)}`, {
+        headers: { 'Authorization': `Bearer ${getActiveToken()}` }
+      })
+      if (!agentResponse.ok) throw new Error('Failed to fetch agent content')
+      const agentJson = await agentResponse.json()
+      const currentContent = agentJson.data?.content
+
+      if (!currentContent) {
+        showToast('error', t('pages.agents.agentsTab.improvementError'), t('pages.agents.agentsTab.noContent'))
+        setImprovingAgentName(null)
+        return
+      }
+
+      const result = await improveAgent.mutateAsync({
+        teamId,
+        agentName: agentNameToImprove,
+        currentContent,
+      })
+
+      if (result?.planId) {
+        setImprovementPlanId(result.planId)
+      }
+    } catch (error) {
+      console.error('Error improving agent:', error)
+      setAgentImprovementError('Failed to improve agent. Please try again.')
+      setImprovementPlanId(null)
+      setImprovingAgentName(null)
+    }
+  }
+
+  const handleApproveAgentImprovement = (approvedContent: string) => {
+    if (!improvingAgentName) return
+    saveAgent.mutate(
+      { name: improvingAgentName, content: approvedContent },
+      {
+        onSuccess: () => {
+          setShowAgentImprovementModal(false)
+          setImprovedAgentContent('')
+          setImprovingAgentName(null)
+          setImprovementPlanId(null)
+          hasShownAgentModalRef.current = false
+          showToast('success', t('pages.agents.agentsTab.agentSaved'), t('pages.agents.agentsTab.agentSavedDesc', { name: improvingAgentName }))
+        },
+      }
+    )
+  }
+
+  const handleDiscardAgentImprovement = () => {
+    setShowAgentImprovementModal(false)
+    setImprovedAgentContent('')
+    setImprovingAgentName(null)
+    setImprovementPlanId(null)
+    hasShownAgentModalRef.current = false
+  }
+
+  // Check if any agent is currently being improved
+  const isAnyAgentImproving = improveAgent.isPending || isAgentImproving
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className={`text-lg font-semibold ${textColors.primary}`}>{t('pages.agents.agentsTab.title', { count: agents.length })}</h3>
-        <Button variant="primary" onClick={handleNewAgent}>
-          <Plus size={16} /> {t('pages.agents.agentsTab.newAgent')}
-        </Button>
-      </div>
-
-      {/* Native Agents Section */}
-      <div className="mb-6">
-        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.agentsTab.nativeAgents')}</h4>
-        <div className="space-y-2">
-          {nativeAgents.map(agent => {
-            const isInstalled = installedAgentNames.includes(agent.name)
-            return (
-              <div key={agent.name} className={`flex items-center justify-between py-2 px-3 ${withDarkMode(bgColors.tertiary, darkModeBgColors.primary)} rounded border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
-                <div className="flex items-center gap-3">
-                  {agent.color && (
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: agent.color }}
-                    />
-                  )}
-                  <div>
-                    <p className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{agent.name}</p>
-                    <p className={`text-xs ${textColors.muted} mt-0.5`}>{agent.description}</p>
-                    <p className={`text-xs ${textColors.tertiary} mt-0.5`}>Model: {agent.model} • Tools: {agent.tools}</p>
-                  </div>
-                </div>
-                {isInstalled ? (
-                  <span className={`text-xs ${successColors.text} font-medium`}>{t('pages.agents.agentsTab.installed')}</span>
-                ) : (
-                  <Button
-                    variant="secondary" size="sm"
-                    onClick={() => installNativeAgent.mutate({ teamId, agentName: agent.name })}
-                    disabled={installNativeAgent.isPending}
-                  >
-                    {installNativeAgent.isPending ? t('pages.agents.agentsTab.installing') : t('pages.agents.agentsTab.add')}
-                  </Button>
-                )}
-              </div>
-            )
-          })}
-          {nativeAgents.length === 0 && (
-            <div className={`text-sm ${textColors.tertiary} italic`}>{t('pages.agents.agentsTab.noNativeAgents')}</div>
-          )}
+        <div className="flex gap-2">
+          <label className={`cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 border ${borderColors.thick} rounded-md text-xs ${textColors.secondary} ${interactiveStates.hoverBg}`}>
+            <Upload className="h-3.5 w-3.5" />
+            {t('pages.agents.agentsTab.importMd')}
+            <input
+              ref={importAgentRef}
+              type="file"
+              accept=".md,.txt,.markdown"
+              className="hidden"
+              onChange={handleAgentFileImport}
+            />
+          </label>
+          <Button variant="primary" onClick={handleNewAgent}>
+            <Plus size={16} /> {t('pages.agents.agentsTab.newAgent')}
+          </Button>
         </div>
       </div>
 
-      {/* Custom Sub-Agents Section */}
+      {/* Agent improvement progress indicator */}
+      {isAnyAgentImproving && improvingAgentName && (
+        <div className={`p-4 bg-gradient-to-r from-blue-50 dark:from-blue-950 to-purple-50 dark:to-purple-950 border-2 ${withDarkMode(infoColors.border, darkModeInfoColors.border)} rounded-lg shadow-sm`}>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-6 w-6 border-3 border-blue-200 dark:border-blue-800"></div>
+              <div className="absolute top-0 left-0 animate-spin rounded-full h-6 w-6 border-3 border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent"></div>
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-semibold ${withDarkMode(infoColors.textAlt, darkModeInfoColors.textAlt)}`}>
+                {improveAgent.isPending
+                  ? t('pages.agents.agentsTab.improvementStarting')
+                  : t('pages.agents.agentsTab.improvementInProgress', { name: improvingAgentName })}
+              </p>
+              <p className={`text-xs ${withDarkMode(infoColors.text, darkModeInfoColors.text)} mt-1`}>
+                {improveAgent.isPending ? t('pages.agents.agentsTab.improvementInitializing') : t('pages.agents.agentsTab.improvementWait')}
+              </p>
+            </div>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse delay-75"></div>
+              <div className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-full animate-pulse delay-150"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Agent improvement error */}
+      {agentImprovementError && (
+        <div className={`p-3 ${errorColors.bg} border ${errorColors.border} rounded-lg`}>
+          <p className={`text-sm ${errorColors.text}`}>{agentImprovementError}</p>
+        </div>
+      )}
+
+      {/* Native Agents Section — grouped by team type */}
+      <div className="mb-6">
+        <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.agentsTab.nativeAgents')}</h4>
+        {nativeAgents.length === 0 ? (
+          <div className={`text-sm ${textColors.tertiary} italic`}>{t('pages.agents.agentsTab.noNativeAgents')}</div>
+        ) : (
+          <div className="space-y-5">
+            {groupNativeAgentsByTeamType(nativeAgents).map(group => (
+              <NativeAgentGroup
+                key={group.teamType}
+                group={group}
+                installedAgentNames={installedAgentNames}
+                onInstall={(agent) => installNativeAgent.mutate({ teamId, agentName: agent.relativePath })}
+                isInstalling={installNativeAgent.isPending}
+                t={t}
+                expanded={expandedGroups.has(group.teamType)}
+                onToggle={() => toggleGroup(group.teamType)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Custom Agents Section */}
       <div>
         <h4 className={`text-xs font-semibold ${textColors.tertiary} uppercase tracking-wide mb-3`}>{t('pages.agents.agentsTab.customSubAgents')}</h4>
         {(showNewForm || editingAgent) && (
@@ -1745,7 +2166,20 @@ Descreva a especialidade e comportamento deste agente.
                   <div className={`text-xs ${textColors.tertiary}`}>{agent.file}</div>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleImproveAgent(agent.name)}
+                  disabled={isAnyAgentImproving}
+                  className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950 hover:bg-purple-100 dark:hover:bg-purple-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                  title={t('pages.agents.agentsTab.improveWithAi')}
+                >
+                  {improvingAgentName === agent.name && (improveAgent.isPending || isAgentImproving) ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Wand2 size={13} />
+                  )}
+                  {t('pages.agents.agentsTab.improveWithAi')}
+                </button>
                 <Button variant="ghost" size="sm" onClick={() => handleEdit(agent.name)} title="Edit agent">
                   <Edit3 size={16} />
                 </Button>
@@ -1764,12 +2198,21 @@ Descreva a especialidade e comportamento deste agente.
 
       <ConfirmDialog
         open={deleteConfirm !== null}
-        title="Delete Agent"
-        description={`Are you sure you want to delete "${deleteConfirm}"? This action cannot be undone.`}
+        title={t('pages.agents.agentsTab.deleteTitle')}
+        description={t('pages.agents.agentsTab.deleteConfirm', { name: deleteConfirm })}
         variant="danger"
-        confirmLabel="Delete"
+        confirmLabel={t('common.buttons.delete')}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirm(null)}
+      />
+
+      <AgentImprovementModal
+        isOpen={showAgentImprovementModal}
+        agentName={improvingAgentName || ''}
+        improvedContent={improvedAgentContent}
+        onApprove={handleApproveAgentImprovement}
+        onDiscard={handleDiscardAgentImprovement}
+        isLoading={saveAgent.isPending}
       />
     </div>
   )

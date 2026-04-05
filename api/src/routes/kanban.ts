@@ -285,12 +285,25 @@ router.get('/:projectId/can-advance', authenticateToken, (req: Request, res: Res
       WHERE project_id = ? AND column = 'planning'
     `).get(req.params.projectId) as { count: number }
 
-    // Count tasks in 'in_progress' column for the specific project
-    const inProgressTasksCount = db.prepare(`
+    // Count tasks in 'in_dev' column for the specific project
+    const inDevTasksCount = db.prepare(`
       SELECT COUNT(*) as count
       FROM kanban_tasks
-      WHERE project_id = ? AND column = 'in_progress'
+      WHERE project_id = ? AND column = 'in_dev'
     `).get(req.params.projectId) as { count: number }
+
+    // Count tasks in 'validation' column for the specific project
+    const validationTasksCount = db.prepare(`
+      SELECT COUNT(*) as count
+      FROM kanban_tasks
+      WHERE project_id = ? AND column = 'validation'
+    `).get(req.params.projectId) as { count: number }
+
+    // Parse auto-advance gate settings (from project settings JSON)
+    const gates = typedSettings as Record<string, unknown>
+    const autoAdvancePlanToDev = gates.auto_advance_plan_to_dev !== false // default true
+    const autoAdvanceDevToStaging = gates.auto_advance_dev_to_staging !== false // default true
+    const autoAdvanceStagingToDone = gates.auto_advance_staging_to_done === true // default false
 
     // Determine if task can advance and the reason
     let canAdvance = true
@@ -306,13 +319,13 @@ router.get('/:projectId/can-advance', authenticateToken, (req: Request, res: Res
       canAdvance = false
       reason = `Maximum planning tasks limit reached (${planningTasksCount.count}/${maxPlanningTasks})`
     }
-    // Check in-progress tasks limit
-    else if (inProgressTasksCount.count >= maxInProgressTasks) {
+    // Check in-dev tasks limit
+    else if (inDevTasksCount.count >= maxInProgressTasks) {
       canAdvance = false
-      reason = `Maximum in-progress tasks limit reached (${inProgressTasksCount.count}/${maxInProgressTasks})`
+      reason = `Maximum in-dev tasks limit reached (${inDevTasksCount.count}/${maxInProgressTasks})`
     }
 
-    // Return response with all counts
+    // Return response with all counts and gate settings
     res.json({
       data: {
         can_advance: canAdvance,
@@ -320,13 +333,19 @@ router.get('/:projectId/can-advance', authenticateToken, (req: Request, res: Res
         current_counts: {
           running_workflows: runningWorkflowsCount.count,
           planning_tasks: planningTasksCount.count,
-          in_progress_tasks: inProgressTasksCount.count
+          in_dev_tasks: inDevTasksCount.count,
+          validation_tasks: validationTasksCount.count,
         },
         limits: {
           max_concurrent_workflows: maxConcurrentWorkflows,
           max_planning_tasks: maxPlanningTasks,
-          max_in_progress_tasks: maxInProgressTasks
-        }
+          max_in_progress_tasks: maxInProgressTasks,
+        },
+        gates: {
+          auto_advance_plan_to_dev: autoAdvancePlanToDev,
+          auto_advance_dev_to_staging: autoAdvanceDevToStaging,
+          auto_advance_staging_to_done: autoAdvanceStagingToDone,
+        },
       },
       error: null
     })
@@ -363,6 +382,11 @@ router.post('/:projectId/auto-move', authenticateToken, (req: Request, res: Resp
     const maxPlanningTasks = (typedSettings.max_planning_tasks as number) ?? (finalProject.max_planning_tasks as number) ?? 1
     const maxInProgressTasks = (typedSettings.max_in_progress_tasks as number) ?? (finalProject.max_in_progress_tasks as number) ?? 1
     const maxConcurrentWorkflows = (typedSettings.max_concurrent_workflows as number) ?? (finalProject.max_concurrent_workflows as number) ?? 0
+
+    // Parse auto-advance gate settings (from project settings JSON)
+    const autoAdvancePlanToDev = typedSettings.auto_advance_plan_to_dev !== false // default true
+    const autoAdvanceDevToStaging = typedSettings.auto_advance_dev_to_staging !== false // default true
+    const autoAdvanceStagingToDone = typedSettings.auto_advance_staging_to_done === true // default false
 
     // Use transaction for atomic updates
     db.transaction(() => {
@@ -426,18 +450,18 @@ router.post('/:projectId/auto-move', authenticateToken, (req: Request, res: Resp
         }
       }
 
-      // Rule 2: Planning → In Progress
-      // Check if in_progress column is empty
-      const inProgressCount = db.prepare(`
+      // Rule 2: Planning → In Dev (respects auto_advance_plan_to_dev gate)
+      // Check if in_dev column has capacity
+      const inDevCount = db.prepare(`
         SELECT COUNT(*) as count
         FROM kanban_tasks
-        WHERE project_id = ? AND column = 'in_progress'
+        WHERE project_id = ? AND column = 'in_dev'
       `).get(req.params.projectId) as { count: number }
 
-      console.log(`[Auto-move] In Progress column count: ${inProgressCount.count}, limit: ${maxInProgressTasks}`)
+      console.log(`[Auto-move] In Dev column count: ${inDevCount.count}, limit: ${maxInProgressTasks}, gate: ${autoAdvancePlanToDev}`)
 
       const effectiveInProgressLimit = maxInProgressTasks === 0 ? Infinity : maxInProgressTasks
-      if (inProgressCount.count < effectiveInProgressLimit) {
+      if (autoAdvancePlanToDev && inDevCount.count < effectiveInProgressLimit) {
         // Find task in planning that has a workflow_id set
         const planningTask = db.prepare(`
           SELECT *
@@ -453,10 +477,10 @@ router.post('/:projectId/auto-move', authenticateToken, (req: Request, res: Resp
         if (planningTask) {
           console.log(`[Auto-move] Found planning task with workflow_id: ${planningTask.id} - ${planningTask.title} (workflow_id: ${planningTask.workflow_id})`)
 
-          // Move task to in_progress
+          // Move task to in_dev
           db.prepare(`
             UPDATE kanban_tasks
-            SET column = 'in_progress', updated_at = datetime('now')
+            SET column = 'in_dev', updated_at = datetime('now')
             WHERE id = ?
           `).run(planningTask.id)
 
@@ -466,14 +490,95 @@ router.post('/:projectId/auto-move', authenticateToken, (req: Request, res: Resp
           movedTasks.push({
             task: updatedTask,
             oldColumn: 'planning',
-            newColumn: 'in_progress'
+            newColumn: 'in_dev'
           })
 
-          reasons.push(`Moved "${planningTask.title}" from planning to in_progress (has workflow_id: ${planningTask.workflow_id})`)
-          console.log(`[Auto-move] ✓ Moved task ${planningTask.id} from planning to in_progress`)
+          reasons.push(`Moved "${planningTask.title}" from planning to in_dev (has workflow_id: ${planningTask.workflow_id})`)
+          console.log(`[Auto-move] ✓ Moved task ${planningTask.id} from planning to in_dev`)
         } else {
           console.log(`[Auto-move] No planning tasks with workflow_id found to move`)
         }
+      } else if (!autoAdvancePlanToDev) {
+        console.log(`[Auto-move] Gate blocked: planning → in_dev (auto_advance_plan_to_dev is false)`)
+      }
+
+      // Rule 3: In Dev → Validation (respects auto_advance_dev_to_staging gate)
+      if (autoAdvanceDevToStaging) {
+        // Find in_dev tasks whose workflow has completed (status = 'success')
+        const completedInDevTasks = db.prepare(`
+          SELECT kt.*
+          FROM kanban_tasks kt
+          JOIN plans p ON p.id = kt.workflow_id
+          WHERE kt.project_id = ?
+            AND kt.column = 'in_dev'
+            AND kt.workflow_id IS NOT NULL
+            AND kt.workflow_id != ''
+            AND p.status = 'success'
+            AND (p.result_status IS NULL OR p.result_status != 'needs_rework')
+          ORDER BY kt.priority ASC, kt.created_at ASC
+          LIMIT 1
+        `).get(req.params.projectId) as any
+
+        if (completedInDevTasks) {
+          console.log(`[Auto-move] Moving task to validation: ${completedInDevTasks.id} - ${completedInDevTasks.title}`)
+
+          db.prepare(`
+            UPDATE kanban_tasks
+            SET column = 'validation', updated_at = datetime('now')
+            WHERE id = ?
+          `).run(completedInDevTasks.id)
+
+          const updatedTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(completedInDevTasks.id)
+
+          movedTasks.push({
+            task: updatedTask,
+            oldColumn: 'in_dev',
+            newColumn: 'validation'
+          })
+
+          reasons.push(`Moved "${completedInDevTasks.title}" from in_dev to validation (workflow completed)`)
+          console.log(`[Auto-move] ✓ Moved task ${completedInDevTasks.id} from in_dev to validation`)
+        }
+      } else {
+        console.log(`[Auto-move] Gate blocked: in_dev → validation (auto_advance_dev_to_staging is false)`)
+      }
+
+      // Rule 4: Validation → Done (respects auto_advance_staging_to_done gate)
+      if (autoAdvanceStagingToDone) {
+        // Find validation tasks that have been in validation for a while
+        // For now, move any validation task (the gate being true means auto-advance)
+        // Future: could add time-in-column check
+        const validationTasks = db.prepare(`
+          SELECT *
+          FROM kanban_tasks
+          WHERE project_id = ?
+            AND column = 'validation'
+          ORDER BY priority ASC, created_at ASC
+          LIMIT 1
+        `).get(req.params.projectId) as any
+
+        if (validationTasks) {
+          console.log(`[Auto-move] Moving task to done: ${validationTasks.id} - ${validationTasks.title}`)
+
+          db.prepare(`
+            UPDATE kanban_tasks
+            SET column = 'done', pipeline_status = 'done', updated_at = datetime('now')
+            WHERE id = ?
+          `).run(validationTasks.id)
+
+          const updatedTask = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(validationTasks.id)
+
+          movedTasks.push({
+            task: updatedTask,
+            oldColumn: 'validation',
+            newColumn: 'done'
+          })
+
+          reasons.push(`Moved "${validationTasks.title}" from validation to done`)
+          console.log(`[Auto-move] ✓ Moved task ${validationTasks.id} from validation to done`)
+        }
+      } else {
+        console.log(`[Auto-move] Gate blocked: validation → done (auto_advance_staging_to_done is false)`)
       }
     })()
 

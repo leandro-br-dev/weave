@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from orchestrator.kanban_pipeline import (
-    extract_plan_from_text,
+    load_plan_from_file,
     find_planner_workspace,
     process_kanban_task,
     poll_kanban_tasks,
@@ -25,49 +25,65 @@ from orchestrator.daemon_client import DaemonClient
 from orchestrator import logger
 
 
-def test_extract_plan_from_text():
-    """Test the plan extraction from various text formats."""
-    logger.header("Testing extract_plan_from_text")
+def test_load_plan_from_file():
+    """Test loading plan from a file (Blackboard pattern)."""
+    logger.header("Testing load_plan_from_file")
+
+    import tempfile
 
     # Valid plan
-    text1 = '<plan>{"name": "Test Plan", "tasks": [{"id": "t1", "name": "Task 1"}]}</plan>'
-    result1 = extract_plan_from_text(text1)
-    assert result1 is not None, "Should extract valid plan"
+    plan_data = {"name": "Test Plan", "tasks": [{"id": "t1", "name": "Task 1", "prompt": "Do task 1", "cwd": "/root/test", "workspace": "/root/test/ws"}]}
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(plan_data, f)
+        f.flush()
+        result1 = load_plan_from_file(f.name)
+    assert result1 is not None, "Should load valid plan"
     assert result1["name"] == "Test Plan", "Should have correct name"
     assert len(result1["tasks"]) == 1, "Should have one task"
-    logger.success("✓ Valid plan extraction")
+    logger.success("✓ Valid plan loading")
 
-    # Plan with surrounding text
-    text2 = "Some context <plan>{\"name\": \"Plan\", \"tasks\": [{\"id\": \"t1\", \"name\": \"T\"}]}</plan> more text"
-    result2 = extract_plan_from_text(text2)
-    assert result2 is not None, "Should extract plan from text"
-    logger.success("✓ Plan extraction with surrounding text")
+    # Missing file
+    result2 = load_plan_from_file("/tmp/nonexistent_plan_file_test.json")
+    assert result2 is None, "Should return None for missing file"
+    logger.success("✓ Missing file handling")
 
     # Invalid JSON
-    text3 = "<plan>invalid json</plan>"
-    result3 = extract_plan_from_text(text3)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        f.write("not json")
+        f.flush()
+        result3 = load_plan_from_file(f.name)
     assert result3 is None, "Should reject invalid JSON"
     logger.success("✓ Invalid JSON rejection")
 
     # Empty tasks
-    text4 = '<plan>{"name": "Empty", "tasks": []}</plan>'
-    result4 = extract_plan_from_text(text4)
+    empty_plan = {"name": "Empty", "tasks": []}
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(empty_plan, f)
+        f.flush()
+        result4 = load_plan_from_file(f.name)
     assert result4 is None, "Should reject empty tasks list"
     logger.success("✓ Empty tasks rejection")
 
     # Placeholder name
-    text5 = '<plan>{"name": "Descriptive plan name", "tasks": [{"id": "t1"}]}</plan>'
-    result5 = extract_plan_from_text(text5)
+    template_plan = {"name": "Descriptive plan name", "tasks": [{"id": "t1", "name": "T", "prompt": "p", "cwd": "/root", "workspace": "/root/ws"}]}
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(template_plan, f)
+        f.flush()
+        result5 = load_plan_from_file(f.name)
     assert result5 is None, "Should reject placeholder name"
     logger.success("✓ Placeholder name rejection")
 
-    # Multiple plan tags (should use first valid)
-    text6 = '<plan>invalid</plan> <plan>{"name": "Second", "tasks": [{"id": "t1"}]}</plan>'
-    result6 = extract_plan_from_text(text6)
-    assert result6 is not None, "Should find second valid plan"
-    logger.success("✓ Multiple plan tags handling")
+    # Fallback name
+    no_name_plan = {"tasks": [{"id": "t1", "name": "T", "prompt": "p", "cwd": "/root", "workspace": "/root/ws"}]}
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(no_name_plan, f)
+        f.flush()
+        result6 = load_plan_from_file(f.name, fallback_name="Fallback")
+    assert result6 is not None, "Should use fallback name"
+    assert result6["name"] == "Fallback", "Should have fallback name"
+    logger.success("✓ Fallback name handling")
 
-    logger.plan_done("extract_plan_from_text", success=True)
+    logger.plan_done("load_plan_from_file", success=True)
 
 
 @pytest.mark.asyncio
@@ -84,6 +100,7 @@ async def test_daemon_client_methods():
         "get_all_projects",
         "update_kanban_pipeline",
         "create_plan_from_data",
+        "prepare_workflow",
         "start_plan_async",
         "_patch",
         "_post",
@@ -102,6 +119,7 @@ async def test_daemon_client_methods():
         "get_all_projects",
         "update_kanban_pipeline",
         "create_plan_from_data",
+        "prepare_workflow",
         "start_plan_async",
     ]
 
@@ -118,26 +136,34 @@ async def test_error_handling():
     """Test error handling in kanban pipeline."""
     logger.header("Testing Error Handling")
 
-    # Test extract_plan_from_text with malformed input
-    malformed_inputs = [
-        "",
-        "no plan tags here",
-        "<plan></plan>",
-        '{"name": "No tags"}',
-        None,
+    import tempfile
+
+    # Test load_plan_from_file with malformed input files
+    test_cases = [
+        ("missing file", "/tmp/nonexistent_test_file_123.json"),
+        ("empty file", None),  # will create temp
+        ("invalid JSON", None),  # will create temp
     ]
 
-    for test_input in malformed_inputs:
+    for test_name, test_path in test_cases:
         try:
-            if test_input is None:
-                result = extract_plan_from_text("")
+            if test_name == "empty file":
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                    f.write("")
+                    f.flush()
+                    result = load_plan_from_file(f.name)
+            elif test_name == "invalid JSON":
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                    f.write("{bad json}")
+                    f.flush()
+                    result = load_plan_from_file(f.name)
             else:
-                result = extract_plan_from_text(test_input)
+                result = load_plan_from_file(test_path)
             # Should return None, not raise exception
             assert result is None or isinstance(result, dict), "Should handle gracefully"
-            logger.success(f"✓ Handled: {repr(test_input)[:50]}")
+            logger.success(f"✓ Handled: {test_name}")
         except Exception as e:
-            logger.error(f"✗ Failed on {repr(test_input)[:50]}: {e}")
+            logger.error(f"✗ Failed on {test_name}: {e}")
             raise
 
     logger.plan_done("Error handling", success=True)
@@ -175,7 +201,7 @@ async def run_all_tests():
     logger.header("Kanban Pipeline Test Suite")
 
     tests = [
-        ("Plan Extraction", test_extract_plan_from_text),
+        ("Plan File Loading", test_load_plan_from_file),
         ("DaemonClient Methods", test_daemon_client_methods),
         ("Error Handling", test_error_handling),
         ("Running Tasks Tracking", test_running_tasks_tracking),

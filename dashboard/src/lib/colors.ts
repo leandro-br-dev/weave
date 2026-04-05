@@ -222,6 +222,8 @@ export interface DropdownColorScheme {
   itemHover: string
   /** Dropdown item text */
   itemText: string
+  /** Dropdown item checked/selected state (background + text) */
+  itemChecked: string
   /** Dropdown divider */
   divider: string
 }
@@ -934,6 +936,8 @@ export const dropdownColors: DropdownColorScheme = {
   itemHover: 'hover:bg-gray-100',
   /** Dropdown item text - medium weight gray */
   itemText: 'text-gray-700',
+  /** Dropdown item checked/selected - subtle orange accent background with readable text */
+  itemChecked: 'data-[state=checked]:bg-orange-50 data-[state=checked]:text-orange-700',
   /** Dropdown divider between sections */
   divider: 'border-gray-100',
 } as const
@@ -1466,6 +1470,8 @@ export const darkModeDropdownColors: DropdownColorScheme = {
   itemHover: 'dark:hover:bg-gray-700',
   /** Dropdown item text - light gray */
   itemText: 'dark:text-gray-200',
+  /** Dropdown item checked/selected - subtle orange accent background with readable text */
+  itemChecked: 'dark:data-[state=checked]:bg-orange-950 dark:data-[state=checked]:text-orange-300',
   /** Dropdown divider between sections */
   divider: 'dark:border-gray-700',
 } as const
@@ -1591,7 +1597,17 @@ export const darkModeColors = {
  * ```
  */
 export function withDarkMode(lightClass: string, darkClass: string): string {
-  return `${lightClass} ${darkClass}`
+  // Add Tailwind's dark: variant prefix to each utility class in darkClass.
+  // Skips classes that already start with "dark:" (e.g. from darkModeColors constants).
+  // Handles compound variants like "hover:bg-gray-700" → "dark:hover:bg-gray-700",
+  // responsive prefixes like "md:bg-gray-700" → "dark:md:bg-gray-700",
+  // and combinations like "focus:ring-2" → "dark:focus:ring-2".
+  const darkPrefixed = darkClass
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((cls) => cls.startsWith('dark:') ? cls : `dark:${cls}`)
+    .join(' ')
+  return `${lightClass} ${darkPrefixed}`
 }
 
 /**

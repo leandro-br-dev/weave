@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip, ArrowRight } from 'lucide-react';
 import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectIcon, ProjectSelectDropdown, FileAttachmentInput } from '@/components';
 import { type FileAttachment } from '@/components';
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads';
+import { kanbanColors, darkModeKanbanColors } from '@/lib/colors';
 import { useGetProjects, useUpdateProject } from '@/api/projects';
 import { useApprovePlan } from '@/api/plans';
 import { useToast } from '@/contexts/ToastContext';
@@ -48,8 +49,9 @@ function getTaskProjectColor(projectId: string, projects: Array<{ id: string; co
 export default function KanbanPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: projects = [] } = useGetProjects();
-  const [projectFilter, setProjectFilter] = useState<string>('');
+  const [projectFilter, setProjectFilter] = useState<string>(() => searchParams.get('project') || '');
 
   const { data: allTasks = [], isLoading } = useGetAllKanbanTasks();
   const createTask = useCreateKanbanTaskAny();
@@ -75,7 +77,7 @@ export default function KanbanPage() {
   // Column limits
   const activeProjectId = projectFilter && projectFilter !== 'all' ? projectFilter : (projects.length === 1 ? projects[0]?.id : undefined);
   const { data: canAdvanceData } = useCanAdvance(activeProjectId);
-  const [editingLimit, setEditingLimit] = useState<{ columnId: 'planning' | 'in_progress'; current: number } | null>(null);
+  const [editingLimit, setEditingLimit] = useState<{ columnId: 'planning' | 'in_dev'; current: number } | null>(null);
 
   // Track recently auto-moved tasks for visual indicator
   const [recentlyMovedTasks, setRecentlyMovedTasks] = useState<Set<string>>(new Set());
@@ -86,7 +88,7 @@ export default function KanbanPage() {
     ? allTasks.filter((task) => task.project_id === projectFilter)
     : allTasks;
 
-  // Initialize auto-move and auto-approve state from project settings
+  // Initialize auto-move, auto-approve and gate state from project settings
   useEffect(() => {
     if (projectFilter && projectFilter !== 'all') {
       const project = projects.find(p => p.id === projectFilter);
@@ -94,16 +96,25 @@ export default function KanbanPage() {
       setAutoMoveProjectId(projectFilter);
       setAutoApproveEnabled(project?.settings?.auto_approve_workflows ?? false);
       setAutoApproveProjectId(projectFilter);
+      setGatePlanToDev(project?.settings?.auto_advance_plan_to_dev ?? true);
+      setGateDevToStaging(project?.settings?.auto_advance_dev_to_staging ?? true);
+      setGateStagingToDone(project?.settings?.auto_advance_staging_to_done ?? false);
     } else if (projects.length === 1) {
       setAutoMoveEnabled(projects[0]?.settings?.auto_move_enabled ?? false);
       setAutoMoveProjectId(projects[0]?.id ?? '');
       setAutoApproveEnabled(projects[0]?.settings?.auto_approve_workflows ?? false);
       setAutoApproveProjectId(projects[0]?.id ?? '');
+      setGatePlanToDev(projects[0]?.settings?.auto_advance_plan_to_dev ?? true);
+      setGateDevToStaging(projects[0]?.settings?.auto_advance_dev_to_staging ?? true);
+      setGateStagingToDone(projects[0]?.settings?.auto_advance_staging_to_done ?? false);
     } else {
       setAutoMoveEnabled(false);
       setAutoMoveProjectId('');
       setAutoApproveEnabled(false);
       setAutoApproveProjectId('');
+      setGatePlanToDev(true);
+      setGateDevToStaging(true);
+      setGateStagingToDone(false);
     }
   }, [projectFilter, projects]);
 
@@ -131,6 +142,11 @@ export default function KanbanPage() {
   // Auto-approve state
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
   const [autoApproveProjectId, setAutoApproveProjectId] = useState<string>('');
+
+  // Gate toggle state
+  const [gatePlanToDev, setGatePlanToDev] = useState(true);
+  const [gateDevToStaging, setGateDevToStaging] = useState(true);
+  const [gateStagingToDone, setGateStagingToDone] = useState(false);
 
   // Templates and recurrence state
   const [editingRecurrence, setEditingRecurrence] = useState<KanbanTemplate | null>(null);
@@ -273,7 +289,10 @@ export default function KanbanPage() {
         id: autoMoveProjectId,
         settings: {
           auto_move_enabled: enabled,
-          auto_approve_workflows: autoApproveEnabled
+          auto_approve_workflows: autoApproveEnabled,
+          auto_advance_plan_to_dev: gatePlanToDev,
+          auto_advance_dev_to_staging: gateDevToStaging,
+          auto_advance_staging_to_done: gateStagingToDone,
         }
       });
     }
@@ -286,10 +305,36 @@ export default function KanbanPage() {
         id: autoApproveProjectId,
         settings: {
           auto_move_enabled: autoMoveEnabled,
-          auto_approve_workflows: enabled
+          auto_approve_workflows: enabled,
+          auto_advance_plan_to_dev: gatePlanToDev,
+          auto_advance_dev_to_staging: gateDevToStaging,
+          auto_advance_staging_to_done: gateStagingToDone,
         }
       });
     }
+  };
+
+  const handleToggleGate = (gate: 'plan_to_dev' | 'dev_to_staging' | 'staging_to_done', enabled: boolean) => {
+    const projectId = autoMoveProjectId || autoApproveProjectId;
+    if (!projectId) return;
+
+    const project = projects.find(p => p.id === projectId);
+    const s = project?.settings;
+
+    if (gate === 'plan_to_dev') setGatePlanToDev(enabled);
+    if (gate === 'dev_to_staging') setGateDevToStaging(enabled);
+    if (gate === 'staging_to_done') setGateStagingToDone(enabled);
+
+    updateProject.mutate({
+      id: projectId,
+      settings: {
+        auto_move_enabled: autoMoveEnabled,
+        auto_approve_workflows: autoApproveEnabled,
+        auto_advance_plan_to_dev: gate === 'plan_to_dev' ? enabled : gatePlanToDev,
+        auto_advance_dev_to_staging: gate === 'dev_to_staging' ? enabled : gateDevToStaging,
+        auto_advance_staging_to_done: gate === 'staging_to_done' ? enabled : gateStagingToDone,
+      }
+    });
   };
 
   const handleRunAutoMove = () => {
@@ -505,7 +550,7 @@ export default function KanbanPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [editingLimit]);
 
-  const getColumnLimit = (columnId: 'planning' | 'in_progress'): number | undefined => {
+  const getColumnLimit = (columnId: 'planning' | 'in_dev'): number | undefined => {
     if (!activeProjectId) return undefined;
     if (canAdvanceData?.limits) {
       return columnId === 'planning'
@@ -518,13 +563,13 @@ export default function KanbanPage() {
       : project?.settings?.max_in_progress_tasks;
   };
 
-  const isColumnLimitReached = (columnId: 'planning' | 'in_progress', count: number): boolean => {
+  const isColumnLimitReached = (columnId: 'planning' | 'in_dev', count: number): boolean => {
     const limit = getColumnLimit(columnId);
     if (limit === undefined || limit === 0) return false;
     return count >= limit;
   };
 
-  const isColumnLimitApproaching = (columnId: 'planning' | 'in_progress', count: number): boolean => {
+  const isColumnLimitApproaching = (columnId: 'planning' | 'in_dev', count: number): boolean => {
     const limit = getColumnLimit(columnId);
     if (limit === undefined || limit === 0) return false;
     return count >= limit - 1 && count < limit;
@@ -553,7 +598,7 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="w-full mx-auto py-4 sm:py-8 px-4 sm:px-6">
+    <div className="w-full mx-auto py-4 sm:py-8 px-4 sm:px-6 h-full flex flex-col overflow-hidden">
       <PageHeader
         title={t('pages.kanban.title')}
         description={
@@ -655,65 +700,76 @@ export default function KanbanPage() {
           action={<Button variant="primary" onClick={() => handleOpenCreate()}>{t('pages.kanban.noTasks.addTask')}</Button>}
         />
       ) : (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-2 sm:gap-4 p-2 sm:p-3 h-full overflow-x-auto overflow-y-auto`}>
-              {COLUMNS.filter(col => {
-                if (col.id !== 'templates') return true;
-                // Show templates column if there are public templates
-                const hasPublicTemplates = templates.some(t => t.is_public);
-                // Or if there are project-specific templates for the current filter
-                // Only show project-specific templates when a project is actually selected
-                const hasProjectTemplates = projectFilter && projectFilter !== 'all'
-                  ? templates.some(t => !t.is_public && t.project_id === projectFilter)
-                  : false;
-                return hasPublicTemplates || hasProjectTemplates;
-              }).map((column) => {
-            // Handle templates column
-            if (isTemplatesColumn(column.id)) {
-              return (
-                <div key={column.id} className="flex flex-col min-h-0 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="px-2 sm:px-3 py-2 border-b border-amber-200 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <BookmarkCheck className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-amber-600" />
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100">{t(`pages.kanban.columns.${column.id}`)}</h3>
-                    </div>
-                    <span className="text-xs font-mono text-amber-600 bg-white px-1.5 sm:px-2 py-0.5 rounded border border-amber-200">
-                      {templates.length}
-                    </span>
-                  </div>
+        <div className="flex gap-2 sm:gap-4 p-2 sm:p-3 flex-1 overflow-x-auto overflow-y-auto min-h-0">
+              {(() => {
+                const visibleColumns = COLUMNS.filter(col => {
+                  if (col.id !== 'templates') return true;
+                  const hasPublicTemplates = templates.some(t => t.is_public);
+                  const hasProjectTemplates = projectFilter && projectFilter !== 'all'
+                    ? templates.some(t => !t.is_public && t.project_id === projectFilter)
+                    : false;
+                  return hasPublicTemplates || hasProjectTemplates;
+                });
 
-                  <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-1.5 sm:p-2 space-y-1.5 sm:space-y-2">
-                    {templates.map((template) => (
-                      <TemplateCard
-                        key={template.id}
-                        template={template}
-                        projects={projects}
-                        onUseTemplate={handleUseTemplate}
-                        onEditTemplate={handleOpenEditTemplate}
-                        onEditRecurrence={(template) => {
-                          setEditingRecurrence(template);
-                          const isPreset = RECURRENCE_PRESETS.some(p => p.value === template.recurrence);
-                          setRecurrenceValue(isPreset ? template.recurrence : (template.recurrence ? 'custom' : ''));
-                          setCustomCron(isPreset ? '' : (template.recurrence || ''));
-                        }}
-                        onDeleteTemplate={handleDeleteTemplate}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            }
+                const hasProject = !!(autoMoveProjectId || autoApproveProjectId);
+                const gateConfigs: Array<{ afterColId: string; gateKey: 'plan_to_dev' | 'dev_to_staging' | 'staging_to_done'; labelKey: string; checked: boolean; fromLabel: string; toLabel: string }> = [];
 
-            // Handle regular columns
-            const columnTasks = getTasksByColumn(column.id);
-            return (
-              <div key={column.id} className={`flex flex-col min-h-0 bg-gray-50 dark:bg-gray-900 rounded-lg border transition-colors ${
-                (column.id === 'planning' || column.id === 'in_progress') && isColumnLimitReached(column.id, columnTasks.length)
-                  ? 'border-red-300 dark:border-red-700'
-                  : 'border-gray-200 dark:border-gray-800'
-              }`}>
-                <div className="px-2 sm:px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
-                  <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100">{t(`pages.kanban.columns.${column.id}`)}</h3>
-                  {(column.id === 'planning' || column.id === 'in_progress') ? (
+                if (hasProject) {
+                  gateConfigs.push(
+                    { afterColId: 'planning', gateKey: 'plan_to_dev', labelKey: 'planToDev', checked: gatePlanToDev, fromLabel: t('pages.kanban.columns.planning'), toLabel: t('pages.kanban.columns.in_dev') },
+                    { afterColId: 'in_dev', gateKey: 'dev_to_staging', labelKey: 'devToStaging', checked: gateDevToStaging, fromLabel: t('pages.kanban.columns.in_dev'), toLabel: t('pages.kanban.columns.validation') },
+                    { afterColId: 'validation', gateKey: 'staging_to_done', labelKey: 'stagingToDone', checked: gateStagingToDone, fromLabel: t('pages.kanban.columns.validation'), toLabel: t('pages.kanban.columns.done') },
+                  );
+                }
+
+                return visibleColumns.flatMap((column, idx) => {
+                  const elements: React.ReactNode[] = [];
+
+                  // Render column
+                  if (isTemplatesColumn(column.id)) {
+                    elements.push(
+                      <div key={column.id} className="flex flex-col min-h-0 min-w-[200px] sm:min-w-[220px] bg-amber-50 rounded-lg border border-amber-200">
+                        <div className="px-2 sm:px-3 py-2 border-b border-amber-200 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <BookmarkCheck className="h-3.5 sm:h-4 w-3.5 sm:w-4 text-amber-600" />
+                            <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100">{t(`pages.kanban.columns.${column.id}`)}</h3>
+                          </div>
+                          <span className="text-xs font-mono text-amber-600 bg-white px-1.5 sm:px-2 py-0.5 rounded border border-amber-200">
+                            {templates.length}
+                          </span>
+                        </div>
+
+                        <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-1.5 sm:p-2 space-y-1.5 sm:space-y-2">
+                          {templates.map((template) => (
+                            <TemplateCard
+                              key={template.id}
+                              template={template}
+                              projects={projects}
+                              onUseTemplate={handleUseTemplate}
+                              onEditTemplate={handleOpenEditTemplate}
+                              onEditRecurrence={(template) => {
+                                setEditingRecurrence(template);
+                                const isPreset = RECURRENCE_PRESETS.some(p => p.value === template.recurrence);
+                                setRecurrenceValue(isPreset ? template.recurrence : (template.recurrence ? 'custom' : ''));
+                                setCustomCron(isPreset ? '' : (template.recurrence || ''));
+                              }}
+                              onDeleteTemplate={handleDeleteTemplate}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  } else {
+                    const columnTasks = getTasksByColumn(column.id);
+                    elements.push(
+                      <div key={column.id} className={`flex-1 min-w-[200px] sm:min-w-[220px] flex flex-col min-h-0 ${kanbanColors.columnBg} ${darkModeKanbanColors.columnBg} rounded-lg border transition-colors ${
+                        (column.id === 'planning' || column.id === 'in_dev') && isColumnLimitReached(column.id, columnTasks.length)
+                          ? 'border-red-300 dark:border-red-700'
+                          : `${kanbanColors.cardBorder} ${darkModeKanbanColors.cardBorder}`
+                      }`}>
+                        <div className="px-2 sm:px-3 py-2 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+                          <h3 className={`text-xs sm:text-sm font-semibold ${kanbanColors.columnHeader} ${darkModeKanbanColors.columnHeader}`}>{t(`pages.kanban.columns.${column.id}`)}</h3>
+                          {(column.id === 'planning' || column.id === 'in_dev') ? (
                     <div className="relative" data-limit-editor>
                       <button
                         onClick={(e) => {
@@ -749,7 +805,7 @@ export default function KanbanPage() {
                           <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                             {column.id === 'planning'
                               ? t('pages.kanban.limits.planningLimit')
-                              : t('pages.kanban.limits.inProgressLimit')}
+                              : t('pages.kanban.limits.inDevLimit')}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                             {t('pages.kanban.limits.current')}: {columnTasks.length}
@@ -767,7 +823,7 @@ export default function KanbanPage() {
                             <button
                               onClick={() => {
                                 if (!activeProjectId) return;
-                                const settingsKey = editingLimit.columnId === 'planning' ? 'max_planning_tasks' : 'max_in_progress_tasks';
+                                const settingsKey = editingLimit.columnId === 'planning' ? 'max_planning_tasks' : 'max_in_progress_tasks'; // max_in_progress_tasks still controls in_dev column
                                 const project = projects.find(p => p.id === activeProjectId);
                                 const s = project?.settings;
                                 updateProject.mutate({
@@ -775,6 +831,9 @@ export default function KanbanPage() {
                                   settings: {
                                     auto_move_enabled: s?.auto_move_enabled ?? false,
                                     auto_approve_workflows: s?.auto_approve_workflows ?? false,
+                                    auto_advance_plan_to_dev: gatePlanToDev,
+                                    auto_advance_dev_to_staging: gateDevToStaging,
+                                    auto_advance_staging_to_done: gateStagingToDone,
                                     [settingsKey]: editingLimit.current,
                                   }
                                 }, {
@@ -833,8 +892,8 @@ export default function KanbanPage() {
                   onDrop={(e) => {
                     e.preventDefault();
                     if (draggedTaskId && !isTemplatesColumn(column.id) && column.id !== getTaskColumn(draggedTaskId)) {
-                      // Check column limit for planning and in_progress
-                      if (column.id === 'planning' || column.id === 'in_progress') {
+                      // Check column limit for planning and in_dev
+                      if (column.id === 'planning' || column.id === 'in_dev') {
                         const limit = getColumnLimit(column.id);
                         if (limit !== undefined && limit > 0 && columnTasks.length >= limit) {
                           showError(
@@ -860,7 +919,7 @@ export default function KanbanPage() {
                   }}
                   className={`flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-2 space-y-2 transition-colors rounded-b-lg ${
                     dragOverColumn === column.id
-                      ? (column.id === 'planning' || column.id === 'in_progress') && isColumnLimitReached(column.id, columnTasks.length)
+                      ? (column.id === 'planning' || column.id === 'in_dev') && isColumnLimitReached(column.id, columnTasks.length)
                         ? 'bg-red-50 dark:bg-red-900/20 ring-2 ring-inset ring-red-300 dark:ring-red-700'
                         : 'bg-orange-50 ring-2 ring-inset ring-orange-200'
                       : ''
@@ -913,8 +972,39 @@ export default function KanbanPage() {
                   ))}
                 </div>
               </div>
-            );
-              })}
+                    );
+
+                    // Insert gate toggle between columns if applicable
+                    const gate = gateConfigs.find(g => g.afterColId === column.id);
+                    if (gate) {
+                      elements.push(
+                        <div key={`gate-${column.id}`} className="flex flex-col items-center justify-center px-1 sm:px-2 flex-shrink-0 self-center">
+                          <div className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border transition-colors ${
+                            gate.checked
+                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                              : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                          }`}>
+                            <span className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                              {t(`pages.kanban.gates.${gate.labelKey}`)}
+                            </span>
+                            <Switch
+                              checked={gate.checked}
+                              onCheckedChange={(checked) => handleToggleGate(gate.gateKey, checked)}
+                              disabled={updateProject.isPending}
+                              className="scale-75 sm:scale-90"
+                            />
+                            <ArrowRight className={`h-3 sm:h-3.5 w-3 sm:w-3.5 ${
+                              gate.checked ? 'text-green-500' : 'text-gray-300 dark:text-gray-600'
+                            }`} />
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+
+                  return elements;
+                });
+              })()}
             </div>
       )}
 

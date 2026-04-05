@@ -189,8 +189,8 @@ idle → planning → awaiting_approval → running → completed
 
 **Functions:**
 
-`extract_plan_from_text(text)`
-- Extracts JSON plan from `<plan>...</plan>` tags
+`load_plan_from_file(file_path, fallback_name)`
+- Loads JSON plan from a file (Blackboard pattern)
 - Validates plan structure (name, tasks list)
 - Returns validated plan dict or None
 
@@ -199,19 +199,23 @@ idle → planning → awaiting_approval → running → completed
 - Queries `/api/projects/:id/agents-context`
 - Returns workspace path or None
 
-`build_planning_prompt(task, planning_context, skill_content)`
+`build_planning_prompt(task, planning_context, skill_content, workflow_context, workflow_dir)`
 - Builds comprehensive prompt for planning agent
 - Includes project context, environments, and agents
 - Provides clear instructions on cwd vs workspace usage
+- Injects Blackboard path for plan.json output
 
 `process_kanban_task(task, client)`
 - Main processing logic for a single kanban task
 - Marks task as 'planning'
+- Pre-creates workflow directory via API (Blackboard pattern)
 - Finds project's planner agent workspace
-- Builds prompt with task details and agents context
+- Builds prompt with task details, agents context, and workflow dir
 - Executes planning agent via Claude Agent SDK
-- Extracts plan from agent response
-- Creates workflow via API
+- Agent saves plan.json directly to workflow directory
+- Agent validates plan with `weave-validate plan`
+- Reads validated plan from workflow directory
+- Creates workflow via API (reusing pre-created workflow_id)
 - Links workflow to kanban task
 - Auto-approves if `auto_approve_workflows` is enabled
 - Handles errors and updates status
@@ -503,7 +507,7 @@ tests/test_daemon_client.py::TestResponseHandling::test_handle_response_parse_er
    - Comprehensive error handling
 
 2. **`orchestrator/kanban_pipeline.py`** (280+ lines)
-   - `extract_plan_from_text()` function
+   - `load_plan_from_file()` function
    - `find_planner_workspace()` function
    - `build_planning_prompt()` function
    - `process_kanban_task()` function

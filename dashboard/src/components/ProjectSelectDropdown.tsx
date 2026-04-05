@@ -144,7 +144,7 @@ export function ProjectSelectDropdown({
                       ${withDarkMode(dropdownColors.itemHover, darkModeDropdownColors.itemHover)}
                       data-[highlighted]:outline-none
                       data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed
-                      ${withDarkMode('data-[state=checked]:bg-gray-50', 'data-[state=checked]:bg-gray-800')}
+                      ${dropdownColors.itemChecked} ${darkModeDropdownColors.itemChecked}
                       transition-colors
                     `}
                   >
@@ -157,7 +157,7 @@ export function ProjectSelectDropdown({
                       </div>
                     </Select.ItemText>
                     <Select.ItemIndicator className="absolute right-2">
-                      <Check size={16} className={textColors.primary} />
+                      <Check size={16} className={withDarkMode(textColors.primary, darkModeTextColors.primary)} />
                     </Select.ItemIndicator>
                   </Select.Item>
                 )}
@@ -172,7 +172,7 @@ export function ProjectSelectDropdown({
                       ${withDarkMode(dropdownColors.itemHover, darkModeDropdownColors.itemHover)}
                       data-[highlighted]:outline-none
                       data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed
-                      ${withDarkMode('data-[state=checked]:bg-gray-50', 'data-[state=checked]:bg-gray-800')}
+                      ${dropdownColors.itemChecked} ${darkModeDropdownColors.itemChecked}
                       transition-colors
                     `}
                   >

@@ -6,10 +6,12 @@ export type Environment = {
   project_id: string
   name: string
   type: 'local-wsl' | 'local-windows' | 'ssh'
+  env_type?: 'plan' | 'dev' | 'staging' | string | null
   project_path: string
   agent_workspace: string
   ssh_config?: string | null
   env_vars?: string | null
+  default_team?: string | null
   created_at: string
 }
 
@@ -21,6 +23,10 @@ export type ProjectSettings = {
   max_concurrent_workflows?: number    // 0 = unlimited (global max running workflows)
   max_planning_tasks?: number            // 0 = unlimited (per-project planning column limit, default 1)
   max_in_progress_tasks?: number         // 0 = unlimited (per-project in_progress column limit, default 1)
+  // Auto-advance gate controls
+  auto_advance_plan_to_dev?: boolean     // default true — Planning → In Dev
+  auto_advance_dev_to_staging?: boolean  // default true — In Dev → Validation
+  auto_advance_staging_to_done?: boolean // default false — Validation → Done (critical gate)
 }
 
 export type Project = {
@@ -51,6 +57,9 @@ export function useCreateProject() {
       color?: string
       git_url?: string
       create_default_envs?: boolean
+      base_path?: string
+      env_types?: string[]
+      git_token?: string
     }) =>
       apiFetch<{ id: string; environments?: any[] }>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
@@ -213,6 +222,28 @@ export function useCreateDefaultAgents() {
           }),
         }
       ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['teams'] })
+    },
+  })
+}
+
+export type RepairTeamsResult = {
+  action: string
+  envName: string
+  teamPath: string
+  created: boolean
+  error?: string
+}
+
+export function useRepairTeams() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (projectId: string) =>
+      apiFetch<RepairTeamsResult[]>(`/api/projects/${projectId}/repair-teams`, {
+        method: 'POST',
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       qc.invalidateQueries({ queryKey: ['teams'] })

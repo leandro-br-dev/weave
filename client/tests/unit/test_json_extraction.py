@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify JSON code block extraction works correctly
+Test script to verify structured output extraction works correctly
 """
 import sys
 import json
@@ -11,59 +11,54 @@ sys.path.insert(0, '/root/projects/weave/client')
 
 from orchestrator.runner import extract_structured_output
 
-def test_json_code_block():
-    """Test extraction of JSON from code blocks"""
+
+def test_plan_json_block():
+    """Test extraction of plan content from <plan> JSON blocks"""
     test_cases = [
         {
-            "name": "Simple improvedContent in JSON block",
+            "name": "Simple plan JSON block",
             "text": """
-Here's my analysis of the CLAUDE.md file.
+Here's my analysis.
 
-I've made several improvements to make it clearer and more effective.
+<plan>
+{"name": "Test Plan", "tasks": [{"id": "1", "name": "task1"}]}
+</plan>
 
-```json
-{"improvedContent": "# Improved CLAUDE.md\\n\\nThis is the improved content."}
-```
-
-Let me know if you need any further changes!
+Let me know if you need any changes!
 """,
-            "expected_type": "improvement",
-            "expected_content_key": "improvedContent",
+            "expected_type": "plan",
         },
         {
-            "name": "JSON block with extra whitespace",
-            "text": """
-Analysis complete.
-
-```json
-{
-  "improvedContent": "Test content with more structure"
-}
-```
-
-Done!
-""",
-            "expected_type": "improvement",
-            "expected_content_key": "improvedContent",
-        },
-        {
-            "name": "Multiple JSON blocks - should use last one",
+            "name": "Multiple plan blocks - should use last one",
             "text": """
 Here's an example format:
 
-```json
-{"improvedContent": "example template"}
-```
+<plan>
+{"name": "Example", "tasks": []}
+</plan>
 
 Now here's the actual response:
 
-```json
-{"improvedContent": "real improved content"}
-```
+<plan>
+{"name": "Real Plan", "tasks": [{"id": "1", "name": "real-task"}]}
+</plan>
 """,
-            "expected_type": "improvement",
-            "expected_content_key": "improvedContent",
-            "expected_value": "real improved content",
+            "expected_type": "plan",
+            "expected_name": "Real Plan",
+        },
+        {
+            "name": "Invalid JSON in plan block - should skip",
+            "text": """
+<plan>
+{invalid json here}
+</plan>
+
+<plan>
+{"name": "Valid Plan", "tasks": []}
+</plan>
+""",
+            "expected_type": "plan",
+            "expected_name": "Valid Plan",
         },
     ]
 
@@ -78,43 +73,116 @@ Now here's the actual response:
         result = extract_structured_output(test['text'])
 
         if result is None:
-            print(f"❌ FAILED: No structured output found")
+            print(f"  FAILED: No structured output found")
             failed += 1
             continue
 
         print(f"Found structured output:")
         print(f"  Type: {result['type']}")
-        print(f"  Content keys: {list(result['content'].keys())}")
+        print(f"  Content: {json.dumps(result['content'], indent=2)[:200]}")
 
         # Check type
         if result['type'] != test['expected_type']:
-            print(f"❌ FAILED: Expected type '{test['expected_type']}', got '{result['type']}'")
+            print(f"  FAILED: Expected type '{test['expected_type']}', got '{result['type']}'")
             failed += 1
             continue
 
-        # Check content key exists
-        if test['expected_content_key'] not in result['content']:
-            print(f"❌ FAILED: Expected key '{test['expected_content_key']}' not found in content")
-            failed += 1
-            continue
-
-        # Check value if specified
-        if 'expected_value' in test:
-            actual_value = result['content'][test['expected_content_key']]
-            if actual_value != test['expected_value']:
-                print(f"❌ FAILED: Expected value '{test['expected_value']}', got '{actual_value}'")
+        # Check expected name if specified
+        if 'expected_name' in test:
+            actual_name = result['content'].get('name', '')
+            if actual_name != test['expected_name']:
+                print(f"  FAILED: Expected name '{test['expected_name']}', got '{actual_name}'")
                 failed += 1
                 continue
 
-        print(f"✅ PASSED")
+        print(f"  PASSED")
         passed += 1
 
     print(f"\n{'='*60}")
-    print(f"Results: {passed} passed, {failed} failed")
+    print(f"Plan extraction results: {passed} passed, {failed} failed")
     print(f"{'='*60}")
 
     return failed == 0
 
+
+def test_review_json_block():
+    """Test extraction of review content from <review> JSON blocks"""
+    test_cases = [
+        {
+            "name": "Simple review JSON block",
+            "text": """
+Review complete.
+
+<review>
+{"result_status": "approved", "result_notes": "Looks good!", "issues": [], "next_steps": []}
+</review>
+""",
+            "expected_type": "review",
+            "expected_status": "approved",
+        },
+    ]
+
+    passed = 0
+    failed = 0
+
+    for i, test in enumerate(test_cases):
+        print(f"\n{'='*60}")
+        print(f"Test {i+1}: {test['name']}")
+        print(f"{'='*60}")
+
+        result = extract_structured_output(test['text'])
+
+        if result is None:
+            print(f"  FAILED: No structured output found")
+            failed += 1
+            continue
+
+        print(f"Found structured output:")
+        print(f"  Type: {result['type']}")
+
+        if result['type'] != test['expected_type']:
+            print(f"  FAILED: Expected type '{test['expected_type']}', got '{result['type']}'")
+            failed += 1
+            continue
+
+        if 'expected_status' in test:
+            actual_status = result['content'].get('result_status', '')
+            if actual_status != test['expected_status']:
+                print(f"  FAILED: Expected status '{test['expected_status']}', got '{actual_status}'")
+                failed += 1
+                continue
+
+        print(f"  PASSED")
+        passed += 1
+
+    print(f"\n{'='*60}")
+    print(f"Review extraction results: {passed} passed, {failed} failed")
+    print(f"{'='*60}")
+
+    return failed == 0
+
+
+def test_no_improvement_pattern():
+    """Test that <improvement> XML blocks are no longer extracted (removed feature)"""
+    text = """
+<improvement>
+# Some improved content
+</improvement>
+"""
+    result = extract_structured_output(text)
+
+    if result is None:
+        print("  PASSED: <improvement> blocks are correctly ignored")
+        return True
+    else:
+        print(f"  FAILED: <improvement> should not be extracted, got {result['type']}")
+        return False
+
+
 if __name__ == '__main__':
-    success = test_json_code_block()
-    sys.exit(0 if success else 1)
+    all_passed = True
+    all_passed = test_plan_json_block() and all_passed
+    all_passed = test_review_json_block() and all_passed
+    all_passed = test_no_improvement_pattern() and all_passed
+
+    sys.exit(0 if all_passed else 1)

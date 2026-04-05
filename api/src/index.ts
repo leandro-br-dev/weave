@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
 import express from 'express'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -28,6 +29,8 @@ import environmentVariablesRouter from './routes/environmentVariables.js'
 import cloudflareRouter from './routes/cloudflare.js'
 import backupRouter from './routes/backup.js'
 import uploadsRouter from './routes/uploads.js'
+import validateRouter from './routes/internal/validate.routes.js'
+import { requireLocalhost } from './middleware/auth.js'
 import { db } from './db/index.js'
 
 const app = express()
@@ -145,15 +148,47 @@ app.use('/api/backup', backupRouter)
 // Upload routes
 app.use('/api/uploads', uploadsRouter)
 
+// Internal routes — localhost only, no auth (used by Claude agents for pre-submission validation)
+app.use('/internal/validate', requireLocalhost, validateRouter)
+
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack)
   res.status(500).json({ error: 'Something went wrong!' })
 })
 
+/**
+ * Write the weave-validate helper script to /usr/local/bin so that Claude agents
+ * can call `weave-validate <type> <file>` from any terminal.
+ * The script reads WEAVE_API_URL from the environment to know where the API lives.
+ */
+function installWeaveValidateScript(port: number): void {
+  const script = `#!/bin/bash
+TYPE=$1
+FILE_PATH=$2
+
+if [ -z "$WEAVE_API_URL" ]; then echo "Erro: Variável WEAVE_API_URL não definida no terminal."; exit 1; fi
+if [ ! -f "$FILE_PATH" ]; then echo "Erro: Arquivo $FILE_PATH não encontrado."; exit 1; fi
+
+RESPONSE=$(curl -s -w "\\n%{http_code}" -X POST "$WEAVE_API_URL/internal/validate/$TYPE" -H "Content-Type: application/json" -d @"$FILE_PATH")
+HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
+HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+
+if [ "$HTTP_STATUS" -eq 200 ]; then echo "✅ Validação $TYPE SUCESSO!"; exit 0; else echo -e "❌ ERRO DE VALIDAÇÃO:\\n$HTTP_BODY"; exit 1; fi
+`
+  const dest = '/usr/local/bin/weave-validate'
+  try {
+    fs.writeFileSync(dest, script, { mode: 0o755 })
+    console.log(`[api] weave-validate script installed at ${dest}`)
+  } catch (err: any) {
+    console.warn(`[api] Could not install weave-validate script at ${dest}: ${err.message}`)
+  }
+}
+
 const server = app.listen(PORT, () => {
   console.log(`[api] Server running on port ${PORT}`)
   recoverStuckPlans(db)
+  installWeaveValidateScript(Number(PORT))
 })
 
 // Run approval timeout check every minute

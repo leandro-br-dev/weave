@@ -31,7 +31,13 @@
           "nextRun": "Próxima Execução",
           "actions": "Ações",
           "trigger": "Gatilho",
-          "schedule": "Agendamento"
+          "schedule": "Agendamento",
+          "tasks": "Tarefas",
+          "duration": "Duração",
+          "client": "Cliente",
+          "when": "Quando",
+          "export": "Exportar como JSON",
+          "created": "Criado em"
         }
       },
       "header": {

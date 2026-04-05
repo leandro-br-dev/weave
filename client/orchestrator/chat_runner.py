@@ -14,15 +14,51 @@ from io import StringIO
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    PermissionResultAllow,
     ResultMessage,
     TextBlock,
+    ToolPermissionContext,
     query,
 )
 from claude_agent_sdk._errors import ProcessError
 
 from orchestrator import logger
 from orchestrator.attachments import build_prompt_with_attachments
-from orchestrator.runner import extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir, list_agent_docs
+from orchestrator.runner import (
+    extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir,
+    list_agent_docs,
+)
+
+
+async def _string_to_async_iterable(text: str):
+    """
+    Convert a string prompt to an AsyncIterable of SDK message dicts.
+
+    The Claude Agent SDK requires an AsyncIterable prompt when can_use_tool
+    is set. This helper wraps a single user message in an async generator.
+    """
+    yield {
+        "type": "user",
+        "session_id": "",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+    }
+
+
+async def _chat_can_use_tool(
+    tool_name: str,
+    tool_input: dict,
+    context: ToolPermissionContext,
+) -> PermissionResultAllow:
+    """
+    Auto-approve all tool permission requests in chat sessions.
+
+    Chat sessions run with permission_mode='acceptEdits' and there is no
+    interactive user to approve requests. Without this callback, tools like
+    ExitPlanMode cause the CLI to hang waiting for a response on stdin.
+    """
+    logger.info(f"[ChatPermission] Auto-approved tool '{tool_name}'")
+    return PermissionResultAllow()
 
 
 async def run_chat_turn(
@@ -120,7 +156,7 @@ async def run_chat_turn(
     except Exception as e:
         logger.warning(f"[ChatTurn] Error reading settings: {e}")
 
-    options = ClaudeAgentOptions(**options_kwargs)
+    options = ClaudeAgentOptions(**options_kwargs, can_use_tool=_chat_can_use_tool)
 
     captured_texts = []
     final_result = None
@@ -175,7 +211,7 @@ async def run_chat_turn(
         full_prompt += docs_guidelines
 
     try:
-        async for message_obj in query(prompt=full_prompt, options=options):
+        async for message_obj in query(prompt=_string_to_async_iterable(full_prompt), options=options):
             msg_type = getattr(message_obj, 'type', None) or type(message_obj).__name__
 
             if msg_type in ('assistant', 'AssistantMessage') or hasattr(message_obj, 'content'):

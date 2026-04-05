@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare,
   LayoutGrid, Package, LogOut, UserCircle, Sun, Moon, Monitor, Check,
-  ChevronRight, Clock, X, MessageCircle, FolderGit2,
-  Bot, ShieldCheck, Store, ChevronLeft
+  ChevronRight, Clock, X, MessageCircle, FolderGit2, Globe,
+  Bot, ShieldCheck, Store, ChevronLeft, Palette
 } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetProjects } from '@/api/projects'
@@ -22,8 +23,9 @@ import {
   darkModeAccentColors,
   withDarkMode,
 } from '@/lib/colors'
+import { useAutoPosition } from '@/lib/useAutoPosition'
 
-type PanelType = 'chat' | 'approvals' | 'workflows' | 'projects' | 'kanban' | 'agents' | 'marketplace' | 'settings' | null
+type PanelType = 'chat' | 'approvals' | 'workflows' | 'projects' | 'kanban' | 'agents' | 'marketplace' | null
 
 interface NavigationRailProps {
   onQuickAction: () => void
@@ -31,7 +33,7 @@ interface NavigationRailProps {
 }
 
 export default function NavigationRail({ onQuickAction, onCollapsedChange }: NavigationRailProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { data: pendingApprovals = [] } = useGetPendingApprovals()
@@ -41,10 +43,28 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
   const [activePanel, setActivePanel] = useState<PanelType>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const themeMenuRef = useRef<HTMLDivElement>(null)
+  const languageMenuRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const themeTriggerRef = useRef<HTMLButtonElement>(null)
+  const languageTriggerRef = useRef<HTMLButtonElement>(null)
+  const themeDropdownRef = useRef<HTMLDivElement>(null)
+  const languageDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Auto-positioning for sub-menus (picks best side based on available viewport space)
+  const themeAutoPos = useAutoPosition(themeTriggerRef, {
+    isOpen: themeMenuOpen,
+    preferHorizontal: 'right',
+    preferVertical: 'top',
+  })
+  const languageAutoPos = useAutoPosition(languageTriggerRef, {
+    isOpen: languageMenuOpen,
+    preferHorizontal: 'right',
+    preferVertical: 'top',
+  })
 
   // Fetch data for panels
   const { data: projects = [] } = useGetProjects()
@@ -66,23 +86,32 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [activePanel])
 
-  // Close user menu on outside click
+  // Close user menu on outside click (also ignore clicks inside theme/language portals)
   useEffect(() => {
     if (!userMenuOpen) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const insideUserMenu = userMenuRef.current?.contains(target)
+      const insideThemeDropdown = themeDropdownRef.current?.contains(target)
+      const insideLanguageDropdown = languageDropdownRef.current?.contains(target)
+      if (!insideUserMenu && !insideThemeDropdown && !insideLanguageDropdown) {
         setUserMenuOpen(false)
+        setThemeMenuOpen(false)
+        setLanguageMenuOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [userMenuOpen])
 
-  // Close theme menu on outside click
+  // Close theme menu on outside click (includes portal dropdown)
   useEffect(() => {
     if (!themeMenuOpen) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const insideTrigger = themeMenuRef.current?.contains(target)
+      const insideDropdown = themeDropdownRef.current?.contains(target)
+      if (!insideTrigger && !insideDropdown) {
         setThemeMenuOpen(false)
       }
     }
@@ -90,11 +119,27 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [themeMenuOpen])
 
+  // Close language menu on outside click (includes portal dropdown)
+  useEffect(() => {
+    if (!languageMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      const insideTrigger = languageMenuRef.current?.contains(target)
+      const insideDropdown = languageDropdownRef.current?.contains(target)
+      if (!insideTrigger && !insideDropdown) {
+        setLanguageMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [languageMenuOpen])
+
   // Close menus on route change
   useEffect(() => {
     setActivePanel(null)
     setUserMenuOpen(false)
     setThemeMenuOpen(false)
+    setLanguageMenuOpen(false)
   }, [location.pathname])
 
   // Notify layout of collapsed state changes
@@ -103,9 +148,14 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
   }, [collapsed, onCollapsedChange])
 
   const themeOptions = [
-    { value: 'light' as const, icon: Sun, label: 'Light' },
-    { value: 'dark' as const, icon: Moon, label: 'Dark' },
-    { value: 'system' as const, icon: Monitor, label: 'System' },
+    { value: 'light' as const, icon: Sun, label: t('common.common.themeLight') },
+    { value: 'dark' as const, icon: Moon, label: t('common.common.themeDark') },
+    { value: 'system' as const, icon: Monitor, label: t('common.common.themeSystem') },
+  ]
+
+  const languageOptions = [
+    { code: 'en-US', flag: '🇺🇸', nativeName: 'English', localName: 'English' },
+    { code: 'pt-BR', flag: '🇧🇷', nativeName: 'Português', localName: 'Portuguese' },
   ]
 
   const pendingBadge = pendingApprovals.length > 0 ? pendingApprovals.length : undefined
@@ -219,33 +269,119 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             onInfoClick={() => handleInfoClick('marketplace')}
             collapsed={collapsed}
           />
-          <SidebarButton
-            icon={<Settings size={20} />}
-            label={t('common.navigation.settings')}
-            isActive={location.pathname === '/settings'}
-            onClick={() => handleNavClick('/settings')}
-            onInfoClick={() => handleInfoClick('settings')}
-            collapsed={collapsed}
-          />
         </nav>
 
-        {/* Bottom section: Theme + User menu */}
-        <div className={`border-t ${withDarkMode(sidebarColors.divider, darkModeSidebarColors.divider)} px-2 pb-3 pt-2 space-y-1 flex-shrink-0`}>
-          {/* Theme Selector */}
-          <div className="relative" ref={themeMenuRef}>
+        {/* Bottom section: User menu (theme, language, settings) */}
+        <div className={`border-t ${withDarkMode(sidebarColors.divider, darkModeSidebarColors.divider)} px-2 pb-3 pt-2 flex-shrink-0`}>
+          <div className="relative" ref={userMenuRef}>
             <SidebarButton
-              label="Theme"
-              onClick={() => { setThemeMenuOpen(!themeMenuOpen); setActivePanel(null) }}
-              icon={theme === 'dark' ? <Moon size={20} /> : theme === 'light' ? <Sun size={20} /> : <Monitor size={20} />}
+              label={user?.username || 'User'}
+              onClick={() => {
+                setUserMenuOpen(!userMenuOpen)
+                setThemeMenuOpen(false)
+                setLanguageMenuOpen(false)
+                setActivePanel(null)
+              }}
+              avatar
+              initial={user?.username?.charAt(0).toUpperCase() || 'U'}
               collapsed={collapsed}
             />
 
-            {themeMenuOpen && (
-              <div className={`absolute ${collapsed ? 'bottom-full left-full mb-2 ml-0' : 'bottom-full left-0 right-0 mb-1'} bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50 min-w-[140px]`}>
+            {userMenuOpen && (
+              <div className={`absolute ${collapsed ? 'bottom-full left-full mb-2 ml-0' : 'bottom-full left-0 right-0 mb-1'} bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50 min-w-[180px]`}>
+                {/* Theme sub-menu */}
+                <div className="relative" ref={themeMenuRef}>
+                  <button
+                    ref={themeTriggerRef}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setThemeMenuOpen(!themeMenuOpen)
+                      setLanguageMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Palette size={16} />
+                    <span className="flex-1 text-left">{t('common.common.theme')}</span>
+                    <span className="text-xs text-gray-500">
+                      {theme === 'light' ? t('common.common.themeLight') : theme === 'dark' ? t('common.common.themeDark') : t('common.common.themeSystem')}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Language sub-menu */}
+                <div className="relative" ref={languageMenuRef}>
+                  <button
+                    ref={languageTriggerRef}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLanguageMenuOpen(!languageMenuOpen)
+                      setThemeMenuOpen(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Globe size={16} />
+                    <span className="flex-1 text-left">{t('common.common.language')}</span>
+                    <span className="text-xs text-gray-500">
+                      {i18n.language === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-700 dark:border-gray-800 my-1" />
+
+                {/* Settings link */}
+                <Link
+                  to="/settings"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Settings size={16} />
+                  <span>{t('common.common.settings')}</span>
+                </Link>
+
+                {/* User management link */}
+                <Link
+                  to="/users"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <UserCircle size={16} />
+                  <span>{t('auth.userManagement.title')}</span>
+                </Link>
+
+                {/* Divider */}
+                <div className="border-t border-gray-700 dark:border-gray-800 my-1" />
+
+                {/* Logout */}
+                <button
+                  onClick={() => { setUserMenuOpen(false); logout() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <LogOut size={16} />
+                  <span>{t('auth.userManagement.logout.button')}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Theme dropdown — rendered via portal OUTSIDE the userMenuOpen conditional
+                so that clicking an option doesn't unmount the portal before onClick fires */}
+            {themeMenuOpen && createPortal(
+              <div
+                ref={themeDropdownRef}
+                className="bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-[60] min-w-[140px]"
+                style={themeAutoPos.getFixedPositionStyles()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 {themeOptions.map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() => { setTheme(opt.value); setThemeMenuOpen(false) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setTheme(opt.value)
+                      setThemeMenuOpen(false)
+                      setUserMenuOpen(false)
+                    }}
                     className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
                       theme === opt.value
                         ? 'text-orange-400 bg-gray-700'
@@ -257,38 +393,40 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
                     {theme === opt.value && <Check size={14} className="ml-auto" />}
                   </button>
                 ))}
-              </div>
+              </div>,
+              document.body
             )}
-          </div>
 
-          {/* User Menu */}
-          <div className="relative" ref={userMenuRef}>
-            <SidebarButton
-              label={user?.username || 'User'}
-              onClick={() => { setUserMenuOpen(!userMenuOpen); setActivePanel(null) }}
-              avatar
-              initial={user?.username?.charAt(0).toUpperCase() || 'U'}
-              collapsed={collapsed}
-            />
-
-            {userMenuOpen && (
-              <div className={`absolute ${collapsed ? 'bottom-full left-full mb-2 ml-0' : 'bottom-full left-0 right-0 mb-1'} bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50 min-w-[160px]`}>
-                <Link
-                  to="/users"
-                  onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <UserCircle size={16} />
-                  <span>{t('auth.userManagement.title')}</span>
-                </Link>
-                <button
-                  onClick={() => { setUserMenuOpen(false); logout() }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:text-red-400 hover:bg-gray-700 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <LogOut size={16} />
-                  <span>{t('auth.userManagement.logout.button')}</span>
-                </button>
-              </div>
+            {/* Language dropdown — rendered via portal OUTSIDE the userMenuOpen conditional */}
+            {languageMenuOpen && createPortal(
+              <div
+                ref={languageDropdownRef}
+                className="bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-[60] min-w-[160px]"
+                style={languageAutoPos.getFixedPositionStyles()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {languageOptions.map((opt) => (
+                  <button
+                    key={opt.code}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      i18n.changeLanguage(opt.code)
+                      setLanguageMenuOpen(false)
+                      setUserMenuOpen(false)
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm ${
+                      i18n.language === opt.code
+                        ? 'text-orange-400 bg-gray-700'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-700 dark:hover:bg-gray-700'
+                    } transition-colors`}
+                  >
+                    <span>{opt.flag}</span>
+                    <span>{opt.nativeName}</span>
+                    {i18n.language === opt.code && <Check size={14} className="ml-auto" />}
+                  </button>
+                ))}
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -323,6 +461,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             <WorkflowsPanel
               plans={plans}
               onNavigate={() => { setActivePanel(null); navigate('/workflows') }}
+              onSelectPlan={(id) => { setActivePanel(null); navigate(`/plans/${id}`) }}
               onClose={() => setActivePanel(null)}
             />
           )}
@@ -330,6 +469,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             <ProjectsPanel
               projects={projects}
               onNavigate={() => { setActivePanel(null); navigate('/projects') }}
+              onSelectProject={(id) => { setActivePanel(null); navigate(`/projects?project=${id}`) }}
               onClose={() => setActivePanel(null)}
             />
           )}
@@ -337,6 +477,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             <KanbanPanel
               projects={projects}
               onNavigate={() => { setActivePanel(null); navigate('/kanban') }}
+              onSelectProject={(id) => { setActivePanel(null); navigate(`/kanban?project=${id}`) }}
               onClose={() => setActivePanel(null)}
             />
           )}
@@ -344,6 +485,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             <AgentsPanel
               workspaces={workspaces}
               onNavigate={() => { setActivePanel(null); navigate('/agents') }}
+              onSelectWorkspace={(id) => { setActivePanel(null); navigate(`/agents?workspace=${id}`) }}
               onClose={() => setActivePanel(null)}
             />
           )}
@@ -365,12 +507,6 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
           {activePanel === 'marketplace' && (
             <MarketplacePanel
               onNavigate={() => { setActivePanel(null); navigate('/marketplace') }}
-              onClose={() => setActivePanel(null)}
-            />
-          )}
-          {activePanel === 'settings' && (
-            <SettingsPanel
-              onNavigate={() => { setActivePanel(null); navigate('/settings') }}
               onClose={() => setActivePanel(null)}
             />
           )}
@@ -529,10 +665,12 @@ function PanelFooter({ label, onClick }: { label: string; onClick: () => void })
 function WorkflowsPanel({
   plans,
   onNavigate,
+  onSelectPlan,
   onClose,
 }: {
   plans: any[]
   onNavigate: () => void
+  onSelectPlan: (id: string) => void
   onClose: () => void
 }) {
   const recentPlans = plans.slice(0, 8)
@@ -565,7 +703,7 @@ function WorkflowsPanel({
               <div
                 key={plan.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={onNavigate}
+                onClick={() => onSelectPlan(plan.id)}
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-gray-200 truncate">{plan.name || plan.id}</p>
@@ -592,10 +730,12 @@ function WorkflowsPanel({
 function ProjectsPanel({
   projects,
   onNavigate,
+  onSelectProject,
   onClose,
 }: {
   projects: any[]
   onNavigate: () => void
+  onSelectProject: (id: string) => void
   onClose: () => void
 }) {
   return (
@@ -618,7 +758,7 @@ function ProjectsPanel({
               <div
                 key={project.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={onNavigate}
+                onClick={() => onSelectProject(project.id)}
               >
                 {project.color && (
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
@@ -646,10 +786,12 @@ function ProjectsPanel({
 function KanbanPanel({
   projects,
   onNavigate,
+  onSelectProject,
   onClose,
 }: {
   projects: any[]
   onNavigate: () => void
+  onSelectProject: (id: string) => void
   onClose: () => void
 }) {
   return (
@@ -672,7 +814,7 @@ function KanbanPanel({
               <div
                 key={project.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={onNavigate}
+                onClick={() => onSelectProject(project.id)}
               >
                 {project.color && (
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
@@ -698,10 +840,12 @@ function KanbanPanel({
 function AgentsPanel({
   workspaces,
   onNavigate,
+  onSelectWorkspace,
   onClose,
 }: {
   workspaces: any[]
   onNavigate: () => void
+  onSelectWorkspace: (id: string) => void
   onClose: () => void
 }) {
   const roleLabel: Record<string, string> = {
@@ -718,15 +862,15 @@ function AgentsPanel({
     <>
       <PanelHeader
         icon={<Users size={18} className="text-orange-400" />}
-        title="Agents"
+        title="Teams"
         onClose={onClose}
       />
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Your Agents</p>
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Your Teams</p>
         {workspaces.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-gray-500">
             <Bot size={32} strokeWidth={1} />
-            <p className="text-xs mt-2">No agents configured</p>
+            <p className="text-xs mt-2">No teams configured</p>
           </div>
         ) : (
           <div className="space-y-1">
@@ -734,7 +878,7 @@ function AgentsPanel({
               <div
                 key={ws.id}
                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={onNavigate}
+                onClick={() => onSelectWorkspace(ws.id)}
               >
                 <Bot size={14} className="text-gray-400 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -749,7 +893,7 @@ function AgentsPanel({
           </div>
         )}
       </div>
-      <PanelFooter label="View all agents" onClick={onNavigate} />
+      <PanelFooter label="View all teams" onClick={onNavigate} />
     </>
   )
 }
@@ -895,43 +1039,11 @@ function MarketplacePanel({
           <Store size={32} strokeWidth={1} />
           <p className="text-xs mt-2">Browse skills &amp; models</p>
           <p className="text-[10px] mt-1 text-center">
-            Extend your agents with pre-built skills and model configurations from the marketplace
+            Extend your teams with pre-built skills and model configurations from the marketplace
           </p>
         </div>
       </div>
       <PanelFooter label="Open Marketplace" onClick={onNavigate} />
-    </>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   SETTINGS PANEL
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-function SettingsPanel({
-  onNavigate,
-  onClose,
-}: {
-  onNavigate: () => void
-  onClose: () => void
-}) {
-  return (
-    <>
-      <PanelHeader
-        icon={<Settings size={18} className="text-orange-400" />}
-        title="Settings"
-        onClose={onClose}
-      />
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-          <Settings size={32} strokeWidth={1} />
-          <p className="text-xs mt-2">Configuration</p>
-          <p className="text-[10px] mt-1 text-center">
-            Manage your account, environment variables, and application preferences
-          </p>
-        </div>
-      </div>
-      <PanelFooter label="Open Settings" onClick={onNavigate} />
     </>
   )
 }

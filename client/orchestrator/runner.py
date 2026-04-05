@@ -25,11 +25,15 @@ from pathlib import Path
 
 import anyio
 
+from collections.abc import AsyncIterable
+
 from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
+    PermissionResultAllow,
     ResultMessage,
     TextBlock,
+    ToolPermissionContext,
     ToolUseBlock,
     query,
 )
@@ -42,12 +46,72 @@ from orchestrator.plan import Plan, Task
 # Generated once per plan execution and reused across all tasks.
 _workflow_context_cache: dict[str, str] = {}
 
+# Tools that should always be auto-approved when running in agent mode.
+# ExitPlanMode and EnterPlanMode are Claude Code internal tools that request
+# user confirmation — but in daemon/agent mode there is no user to confirm.
+# Without auto-approval, the CLI hangs waiting for a response on stdin.
+AUTO_APPROVE_TOOLS = frozenset({
+    'ExitPlanMode',
+    'EnterPlanMode',
+})
+
+
+def _make_can_use_tool_callback(
+    permission_mode: str | None,
+) -> callable:
+    """
+    Create a can_use_tool callback for the Claude Agent SDK.
+
+    When the Claude CLI needs user permission to use a tool (e.g. ExitPlanMode),
+    it sends a 'can_use_tool' control request. In daemon/agent mode there is no
+    interactive user, so we auto-approve:
+
+    - permission_mode='acceptEdits': auto-approve everything (Quick Actions)
+    - Auto-approve control tools (ExitPlanMode, EnterPlanMode) unconditionally
+    - Otherwise: deny (to be safe)
+
+    Args:
+        permission_mode: The task's permission mode ('acceptEdits', etc.)
+
+    Returns:
+        An async callable compatible with ClaudeAgentOptions.can_use_tool
+    """
+    async def can_use_tool(
+        tool_name: str,
+        tool_input: dict,
+        context: ToolPermissionContext,
+    ) -> PermissionResultAllow:
+        if permission_mode == 'acceptEdits' or tool_name in AUTO_APPROVE_TOOLS:
+            logger.info(f"[permission] Auto-approved tool '{tool_name}' (mode={permission_mode})")
+            return PermissionResultAllow()
+        else:
+            logger.warning(f"[permission] Denied tool '{tool_name}' — no interactive user in daemon mode")
+            from claude_agent_sdk import PermissionResultDeny
+            return PermissionResultDeny(message=f"Tool '{tool_name}' requires user approval")
+
+    return can_use_tool
+
+
+async def _string_to_async_iterable(text: str) -> AsyncIterable[dict]:
+    """
+    Convert a string prompt to an AsyncIterable of SDK message dicts.
+
+    The Claude Agent SDK requires an AsyncIterable prompt when can_use_tool
+    is set. This helper wraps a single user message in an async generator.
+    """
+    yield {
+        "type": "user",
+        "session_id": "",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+    }
+
+
 # Structured output patterns for quick actions
 STRUCTURED_PATTERNS = [
     ('plan', r'<plan>\s*({.*?})\s*</plan>'),
     ('review', r'<review>\s*({.*?})\s*</review>'),
     ('diagnosis', r'<diagnosis>\s*({.*?})\s*</diagnosis>'),
-    ('improvement', r'```json\s*({.*?})\s*```'),  # JSON code blocks for improvement actions
 ]
 
 
@@ -66,6 +130,42 @@ def _read_file(path: str, label: str = 'file') -> str | None:
     except Exception as e:
         logger.warning(f'Could not read {label} at {path}: {e}')
         return None
+
+
+def _build_handoff_section(workflow_path: str | None) -> str | None:
+    """
+    Build the workflow handoff section for multi-agent communication.
+
+    Loads the SKILL.md from native-skills/workflow_handoff/ and substitutes
+    the {WORKFLOW_DIR} placeholder with the actual workflow directory path.
+
+    Args:
+        workflow_path: Absolute path to the workflow directory
+
+    Returns:
+        Formatted handoff section string, or None if no workflow_path
+    """
+    if not workflow_path:
+        return None
+
+    # Load the handoff skill template
+    skill_path = Path(__file__).resolve().parent.parent.parent / 'native-skills' / 'workflow_handoff' / 'SKILL.md'
+    if not skill_path.exists():
+        logger.warning(f'Workflow handoff skill not found at {skill_path}')
+        return None
+
+    try:
+        content = skill_path.read_text(encoding='utf-8')
+    except Exception as e:
+        logger.warning(f'Could not read workflow handoff skill: {e}')
+        return None
+
+    # Substitute the placeholder with the actual path
+    content = content.replace('{WORKFLOW_DIR}', workflow_path)
+
+    logger.info(f"[Handoff] Skill loaded, placeholder replaced with: {workflow_path}")
+
+    return content
 
 
 def prepare_agent_docs_dir(workspace: str, plan_id: str, task_id: str) -> str:
@@ -142,8 +242,7 @@ def extract_structured_output(full_text: str) -> dict | None:
     """
     Extract the last structured output block found in the agent output.
 
-    Searches for JSON blocks wrapped in <plan>, <review>, <diagnosis> tags,
-    or ```json code blocks (for improvement actions).
+    Searches for JSON blocks wrapped in <plan>, <review>, <diagnosis> tags.
     These are used by quick actions to produce structured results for frontend approval.
 
     Uses the LAST occurrence of each pattern type to avoid capturing template examples
@@ -154,7 +253,7 @@ def extract_structured_output(full_text: str) -> dict | None:
         full_text: Complete output text from the agent execution
 
     Returns:
-        dict with 'type' (plan|review|diagnosis|improvement) and 'content' (parsed JSON),
+        dict with 'type' (plan|review|diagnosis) and 'content' (parsed JSON),
         or None if no structured output found
     """
     for output_type, pattern in STRUCTURED_PATTERNS:
@@ -163,12 +262,72 @@ def extract_structured_output(full_text: str) -> dict | None:
         if matches:
             # Use the last match — the real generated plan, not template examples
             last_match = matches[-1]
+            raw_content = last_match.group(1).strip()
+            if not raw_content:
+                continue
+
+            # JSON-parsed content
             try:
-                content = json.loads(last_match.group(1))
+                content = json.loads(raw_content)
                 return {'type': output_type, 'content': content}
             except json.JSONDecodeError:
                 # Pattern matched but JSON is invalid - continue to next pattern
                 continue
+    return None
+
+
+# Improvement output files produced by quick-action workflows.
+# The agent writes these JSON files to the workflow directory and validates
+# them with weave-validate before finishing.  We read them here so the
+# structured_output is available for the frontend.
+_IMPROVEMENT_FILES = [
+    ('agent',    'agent-improvement.json'),
+    ('team',     'team-improvement.json'),
+]
+
+
+def load_improvement_from_workflow(workflow_path: str | None) -> dict | None:
+    """
+    Try to read an improvement JSON file from the workflow directory.
+
+    Used as a fallback when the agent did not emit structured XML tags
+    but was expected to write a JSON file (agent / team improvement flows).
+
+    Args:
+        workflow_path: Absolute path to the workflow directory
+
+    Returns:
+        dict with 'type' and 'content', or None if nothing found / invalid
+    """
+    if not workflow_path:
+        return None
+
+    wf_dir = Path(workflow_path)
+    if not wf_dir.is_dir():
+        return None
+
+    for output_type, filename in _IMPROVEMENT_FILES:
+        filepath = wf_dir / filename
+        if not filepath.exists():
+            continue
+
+        raw = _read_file(str(filepath), label=f'improvement file ({filename})')
+        if not raw:
+            continue
+
+        try:
+            content = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning(f"[workflow] {filename} exists but is not valid JSON — skipping")
+            continue
+
+        if not isinstance(content, dict) or not content:
+            logger.warning(f"[workflow] {filename} parsed but is empty/non-object — skipping")
+            continue
+
+        logger.info(f"[workflow] Loaded improvement from {filename}: keys={list(content.keys())}")
+        return {'type': output_type, 'content': content}
+
     return None
 
 
@@ -488,16 +647,17 @@ Your documentation directory for this workflow:
     return base_prompt
 
 
-def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None) -> str:
+def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None, workflow_path: str | None = None) -> str:
     """
     Build the final prompt for a task, injecting:
-    0. Docs inventory (if docs_dir provided)
-    1. Project context (directory structure + git info) — if workflow_context provided
-    2. Environment context (if available from selected environment)
-    3. Working directory (so Claude doesn't create files in /tmp)
-    4. Context from upstream tasks (from saved notes if ctx_dir provided, otherwise from memory)
-    5. Attachment content (if attachment_ids provided with api_base_url and token)
-    6. The task prompt itself
+    0. Workflow handoff rules (if workflow_path provided)
+    1. Docs inventory (if docs_dir provided)
+    2. Project context (directory structure + git info) — if workflow_context provided
+    3. Environment context (if available from selected environment)
+    4. Working directory (so Claude doesn't create files in /tmp)
+    5. Context from upstream tasks (from saved notes if ctx_dir provided, otherwise from memory)
+    6. Attachment content (if attachment_ids provided with api_base_url and token)
+    7. The task prompt itself
 
     Skills and sub-agents are NOT injected here.
     They live natively in the project under:
@@ -517,13 +677,23 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
         attachment_ids: Optional list of attachment UUIDs to include in the prompt
         api_base_url: Optional API base URL for fetching attachment content
         token: Optional auth token for fetching attachment content
+        workflow_path: Optional path to workflow directory (state.md, plan.json, errors.log)
 
     Returns:
         The formatted prompt string
     """
     parts: list[str] = []
 
-    # 0. Inject docs inventory at the very beginning
+    # 0. Inject workflow handoff rules (multi-agent communication protocol)
+    handoff_section = _build_handoff_section(workflow_path)
+    if handoff_section:
+        parts.append(handoff_section)
+        parts.append('')
+        logger.debug(f"[{task.id}] Workflow handoff injected: path={workflow_path}, section_len={len(handoff_section)}")
+    else:
+        logger.debug(f"[{task.id}] No workflow handoff: workflow_path={workflow_path}")
+
+    # 1. Inject docs inventory at the very beginning
     if docs_dir:
         docs_inventory = list_agent_docs(docs_dir)
         if docs_inventory:
@@ -696,6 +866,7 @@ async def run_task(
     attachment_ids: list[str] | None = None,  # Attachment UUIDs for the task
     api_base_url: str | None = None,  # API base URL for fetching attachments
     token: str | None = None,  # Auth token for fetching attachments
+    workflow_path: str | None = None,  # Path to workflow directory (state.md, plan.json, errors.log)
 ) -> TaskResult:
     """
     Run a single task and stream output to terminal.
@@ -777,6 +948,10 @@ async def run_task(
     if "Skill" not in tools:
         tools.append("Skill")
 
+    # Build can_use_tool callback to handle ExitPlanMode and other
+    # permission requests that would otherwise hang in daemon mode.
+    can_use_tool = _make_can_use_tool_callback(task.permission_mode)
+
     options = ClaudeAgentOptions(
         cwd=task.cwd,
         allowed_tools=tools,
@@ -786,12 +961,13 @@ async def run_task(
         # "project" loads CLAUDE.md, .claude/skills/, .claude/agents/, .claude/settings*.json
         # from the cwd. Without this, all project-level features are silently ignored.
         setting_sources=["project"],
+        can_use_tool=can_use_tool,
     )
 
     # Generate or retrieve cached workflow context
     workflow_context = generate_and_cache_context(project_path or task.cwd)
 
-    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token)
+    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path)
 
     # Inject agents context for planner agents
     agent_context = await build_agent_context(task, client, plan_id)
@@ -799,6 +975,9 @@ async def run_task(
         # Prepend agents context to the prompt with a separator
         prompt = f"{agent_context}\n\n---\n\n{prompt}"
         logger.debug(f"[{task.id}] Injected agents context for planner agent")
+
+    # Log prompt summary (first 200 chars to verify handoff injection without spam)
+    logger.info(f"[{task.id}] Prompt built: {len(prompt)} chars, workflow_path={workflow_path}, starts_with={repr(prompt[:200])}")
 
     final_result: ResultMessage | None = None
     logs_buffer: list[dict] = []
@@ -829,7 +1008,8 @@ async def run_task(
         # Exiting early sends GeneratorExit to the SDK generator, which tries to close
         # an anyio cancel scope from a different task — causing RuntimeError.
         # Let the generator finish naturally; ResultMessage is always the last message.
-        async for message in query(prompt=prompt, options=options):
+        # When can_use_tool is set, the SDK requires an AsyncIterable prompt.
+        async for message in query(prompt=_string_to_async_iterable(prompt), options=options):
             # Debug: log message type for first few messages
             if len(logs_buffer) == 0:
                 logger.debug(f"[{task.id}] Message type: {type(message).__name__}, module: {type(message).__module__}")
@@ -846,7 +1026,9 @@ async def run_task(
                         add_log("debug", f"⚙ {block.name}")
 
                         # Check if this tool requires approval
-                        if client and plan_id:
+                        # When permission_mode is 'acceptEdits', the user has opted
+                        # into auto-approval, so skip the deny-rules approval flow.
+                        if client and plan_id and getattr(task, 'permission_mode', None) != 'acceptEdits':
                             deny_rules = _load_deny_rules(task.workspace, task.cwd)
                             needs_approval, matched_rule = _check_deny_rules(
                                 block.name, block.input, deny_rules
@@ -899,9 +1081,7 @@ async def run_task(
                                         )
 
                                         # Wait for decision
-                                        decision_resp = (
-                                            await client.wait_for_approval(approval_id)
-                                        )
+                                        decision_resp = client.wait_for_approval(approval_id)
 
                                         if decision_resp.error:
                                             error_msg = (
@@ -990,12 +1170,22 @@ async def run_task(
         if success and client and plan_id:
             full_output = '\n'.join(captured_texts)
             structured = extract_structured_output(full_output)
+
+            # Fallback: read improvement JSON from workflow directory when
+            # the agent used the file-based blackboard pattern instead of
+            # XML tags (agent / team improvement flows).
+            if not structured and workflow_path:
+                structured = load_improvement_from_workflow(workflow_path)
+
             if structured:
                 logger.info(f"[{task.id}] Found structured output: {structured['type']}")
                 try:
                     await client.save_structured_output(plan_id, structured)
                 except Exception as e:
                     logger.warning(f"[{task.id}] Failed to save structured output: {e}")
+            else:
+                # Log when no structured output found — helps diagnose improvement flow issues
+                logger.debug(f"[{task.id}] No structured output extracted from {len(captured_texts)} text blocks")
 
         return TaskResult(task_id=task.id, success=success, output=output)
 
@@ -1010,12 +1200,19 @@ async def run_task(
     if client and plan_id:
         full_output = '\n'.join(captured_texts)
         structured = extract_structured_output(full_output)
+
+        # Fallback: read improvement JSON from workflow directory
+        if not structured and workflow_path:
+            structured = load_improvement_from_workflow(workflow_path)
+
         if structured:
             logger.info(f"[{task.id}] Found structured output: {structured['type']}")
             try:
                 await client.save_structured_output(plan_id, structured)
             except Exception as e:
                 logger.warning(f"[{task.id}] Failed to save structured output: {e}")
+        else:
+            logger.debug(f"[{task.id}] No structured output extracted from {len(captured_texts)} text blocks")
 
     return TaskResult(task_id=task.id, success=True)
 
@@ -1031,6 +1228,7 @@ async def run_wave(
     attachment_ids: list[str] | None = None,
     api_base_url: str | None = None,
     token: str | None = None,
+    workflow_path: str | None = None,
 ) -> list[TaskResult]:
     """
     Run all tasks in a wave.
@@ -1054,7 +1252,7 @@ async def run_wave(
     """
     results: list[TaskResult] = []
     for task in tasks:
-        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token)
+        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path)
         results.append(result)
     return results
 
@@ -1111,6 +1309,7 @@ async def run_plan(
         results = await run_wave(
             wave, context, ctx_dir, log_callback, client, plan.id, project_path,
             attachment_ids=plan_attachment_ids, api_base_url=api_base_url, token=attach_token,
+            workflow_path=plan.workflow_path,
         )
 
         for r in results:
@@ -1128,12 +1327,13 @@ async def run_plan(
 
     logger.plan_done(plan.name, success=True)
 
-    # Extract review from accumulated task outputs
+    # Extract review structured output from accumulated task outputs
     review = None
     if context:
         # Concatenate all task outputs
         full_output = '\n'.join(r.output for r in context.values() if r.output)
         if full_output:
+            # Try to extract a review (used by reviewer agents)
             review = extract_review_from_output(full_output)
             if review:
                 logger.info(f"Extracted review from plan output: result_status={review.get('result_status')}")

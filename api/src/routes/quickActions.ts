@@ -6,6 +6,7 @@ import fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { fileURLToPath } from 'url'
 import { AGENTS_BASE_PATH } from '../utils/paths.js'
+import { ensureWorkflowDir } from '../services/workflowDir.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -138,10 +139,25 @@ router.post('/', authenticateToken, (req, res) => {
   // Build attachments JSON if attachment_ids were provided
   const attachmentsJson = JSON.stringify(attachment_ids ?? [])
 
+  // Resolve project name for workflow directory
+  let projectName = 'unknown'
+  if (project_id) {
+    const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(project_id) as any
+    if (project) projectName = project.name
+  }
+
+  // Create per-workflow directory with standard files
+  let workflowPath: string | null = null
+  try {
+    workflowPath = ensureWorkflowDir(projectName, planId)
+  } catch (dirError) {
+    console.error(`[quick-actions] Failed to create workflow directory for plan ${planId}:`, dirError)
+  }
+
   db.prepare(`
-    INSERT INTO plans (id, name, tasks, status, project_id, type, attachments)
-    VALUES (?, ?, ?, 'pending', ?, 'quick_action', ?)
-  `).run(planId, name ?? `Quick: ${message.slice(0, 60)}`, JSON.stringify([task]), project_id ?? null, attachmentsJson)
+    INSERT INTO plans (id, name, tasks, status, project_id, type, attachments, workflow_path)
+    VALUES (?, ?, ?, 'pending', ?, 'quick_action', ?, ?)
+  `).run(planId, name ?? `Quick: ${message.slice(0, 60)}`, JSON.stringify([task]), project_id ?? null, attachmentsJson, workflowPath)
 
   return res.status(201).json({
     data: { id: planId, task_id: taskId },

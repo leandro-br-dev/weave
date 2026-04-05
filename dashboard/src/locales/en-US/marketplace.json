@@ -1,6 +1,6 @@
 {
   "title": "Marketplace",
-  "description": "Discover and install workflows, agents, and integrations",
+  "description": "Discover and install workflows, teams, and integrations",
   "searchPlaceholder": "Search marketplace...",
   "searching": "Searching...",
   "noResults": "No results found",
@@ -25,7 +25,7 @@
   "categories": {
     "all": "All",
     "workflows": "Workflows",
-    "agents": "Agents",
+    "agents": "Teams",
     "integrations": "Integrations",
     "templates": "Templates",
     "tools": "Tools"

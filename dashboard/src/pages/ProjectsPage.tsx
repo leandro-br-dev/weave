@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, type Environment } from '@/api/projects'
+import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, useRepairTeams, type RepairTeamsResult, type Environment } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/teams'
-import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree } from 'lucide-react'
+import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree, Wrench } from 'lucide-react'
 import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ColorSelectDropdown, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
 import {
   bgColors, darkModeBgColors,
@@ -30,19 +30,25 @@ export default function ProjectsPage() {
   const deleteEnvironmentMutation = useDeleteEnvironment()
   const unlinkAgentMutation = useUnlinkAgent()
   const generateContextMutation = useGenerateContext()
+  const repairTeamsMutation = useRepairTeams()
 
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
   const [newProjectColor, setNewProjectColor] = useState('#3b82f6')
   const [newProjectGitUrl, setNewProjectGitUrl] = useState('')
+  const [newProjectGitToken, setNewProjectGitToken] = useState('')
   const [newProjectCreateDefaultEnvs, setNewProjectCreateDefaultEnvs] = useState(false)
+  const [newProjectBasePath, setNewProjectBasePath] = useState('')
+  const [newProjectEnvTypes, setNewProjectEnvTypes] = useState<Set<string>>(new Set(['plan', 'dev', 'staging']))
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set())
   const [showSettings, setShowSettings] = useState<Set<string>>(new Set())
   const [showEnvForm, setShowEnvForm] = useState<Set<string>>(new Set())
   const [editingEnv, setEditingEnv] = useState<{ projectId: string; envId: string } | null>(null)
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<{ id: string; name: string } | null>(null)
   const [deleteEnvConfirm, setDeleteEnvConfirm] = useState<{ projectId: string; envId: string; envName: string } | null>(null)
+  const [repairConfirm, setRepairConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [repairResults, setRepairResults] = useState<{ projectName: string; results: RepairTeamsResult[] } | null>(null)
 
   // Context modal state
   const [contextModal, setContextModal] = useState<{
@@ -113,20 +119,28 @@ export default function ProjectsPage() {
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newProjectName.trim()) return
+    if (newProjectCreateDefaultEnvs && newProjectEnvTypes.size === 0) return
 
     try {
+      const selectedEnvTypes = newProjectCreateDefaultEnvs ? Array.from(newProjectEnvTypes) : undefined
       await createProjectMutation.mutateAsync({
         name: newProjectName,
         description: newProjectDescription || undefined,
         color: newProjectColor,
         git_url: newProjectGitUrl.trim() || undefined,
         create_default_envs: newProjectCreateDefaultEnvs ? true : undefined,
+        base_path: newProjectCreateDefaultEnvs ? (newProjectBasePath.trim() || undefined) : undefined,
+        env_types: selectedEnvTypes,
+        git_token: (newProjectCreateDefaultEnvs && newProjectGitToken.trim()) ? newProjectGitToken.trim() : undefined,
       })
       setNewProjectName('')
       setNewProjectDescription('')
       setNewProjectColor('#3b82f6')
       setNewProjectGitUrl('')
+      setNewProjectGitToken('')
       setNewProjectCreateDefaultEnvs(false)
+      setNewProjectBasePath('')
+      setNewProjectEnvTypes(new Set(['plan', 'dev', 'staging']))
       setShowNewProjectForm(false)
     } catch (error) {
       alert(`Failed to create project: ${(error as Error).message}`)
@@ -247,6 +261,28 @@ export default function ProjectsPage() {
     }
   }
 
+  const getEnvTypeBadgeColor = (envType: string | null | undefined) => {
+    switch (envType) {
+      case 'plan':
+        return `${withDarkMode('bg-purple-100', 'dark:bg-purple-900/40')} ${withDarkMode('text-purple-800', 'dark:text-purple-300')}`
+      case 'dev':
+        return `${withDarkMode(successColors.bg, darkModeSuccessColors.bg)} ${withDarkMode('text-green-800', 'dark:text-green-300')}`
+      case 'staging':
+        return `${withDarkMode(warningColors.bg, darkModeWarningColors.bg)} ${withDarkMode('text-yellow-800', 'dark:text-yellow-300')}`
+      default:
+        return `${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`
+    }
+  }
+
+  const getEnvTypeLabel = (envType: string | null | undefined) => {
+    switch (envType) {
+      case 'plan': return 'Planejamento'
+      case 'dev': return 'Desenvolvimento'
+      case 'staging': return 'Validação'
+      default: return 'Desenvolvimento'
+    }
+  }
+
   const startEditingEnv = (projectId: string, env: Environment) => {
     setEditingEnv({ projectId, envId: env.id })
     setEditEnvData({ ...env })
@@ -302,6 +338,27 @@ export default function ProjectsPage() {
     })
   }
 
+  const confirmRepairTeams = async () => {
+    if (!repairConfirm) return
+    try {
+      const results = await repairTeamsMutation.mutateAsync(repairConfirm.id)
+      setRepairConfirm(null)
+      setRepairResults({ projectName: repairConfirm.name, results })
+    } catch (error) {
+      setRepairConfirm(null)
+      setRepairResults({ projectName: repairConfirm.name, results: [{ action: 'error', envName: '-', teamPath: '-', created: false, error: (error as Error).message }] })
+    }
+  }
+
+  // Check if a project is missing teams (needs repair)
+  const projectNeedsRepair = (project: { environments: Environment[] }) => {
+    const envTypes = new Set(project.environments.map(e => (e.env_type || e.name || '').toLowerCase()))
+    const missingEnvs = ['plan', 'dev', 'staging'].filter(t => !envTypes.has(t))
+    if (missingEnvs.length > 0) return true
+    // Also check if any existing env has no default team
+    return project.environments.some(e => !e.agent_workspace && !e.default_team)
+  }
+
   return (
     <div className="max-w-6xl mx-auto py-4 sm:py-8 px-4 sm:px-6">
       <PageHeader
@@ -349,7 +406,9 @@ export default function ProjectsPage() {
                 value={newProjectGitUrl}
                 onChange={(e) => setNewProjectGitUrl(e.target.value)}
                 placeholder="https://github.com/user/repo.git or git@github.com:user/repo.git"
-                hint="Optional: Link to your git repository"
+                hint={newProjectCreateDefaultEnvs
+                  ? t('pages.projects.form.gitUrlHintWithEnvs')
+                  : 'Optional: Link to your git repository'}
               />
               <div className="flex items-center justify-between">
                 <div>
@@ -362,19 +421,80 @@ export default function ProjectsPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={!newProjectGitUrl.trim()}
                   onClick={() => setNewProjectCreateDefaultEnvs(!newProjectCreateDefaultEnvs)}
                   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                     newProjectCreateDefaultEnvs
                       ? withDarkMode(bgColors.inverted, 'dark:bg-orange-600')
                       : withDarkMode('bg-gray-200', 'dark:bg-gray-700')
-                  } ${!newProjectGitUrl.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  }`}
                 >
                   <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
                     newProjectCreateDefaultEnvs ? 'translate-x-4' : 'translate-x-0.5'
                   }`} />
                 </button>
               </div>
+              {newProjectCreateDefaultEnvs && (
+                <div>
+                  <label className={`block text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-2`}>
+                    {t('pages.projects.form.envTypes')}
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {['plan', 'dev', 'staging'].map((envType) => (
+                      <label
+                        key={envType}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                          newProjectEnvTypes.has(envType)
+                            ? `${withDarkMode('bg-blue-50 border-blue-300', 'dark:bg-blue-950 dark:border-blue-700')} ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`
+                            : `${withDarkMode('bg-gray-50 border-gray-200', 'dark:bg-gray-800 dark:border-gray-600')} ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newProjectEnvTypes.has(envType)}
+                          onChange={(e) => {
+                            const next = new Set(newProjectEnvTypes)
+                            if (e.target.checked) {
+                              next.add(envType)
+                            } else {
+                              // Prevent unchecking if it's the last one
+                              if (next.size > 1) {
+                                next.delete(envType)
+                              }
+                            }
+                            setNewProjectEnvTypes(next)
+                          }}
+                          disabled={newProjectEnvTypes.size === 1 && newProjectEnvTypes.has(envType)}
+                          className="rounded"
+                        />
+                        <span className="text-sm font-medium">{t(`pages.projects.form.envType_${envType}`)}</span>
+                        <span className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`}>
+                          {t(`pages.projects.form.envType_${envType}Desc`)}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {newProjectCreateDefaultEnvs && (
+                <Input
+                  label={t('pages.projects.form.basePath')}
+                  value={newProjectBasePath}
+                  onChange={(e) => setNewProjectBasePath(e.target.value)}
+                  placeholder={t('pages.projects.form.basePathPlaceholder')}
+                  hint={t('pages.projects.form.basePathHint')}
+                  required
+                />
+              )}
+              {newProjectCreateDefaultEnvs && newProjectGitUrl.trim() && (
+                <Input
+                  label={t('pages.projects.form.gitToken')}
+                  value={newProjectGitToken}
+                  onChange={(e) => setNewProjectGitToken(e.target.value)}
+                  placeholder={t('pages.projects.form.gitTokenPlaceholder')}
+                  hint={t('pages.projects.form.gitTokenHint')}
+                  type="password"
+                />
+              )}
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button type="submit" variant="primary" disabled={createProjectMutation.isPending} loading={createProjectMutation.isPending} className="w-full sm:w-auto">
                   {createProjectMutation.isPending ? t('pages.projects.form.creating') : t('pages.projects.form.createProject')}
@@ -388,7 +508,10 @@ export default function ProjectsPage() {
                     setNewProjectDescription('')
                     setNewProjectColor('#3b82f6')
                     setNewProjectGitUrl('')
+                    setNewProjectGitToken('')
                     setNewProjectCreateDefaultEnvs(false)
+                    setNewProjectBasePath('')
+                    setNewProjectEnvTypes(new Set(['plan', 'dev', 'staging']))
                   }}
                   className="w-full sm:w-auto"
                 >
@@ -444,6 +567,19 @@ export default function ProjectsPage() {
                     <span className={`text-xs sm:text-sm ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
                       {project.environments.length} env{project.environments.length !== 1 ? 's' : ''}
                     </span>
+                    {projectNeedsRepair(project) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setRepairConfirm({ id: project.id, name: project.name })
+                        }}
+                        className={`p-1.5 sm:p-2 ${withDarkMode(warningColors.text, darkModeWarningColors.text)} ${withDarkMode('hover:bg-amber-50', 'dark:hover:bg-amber-950')} rounded-lg transition-colors`}
+                        title={t('pages.projects.repair.buttonTooltip')}
+                        disabled={repairTeamsMutation.isPending}
+                      >
+                        <Wrench size={16} className={repairTeamsMutation.isPending ? 'animate-spin' : ''} />
+                      </button>
+                    )}
                     {expandedProjects.has(project.id) ? (
                       <ChevronUp size={18} className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} />
                     ) : (
@@ -476,6 +612,7 @@ export default function ProjectsPage() {
                           setNewEnvData({
                             name: '',
                             type: 'local-wsl',
+                            env_type: 'dev',
                             project_path: '',
                           })
                         }}
@@ -508,6 +645,15 @@ export default function ProjectsPage() {
                             <option value="local-wsl">Local WSL</option>
                             <option value="local-windows">Local Windows</option>
                             <option value="ssh">SSH</option>
+                          </Select>
+                          <Select
+                            label="Ambiente"
+                            value={newEnvData.env_type || 'dev'}
+                            onChange={(e) => setNewEnvData({ ...newEnvData, env_type: e.target.value as any })}
+                          >
+                            <option value="plan">Planejamento (Plan)</option>
+                            <option value="dev">Desenvolvimento (Dev)</option>
+                            <option value="staging">Validação (Staging)</option>
                           </Select>
                           <Input
                             label="Project Path"
@@ -564,6 +710,7 @@ export default function ProjectsPage() {
                               setNewEnvData({
                                 name: '',
                                 type: 'local-wsl',
+                                env_type: 'dev',
                                 project_path: '',
                               })
                             }}
@@ -601,6 +748,15 @@ export default function ProjectsPage() {
                                   <option value="local-windows">Local Windows</option>
                                   <option value="ssh">SSH</option>
                                 </Select>
+                                <Select
+                                  label="Ambiente"
+                                  value={editEnvData.env_type || 'dev'}
+                                  onChange={(e) => setEditEnvData({ ...editEnvData, env_type: e.target.value as any })}
+                                >
+                                  <option value="plan">Planejamento (Plan)</option>
+                                  <option value="dev">Desenvolvimento (Dev)</option>
+                                  <option value="staging">Validação (Staging)</option>
+                                </Select>
                                 <Input
                                   label="Project Path"
                                   value={editEnvData.project_path || ''}
@@ -611,7 +767,7 @@ export default function ProjectsPage() {
                                 />
                               </div>
                               <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} mt-2`}>
-                                Agent team is auto-generated and cannot be edited
+                                Team is auto-generated and cannot be edited
                               </p>
                               <div className="flex gap-2">
                                 <Button type="submit" variant="primary" size="sm" disabled={updateEnvironmentMutation.isPending} loading={updateEnvironmentMutation.isPending}>
@@ -637,6 +793,9 @@ export default function ProjectsPage() {
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
                                     <h5 className={`font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>{env.name}</h5>
+                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getEnvTypeBadgeColor(env.env_type)}`}>
+                                      {getEnvTypeLabel(env.env_type)}
+                                    </span>
                                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getEnvironmentBadgeColor(env.type)}`}>
                                       {env.type}
                                     </span>
@@ -647,9 +806,14 @@ export default function ProjectsPage() {
                                     </div>
                                     {env.agent_workspace && (
                                     <details className="mt-2">
-                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Agent team path</summary>
+                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Team path</summary>
                                       <code className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} block mt-1 break-all`}>{env.agent_workspace}</code>
                                     </details>
+                                    )}
+                                    {!env.agent_workspace && !env.default_team && (
+                                      <div className={`mt-1 text-xs ${withDarkMode(warningColors.text, darkModeWarningColors.text)}`}>
+                                        ⚠ No default team linked
+                                      </div>
                                     )}
                                     {env.type === 'ssh' && env.ssh_config && (
                                       <div>
@@ -708,7 +872,7 @@ export default function ProjectsPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <Link
-                                to="/agents"
+                                to={`/agents?workspace=${agent.id}`}
                                 className={`text-xs ${withDarkMode(accentColors.text, darkModeAccentColors.text)} hover:underline`}
                               >
                                 {t('pages.projects.agents.view')} →
@@ -815,6 +979,30 @@ export default function ProjectsPage() {
         onConfirm={confirmDeleteEnvironment}
         onCancel={() => setDeleteEnvConfirm(null)}
         loading={deleteEnvironmentMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={repairConfirm !== null}
+        title={t('pages.projects.repair.title', { name: repairConfirm?.name })}
+        description={t('pages.projects.repair.description')}
+        variant="primary"
+        confirmLabel={t('pages.projects.repair.confirmLabel')}
+        onConfirm={confirmRepairTeams}
+        onCancel={() => setRepairConfirm(null)}
+        loading={repairTeamsMutation.isPending}
+      />
+
+      {/* Repair Results Dialog */}
+      <ConfirmDialog
+        open={repairResults !== null}
+        title={repairResults ? t('pages.projects.repair.resultTitle', { name: repairResults.projectName }) : ''}
+        description={repairResults
+          ? repairResults.results.map(r => `${r.envName}: ${r.action}${r.error ? ` (${r.error})` : ''}`).join('\n')
+          : ''}
+        variant="primary"
+        confirmLabel={t('pages.projects.repair.ok')}
+        onConfirm={() => setRepairResults(null)}
+        onCancel={() => setRepairResults(null)}
       />
 
       {/* Context Modal */}

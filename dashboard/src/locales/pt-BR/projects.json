@@ -1,120 +1,142 @@
 {
-      "title": "Projetos",
-      "description": "Gerencie seus projetos e seus ambientes de execu\u00e7\u00e3o",
-      "filters": {
-        "allProjects": "Todos os Projetos"
-      },
-      "list": {
-        "title": "Projetos",
-        "empty": "Nenhum projeto encontrado",
-        "createNew": "Criar Novo Projeto",
-        "searchPlaceholder": "Buscar projetos...",
-        "filter": {
-          "status": "Filtrar por Status",
-          "priority": "Filtrar por Prioridade"
-        },
-        "view": {
-          "grid": "Vis\u00e3o em Grade",
-          "list": "Vis\u00e3o em Lista"
-        }
-      },
-      "header": {
-        "newProject": "Novo Projeto",
-        "new": "Novo"
-      },
-      "empty": {
-        "title": "Nenhum projeto ainda",
-        "description": "Crie seu primeiro projeto para começar a gerenciar seus times",
-        "createProject": "Criar Projeto"
-      },
-      "form": {
-        "createTitle": "Criar Novo Projeto",
-        "projectName": "Nome do Projeto",
-        "projectNamePlaceholder": "ex:, CharHub",
-        "description": "Descri\u00e7\u00e3o",
-        "projectColor": "Cor do Projeto",
-        "projectColorHint": "Escolha uma cor para identificar visualmente este projeto",
-        "gitUrl": "URL do Reposit\u00f3rio Git",
-        "createDefaultEnvs": "Criar ambientes padr\u00e3o",
-        "createDefaultEnvsDesc": "Cria automaticamente os ambientes plan, dev e staging a partir do reposit\u00f3rio",
-        "creating": "Criando...",
-        "createProject": "Criar Projeto"
-      },
-      "create": {
-        "title": "Criar Projeto",
-        "name": "Nome do Projeto",
-        "description": "Descri\u00e7\u00e3o",
-        "status": "Status",
-        "priority": "Prioridade",
-        "startDate": "Data de In\u00edcio",
-        "endDate": "Data de T\u00e9rmino",
-        "team": "Membros da Equipe",
-        "tags": "Tags",
-        "save": "Criar Projeto",
-        "cancel": "Cancelar"
-      },
-      "edit": {
-        "title": "Editar Projeto",
-        "save": "Atualizar Projeto",
-        "cancel": "Cancelar"
-      },
-      "delete": {
-        "title": "Excluir Projeto",
-        "confirm": "Tem certeza de que deseja excluir o projeto \"{{name}}\"? Esta a\u00e7\u00e3o n\u00e3o pode ser desfeita.",
-        "success": "Projeto exclu\u00eddo com sucesso"
-      },
-      "details": {
-        "title": "Detalhes do Projeto",
-        "overview": "Vis\u00e3o Geral",
-        "tasks": "Tarefas",
-        "team": "Equipe",
-        "activity": "Atividade",
-        "settings": "Configura\u00e7\u00f5es"
-      },
-      "defaultAgents": {
-        "title": "Criar Agentes Padr\u00e3o",
-        "description": "Voc\u00ea pode criar agentes padr\u00e3o para come\u00e7ar rapidamente. O agente planejador \u00e9 essencial para o funcionamento correto do pipeline.",
-        "coder": {
-          "label": "Agente Coder",
-          "description": "Implementa funcionalidades e corre\u00e7\u00f5es seguindo os padr\u00f5es do projeto"
-        },
-        "planner": {
-          "label": "Agente Planner",
-          "description": "Planeja e divide tarefas em workflows execut\u00e1veis. Necess\u00e1rio para opera\u00e7\u00f5es de pipeline."
-        },
-        "requiredBadge": "Recomendado",
-        "create": "Criar Selecionados",
-        "skip": "Pular",
-        "creating": "Criando agentes...",
-        "success": "Agentes criados com sucesso!",
-        "error": "Falha ao criar agentes"
-      },
-      "status": {
-        "planning": "Planejamento",
-        "active": "Ativo",
-        "onHold": "Em Espera",
-        "completed": "Conclu\u00eddo",
-        "archived": "Arquivado"
-      },
-      "priority": {
-        "low": "Baixa",
-        "medium": "M\u00e9dia",
-        "high": "Alta",
-        "urgent": "Urgente"
-      },
-      "environments": {
-        "title": "Ambientes",
-        "add": "Adicionar Ambiente",
-        "empty": "Nenhum ambiente ainda. Crie um para come\u00e7ar."
-      },
-      "agents": {
-        "title": "Agentes",
-        "empty": "Nenhum agente ainda. Use a p\u00e1gina de Agentes para criar agentes para este projeto.",
-        "view": "Ver"
-      },
-      "pipelineSettings": {
-        "title": "Configura\u00e7\u00f5es de Pipeline",
-        "autoApprove": "Aprovar workflows automaticamente",
-        "autoApproveDesc": "Planos gerados iniciam automaticamente"
-      }
+  "title": "Projetos",
+  "description": "Gerencie seus projetos e seus ambientes de execução",
+  "filters": {
+    "allProjects": "Todos os Projetos"
+  },
+  "list": {
+    "title": "Projetos",
+    "empty": "Nenhum projeto encontrado",
+    "createNew": "Criar Novo Projeto",
+    "searchPlaceholder": "Buscar projetos...",
+    "filter": {
+      "status": "Filtrar por Status",
+      "priority": "Filtrar por Prioridade"
+    },
+    "view": {
+      "grid": "Visão em Grade",
+      "list": "Visão em Lista"
+    }
+  },
+  "header": {
+    "newProject": "Novo Projeto",
+    "new": "Novo"
+  },
+  "empty": {
+    "title": "Nenhum projeto ainda",
+    "description": "Crie seu primeiro projeto para começar a gerenciar seus times",
+    "createProject": "Criar Projeto"
+  },
+  "form": {
+    "createTitle": "Criar Novo Projeto",
+    "projectName": "Nome do Projeto",
+    "projectNamePlaceholder": "ex:, CharHub",
+    "description": "Descrição",
+    "projectColor": "Cor do Projeto",
+    "projectColorHint": "Escolha uma cor para identificar visualmente este projeto",
+    "gitUrl": "URL do Repositório Git",
+    "gitUrlHintWithEnvs": "Opcional. Se preenchido, os ambientes serão clonados a partir deste repositório. Caso contrário, serão criados diretórios vazios com repositório git local.",
+    "createDefaultEnvs": "Criar ambientes padrão",
+    "createDefaultEnvsDesc": "Cria automaticamente os ambientes selecionados",
+    "envTypes": "Selecionar ambientes",
+    "envType_plan": "Plan",
+    "envType_planDesc": "Referência somente leitura",
+    "envType_dev": "Dev",
+    "envType_devDesc": "Trabalho de desenvolvimento",
+    "envType_staging": "Staging",
+    "envType_stagingDesc": "Revisão e testes",
+    "basePath": "Local de Armazenamento",
+    "basePathPlaceholder": "/home/user/projects",
+    "basePathHint": "Diretório base onde os ambientes serão criados. Cada ambiente ficará em uma subpasta (plan, dev, staging).",
+    "gitToken": "Token de Acesso Git",
+    "gitTokenPlaceholder": "ghp_xxxxxxxxxxxx",
+    "gitTokenHint": "Opcional. Token de acesso pessoal para clonar repositórios privados. Se omitido, o sistema usará as credenciais do gh CLI ou a variável de ambiente GIT_TOKEN.",
+    "creating": "Criando...",
+    "createProject": "Criar Projeto"
+  },
+  "create": {
+    "title": "Criar Projeto",
+    "name": "Nome do Projeto",
+    "description": "Descrição",
+    "status": "Status",
+    "priority": "Prioridade",
+    "startDate": "Data de Início",
+    "endDate": "Data de Término",
+    "team": "Membros da Equipe",
+    "tags": "Tags",
+    "save": "Criar Projeto",
+    "cancel": "Cancelar"
+  },
+  "edit": {
+    "title": "Editar Projeto",
+    "save": "Atualizar Projeto",
+    "cancel": "Cancelar"
+  },
+  "delete": {
+    "title": "Excluir Projeto",
+    "confirm": "Tem certeza de que deseja excluir o projeto \"{{name}}\"? Esta ação não pode ser desfeita.",
+    "success": "Projeto excluído com sucesso"
+  },
+  "details": {
+    "title": "Detalhes do Projeto",
+    "overview": "Visão Geral",
+    "tasks": "Tarefas",
+    "team": "Equipe",
+    "activity": "Atividade",
+    "settings": "Configurações"
+  },
+  "defaultAgents": {
+    "title": "Criar Equipes Padrão",
+    "description": "Você pode criar equipes padrão para começar rapidamente. A equipe planejadora é essencial para o funcionamento correto do pipeline.",
+    "coder": {
+      "label": "Equipe Coder",
+      "description": "Implementa funcionalidades e correções seguindo os padrões do projeto"
+    },
+    "planner": {
+      "label": "Equipe Planner",
+      "description": "Planeja e divide tarefas em workflows executáveis. Necessário para operações de pipeline."
+    },
+    "requiredBadge": "Recomendado",
+    "create": "Criar Selecionados",
+    "skip": "Pular",
+    "creating": "Criando equipes...",
+    "success": "Equipes criadas com sucesso!",
+    "error": "Falha ao criar equipes"
+  },
+  "status": {
+    "planning": "Planejamento",
+    "active": "Ativo",
+    "onHold": "Em Espera",
+    "completed": "Concluído",
+    "archived": "Arquivado"
+  },
+  "priority": {
+    "low": "Baixa",
+    "medium": "Média",
+    "high": "Alta",
+    "urgent": "Urgente"
+  },
+  "environments": {
+    "title": "Ambientes",
+    "add": "Adicionar Ambiente",
+    "empty": "Nenhum ambiente ainda. Crie um para começar."
+  },
+  "agents": {
+    "title": "Equipes",
+    "empty": "Nenhuma equipe ainda. Use a página de Equipes para criar equipes para este projeto.",
+    "view": "Ver"
+  },
+  "pipelineSettings": {
+    "title": "Configurações de Pipeline",
+    "autoApprove": "Aprovar workflows automaticamente",
+    "autoApproveDesc": "Planos gerados iniciam automaticamente"
+  },
+  "repair": {
+    "buttonTooltip": "Reparar: criar ambientes e equipes ausentes",
+    "title": "Reparar equipes de \"{{name}}\"?",
+    "description": "Isto irá:\n• Criar ambientes plan/dev/staging ausentes\n• Inicializar equipes padrão (Equipe Plan, Equipe Dev, Equipe Staging)\n• Gerar CLAUDE.md e configurações para cada equipe",
+    "confirmLabel": "Reparar",
+    "resultTitle": "Reparo de equipes concluído para \"{{name}}\"",
+    "ok": "OK"
+  }
 }

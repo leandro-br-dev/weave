@@ -112,3 +112,28 @@ export function envAgentPlannerPath(
 ): string {
   return path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-planner')
 }
+
+/**
+ * Path for a workflow's dedicated directory.
+ * Structure: {dataDir}/projects/{projectSlug}/workflows/{workflowUuid}/
+ *
+ * Each workflow (plan) gets an isolated directory containing:
+ * - plan.json: output of the Plan Team
+ * - state.md: the general blackboard / diary
+ * - errors.log: build / test failure dump
+ */
+export function workflowDirPath(
+  projectSlug: string,
+  workflowUuid: string,
+  appEnv?: string
+): string {
+  return path.join(getProjectsDir(appEnv), slugify(projectSlug), 'workflows', workflowUuid)
+}
+
+/**
+ * Resolve a project slug from a project name.
+ * Simply delegates to slugify().
+ */
+export function projectSlugFromName(name: string): string {
+  return slugify(name)
+}

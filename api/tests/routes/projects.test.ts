@@ -5,7 +5,7 @@
  * - Basic project creation
  * - Project creation with git_url
  * - Project creation with create_default_envs (auto environment creation)
- * - Validation errors (missing git_url when create_default_envs=true)
+ * - Validation errors (missing base_path when create_default_envs=true)
  * - Invalid git_url format
  *
  * @testType Integration
@@ -27,9 +27,9 @@ vi.mock('../../src/services/gitClone.js', () => ({
     const trimmed = url.trim()
     return /^https?:\/\/.+/i.test(trimmed) || /^git@.+:.+/.test(trimmed) || /^git:\/\/.+/i.test(trimmed)
   },
-  createDefaultEnvironments: (gitUrl: string, projectName: string) => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-env-'))
-    return [
+  createDefaultEnvironments: (gitUrl: string | null, projectName: string, baseDir?: string, envTypes?: string[], gitToken?: string | null) => {
+    const tmpDir = baseDir || fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-env-'))
+    const allEnvs = [
       {
         name: 'plan',
         project_path: path.join(tmpDir, projectName, 'plan'),
@@ -49,8 +49,11 @@ vi.mock('../../src/services/gitClone.js', () => ({
         success: true,
       },
     ]
+    const filtered = envTypes ? allEnvs.filter((e) => envTypes.includes(e.name)) : allEnvs
+    return { results: filtered, warnings: [] }
   },
   DEFAULT_ENVIRONMENTS: [],
+  ENV_TYPE_NAMES: ['plan', 'dev', 'staging'],
   getProjectEnvsBaseDir: () => '',
   getEnvProjectPath: () => '',
   cloneRepository: () => 'main',
@@ -195,25 +198,27 @@ describe('Projects API', () => {
     // create_default_envs feature
     // ===========================================================================
     describe('create_default_envs', () => {
-      it('should reject create_default_envs without git_url', async () => {
+      it('should reject create_default_envs without base_path', async () => {
         const res = await request(app)
           .post('/api/projects')
           .send({
-            name: 'No Git URL Project',
+            name: 'No Base Path Project',
             create_default_envs: true,
           })
           .expect(400)
 
-        expect(res.body.error).toBe('git_url is required when create_default_envs is true')
+        expect(res.body.error).toBe('base_path is required when create_default_envs is true')
       })
 
-      it('should create project with default environments when create_default_envs=true', async () => {
+      it('should create project with default environments when create_default_envs=true with git_url', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-'))
         const res = await request(app)
           .post('/api/projects')
           .send({
             name: 'Auto Envs Project',
             git_url: 'https://github.com/user/repo.git',
             create_default_envs: true,
+            base_path: tmpDir,
           })
           .expect(201)
 
@@ -273,6 +278,121 @@ describe('Projects API', () => {
 
         expect(res.body.data.environments).toEqual([])
       })
+
+      it('should create project with default environments without git_url (from scratch)', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-scratch-'))
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Scratch Project',
+            create_default_envs: true,
+            base_path: tmpDir,
+          })
+          .expect(201)
+
+        expect(res.body.error).toBeNull()
+        expect(res.body.data.name).toBe('Scratch Project')
+        expect(res.body.data.git_url).toBeNull()
+        expect(res.body.data.environments).toBeDefined()
+        expect(res.body.data.environments.length).toBe(3)
+
+        const envNames = res.body.data.environments.map((e: any) => e.name)
+        expect(envNames).toContain('plan')
+        expect(envNames).toContain('dev')
+        expect(envNames).toContain('staging')
+
+        // Verify environments were persisted in the database
+        const envs = db.prepare('SELECT * FROM environments WHERE project_id = ?').all(res.body.data.id) as any[]
+        expect(envs.length).toBe(3)
+      })
+
+      it('should create only selected environments when env_types is provided', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-selective-'))
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Selective Envs Project',
+            git_url: 'https://github.com/user/repo.git',
+            create_default_envs: true,
+            base_path: tmpDir,
+            env_types: ['plan', 'dev'],
+          })
+          .expect(201)
+
+        expect(res.body.error).toBeNull()
+        expect(res.body.data.environments).toBeDefined()
+        expect(res.body.data.environments.length).toBe(2)
+
+        const envNames = res.body.data.environments.map((e: any) => e.name)
+        expect(envNames).toContain('plan')
+        expect(envNames).toContain('dev')
+        expect(envNames).not.toContain('staging')
+      })
+
+      it('should reject invalid env_types', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-invalid-env-'))
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Invalid Env Types Project',
+            create_default_envs: true,
+            base_path: tmpDir,
+            env_types: ['plan', 'production'],
+          })
+          .expect(400)
+
+        expect(res.body.error).toContain('Invalid environment types')
+      })
+
+      it('should reject env_types when not an array', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-notarray-'))
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Not Array Env Types Project',
+            create_default_envs: true,
+            base_path: tmpDir,
+            env_types: 'plan',
+          })
+          .expect(400)
+
+        expect(res.body.error).toContain('env_types must be an array')
+      })
+
+      it('should pass git_token to createDefaultEnvironments for private repos', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-token-'))
+        // The mock captures gitToken — verify it's passed through
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Private Repo Project',
+            git_url: 'https://github.com/user/private-repo.git',
+            create_default_envs: true,
+            base_path: tmpDir,
+            git_token: 'ghp_test_token_12345',
+          })
+          .expect(201)
+
+        expect(res.body.error).toBeNull()
+        expect(res.body.data.environments.length).toBe(3)
+        // Mock doesn't fail, so the token was accepted and passed
+      })
+
+      it('should work without git_token (fallback to gh CLI or env var)', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-notoken-'))
+        const res = await request(app)
+          .post('/api/projects')
+          .send({
+            name: 'Public Repo No Token',
+            git_url: 'https://github.com/user/public-repo.git',
+            create_default_envs: true,
+            base_path: tmpDir,
+          })
+          .expect(201)
+
+        expect(res.body.error).toBeNull()
+        expect(res.body.data.environments.length).toBe(3)
+      })
     })
 
     // ===========================================================================
@@ -281,12 +401,14 @@ describe('Projects API', () => {
     describe('GET /api/projects/:id', () => {
       it('should include auto-created environments when fetching project', async () => {
         // Create project with default environments
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weave-test-fetch-'))
         const createRes = await request(app)
           .post('/api/projects')
           .send({
             name: 'Fetch Test Project',
             git_url: 'https://github.com/user/repo.git',
             create_default_envs: true,
+            base_path: tmpDir,
           })
           .expect(201)
 

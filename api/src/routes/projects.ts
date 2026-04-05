@@ -6,7 +6,11 @@ import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 import { envAgentPath, envAgentPlannerPath, AGENTS_BASE_PATH } from '../utils/paths.js'
-import { createDefaultEnvironments, isValidGitUrl } from '../services/gitClone.js'
+import { getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
+import { createDefaultEnvironments, isValidGitUrl, ENV_TYPE_NAMES } from '../services/gitClone.js'
+import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv } from '../services/environmentTeamBootstrap.js'
+import { seedNativeAgentsForTeam } from '../services/nativeAgentsBootstrap.js'
+import { getProjectsDir, slugify } from '../utils/paths.js'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
@@ -75,7 +79,7 @@ router.get('/', authenticateToken, (req, res) => {
 
 // POST /api/projects
 router.post('/', authenticateToken, (req, res) => {
-  const { name, description, settings, color, git_url, create_default_envs } = req.body
+  const { name, description, settings, color, git_url, create_default_envs, base_path, env_types, git_token } = req.body
   if (!name) return res.status(400).json({ data: null, error: 'name is required' })
 
   // Validate workflow limits if provided in settings
@@ -86,14 +90,30 @@ router.post('/', authenticateToken, (req, res) => {
     }
   }
 
-  // If create_default_envs is true, git_url is required
-  if (create_default_envs && !git_url) {
-    return res.status(400).json({ data: null, error: 'git_url is required when create_default_envs is true' })
+  // If create_default_envs is true, base_path is required so the user knows where envs will live
+  if (create_default_envs && !base_path) {
+    return res.status(400).json({ data: null, error: 'base_path is required when create_default_envs is true' })
+  }
+
+  // Validate env_types if provided
+  if (env_types && !Array.isArray(env_types)) {
+    return res.status(400).json({ data: null, error: 'env_types must be an array' })
+  }
+  if (env_types && env_types.length > 0) {
+    const invalidTypes = env_types.filter((t: string) => !(ENV_TYPE_NAMES as readonly string[]).includes(t))
+    if (invalidTypes.length > 0) {
+      return res.status(400).json({ data: null, error: `Invalid environment types: ${invalidTypes.join(', ')}. Valid types are: ${ENV_TYPE_NAMES.join(', ')}` })
+    }
   }
 
   // Validate git_url format if provided
   if (git_url && !isValidGitUrl(git_url)) {
     return res.status(400).json({ data: null, error: 'git_url must be a valid git URL (HTTPS, SSH, or git://)' })
+  }
+
+  // Ensure base_path exists on disk
+  if (base_path) {
+    fs.mkdirSync(base_path, { recursive: true })
   }
 
   const id = uuid()
@@ -102,39 +122,72 @@ router.post('/', authenticateToken, (req, res) => {
 
   // Auto-create default environments if requested
   let environments: any[] = []
-  if (create_default_envs && git_url) {
+  let envWarnings: string[] = []
+  if (create_default_envs) {
     try {
-      const cloneResults = createDefaultEnvironments(git_url, name)
+      const { results: cloneResults, warnings } = createDefaultEnvironments(
+        git_url || null,
+        name,
+        base_path || undefined,
+        env_types && env_types.length > 0 ? env_types : undefined,
+        git_token || null,
+      )
+      envWarnings = warnings
 
       // Insert environment records into the database
+      const envRecords: { id: string; name: string; project_path: string }[] = []
       for (const result of cloneResults) {
         if (result.success) {
           const envId = uuid()
           db.prepare(`
-            INSERT INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             envId,
             id,
             result.name,
             'local-wsl',
+            result.name, // env_type matches the semantic name (plan, dev, staging)
             result.project_path,
-            '', // agent_workspace is empty until user confirms via default-agents endpoint
+            '', // agent_workspace is set by bootstrapTeamForEnvironment
             null,
             null
           )
+          envRecords.push({ id: envId, name: result.name, project_path: result.project_path })
           environments.push({
             id: envId,
             name: result.name,
             type: 'local-wsl',
+            env_type: result.name,
             project_path: result.project_path,
             agent_workspace: '',
             branch: result.branch,
           })
         }
       }
+
+      // Auto-bootstrap teams for all created environments
+      // Each env gets its default team (plan→Plan Team, dev→Dev Team, staging→Staging Team)
+      if (envRecords.length > 0) {
+        try {
+          const bootstrapResults = bootstrapTeamsForEnvironments(id, envRecords, name)
+          // Update the returned environments with the actual workspace paths
+          for (const env of environments) {
+            const boot = bootstrapResults.find((b) => b.envName === env.name)
+            if (boot) {
+              env.agent_workspace = boot.workspacePath
+              env.default_team = boot.workspacePath
+              env.team_id = boot.teamId
+            }
+          }
+        } catch (teamErr: any) {
+          console.error('[POST /api/projects] Error bootstrapping teams:', teamErr.message)
+          // Don't fail — environments are still valid, teams can be created later
+        }
+      }
     } catch (err: any) {
       console.error('[POST /api/projects] Error creating default environments:', err.message)
+      envWarnings.push(`Failed to create environments: ${err.message?.substring(0, 500) || 'Unknown error'}`)
       // Don't fail the project creation — return project without environments
       // The user can still create environments manually
     }
@@ -149,6 +202,7 @@ router.post('/', authenticateToken, (req, res) => {
       color: color ?? '',
       git_url: git_url ?? null,
       environments,
+      warnings: envWarnings.length > 0 ? envWarnings : undefined,
     },
     error: null,
   })
@@ -156,12 +210,16 @@ router.post('/', authenticateToken, (req, res) => {
 
 // POST /api/projects/:id/environments
 router.post('/:id/environments', authenticateToken, (req, res) => {
-  const { name, type, project_path, ssh_config, env_vars } = req.body
+  const { name, type, env_type, project_path, ssh_config, env_vars } = req.body
   if (!name || !project_path) {
     return res.status(400).json({ data: null, error: 'name and project_path are required' })
   }
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as any
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
+
+  // Validate env_type if provided
+  const validEnvTypes = ['plan', 'dev', 'staging']
+  const resolvedEnvType = env_type && validEnvTypes.includes(env_type) ? env_type : 'dev'
 
   // Agent workspace is created only when the user confirms via the /default-agents endpoint (modal).
   // Leave empty until then so no directory is implied or auto-populated.
@@ -169,23 +227,54 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
 
   const id = uuid()
   db.prepare(`
-    INSERT INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, req.params.id, name,
     type ?? 'local-wsl',
+    resolvedEnvType,
     project_path,
     agent_workspace,
     ssh_config ? JSON.stringify(ssh_config) : null,
     env_vars ? JSON.stringify(env_vars) : null
   )
 
-  return res.status(201).json({ data: { id, name, type, project_path, agent_workspace }, error: null })
+  // Auto-bootstrap the default team for this environment
+  let defaultTeam: string | null = null
+  let teamId: string | null = null
+  try {
+    const bootResult = bootstrapTeamForEnvironment(
+      req.params.id as string,
+      id,
+      name,
+      project_path,
+      project.name,
+    )
+    defaultTeam = bootResult.workspacePath
+    teamId = bootResult.teamId
+  } catch (teamErr: any) {
+    console.error('[POST /api/projects/:id/environments] Error bootstrapping team:', teamErr.message)
+    // Don't fail — environment is still valid, team can be created later
+  }
+
+  return res.status(201).json({
+    data: {
+      id,
+      name,
+      type: type ?? 'local-wsl',
+      env_type: resolvedEnvType,
+      project_path,
+      agent_workspace: defaultTeam ?? agent_workspace,
+      default_team: defaultTeam,
+      team_id: teamId,
+    },
+    error: null,
+  })
 })
 
 // PUT /api/projects/:projectId/environments/:envId
 router.put('/:projectId/environments/:envId', authenticateToken, (req, res) => {
-  const { name, type, project_path, ssh_config, env_vars } = req.body
+  const { name, type, env_type, project_path, ssh_config, env_vars } = req.body
   // Verify project exists
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId)
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
@@ -195,11 +284,15 @@ router.put('/:projectId/environments/:envId', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Environment not found' })
   }
 
+  // Validate env_type if provided
+  const validEnvTypes = ['plan', 'dev', 'staging']
+  const resolvedEnvType = env_type && validEnvTypes.includes(env_type) ? env_type : undefined
+
   db.prepare(`
-    UPDATE environments SET name=?, type=?, project_path=?, ssh_config=?, env_vars=?
+    UPDATE environments SET name=?, type=?, env_type=COALESCE(?, env_type), project_path=?, ssh_config=?, env_vars=?
     WHERE id=? AND project_id=?
   `).run(
-    name, type, project_path,
+    name, type, resolvedEnvType, project_path,
     ssh_config ? JSON.stringify(ssh_config) : null,
     env_vars ? JSON.stringify(env_vars) : null,
     req.params.envId, req.params.projectId
@@ -216,7 +309,157 @@ router.delete('/:projectId/environments/:envId', authenticateToken, (req, res) =
   return res.json({ data: { deleted: true }, error: null })
 })
 
-// POST /api/projects/:id/agents — vincular agente ao projeto
+// POST /api/projects/:projectId/repair-teams — backfill missing environments & default teams
+// This endpoint is designed to fix projects that were created before Phase 2
+// (i.e. they are missing plan/staging environments or their environments lack default teams).
+router.post('/:projectId/repair-teams', authenticateToken, (req, res) => {
+  try {
+    const projectId = req.params.projectId as string
+    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as any
+    if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
+
+    const results: { action: string; envName: string; teamPath: string; created: boolean; error?: string }[] = []
+
+    // Step 1: Ensure all 3 standard environments exist
+    const existingEnvs = db
+      .prepare('SELECT * FROM environments WHERE project_id = ?')
+      .all(projectId) as any[]
+
+    const existingEnvTypes = new Set(
+      existingEnvs.map((e) => (e.env_type || 'dev').toLowerCase()),
+    )
+
+    const requiredEnvTypes = ['plan', 'dev', 'staging'] as const
+
+    // Find a base_path from the first environment, or use the projects dir
+    const firstEnvPath = existingEnvs[0]?.project_path
+    let baseDir: string | undefined
+    if (firstEnvPath) {
+      // Derive base_dir: e.g. /root/projects/investing from /root/projects/investing/dev
+      const envSlug = existingEnvs[0]?.name?.toLowerCase()
+      if (envSlug && firstEnvPath.endsWith(envSlug)) {
+        baseDir = firstEnvPath.slice(0, -envSlug.length - 1)
+      } else {
+        baseDir = path.dirname(firstEnvPath)
+      }
+    }
+
+    const createdEnvRecords: { id: string; name: string; project_path: string }[] = []
+
+    for (const envType of requiredEnvTypes) {
+      if (!existingEnvTypes.has(envType)) {
+        // Determine project_path for the new environment
+        const envProjectPath = baseDir
+          ? path.join(baseDir, envType)
+          : path.join(getProjectsDir(), slugify(project.name), envType)
+
+        // Create the directory if it doesn't exist
+        if (!fs.existsSync(envProjectPath)) {
+          fs.mkdirSync(envProjectPath, { recursive: true })
+          // If the base env has a git repo, clone/copy into the new env
+          if (baseDir && firstEnvPath) {
+            try {
+              // Try git clone from the existing repo or init
+              const gitDir = path.join(envProjectPath, '.git')
+              if (!fs.existsSync(gitDir)) {
+                execSync('git init -b main', {
+                  cwd: envProjectPath,
+                  encoding: 'utf-8',
+                  stdio: ['pipe', 'pipe', 'pipe'],
+                })
+                // If there's a git remote on the project, try to add it
+                const gitUrl = project.git_url
+                if (gitUrl) {
+                  try {
+                    execSync(`git remote add origin "${gitUrl}"`, {
+                      cwd: envProjectPath,
+                      encoding: 'utf-8',
+                      stdio: ['pipe', 'pipe', 'pipe'],
+                    })
+                  } catch {
+                    // Remote add may fail, not critical
+                  }
+                }
+              }
+            } catch {
+              // Git init may fail, not critical — directory exists
+            }
+          }
+        }
+
+        // Create the branch name
+        const branchName = envType === 'plan' ? 'main'
+          : envType === 'dev' ? 'dev'
+          : 'staging'
+
+        // Insert environment record
+        const envId = uuid()
+        db.prepare(`
+          INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          envId, projectId, envType, 'local-wsl', envType,
+          envProjectPath, '', null, null,
+        )
+
+        createdEnvRecords.push({ id: envId, name: envType, project_path: envProjectPath })
+        results.push({ action: 'environment_created', envName: envType, teamPath: '', created: true })
+      }
+    }
+
+    // Step 2: Bootstrap teams for ALL environments (both existing and newly created)
+    const allEnvs = db
+      .prepare('SELECT * FROM environments WHERE project_id = ?')
+      .all(projectId) as any[]
+
+    for (const env of allEnvs) {
+      const envName = (env.env_type || env.name || 'dev').toLowerCase()
+      const teamId = resolveTeamIdForEnv(envName)
+
+      // Check if this environment already has a default team
+      if (env.default_team && fs.existsSync(env.default_team)) {
+        results.push({
+          action: 'already_has_team',
+          envName,
+          teamPath: env.default_team,
+          created: false,
+        })
+        continue
+      }
+
+      try {
+        const bootResult = bootstrapTeamForEnvironment(
+          projectId,
+          env.id,
+          envName,
+          env.project_path,
+          project.name,
+        )
+        results.push({
+          action: bootResult.created ? 'team_created' : 'team_linked',
+          envName,
+          teamPath: bootResult.workspacePath,
+          created: bootResult.created,
+        })
+      } catch (teamErr: any) {
+        results.push({
+          action: 'team_error',
+          envName,
+          teamPath: '',
+          created: false,
+          error: teamErr.message?.substring(0, 200),
+        })
+      }
+    }
+
+    return res.json({ data: { results }, error: null })
+  } catch (err: any) {
+    console.error('[POST /api/projects/:projectId/repair-teams] Error:', err.message)
+    return res.status(500).json({ data: null, error: err.message })
+  }
+})
+
+// POST /api/projects/:id/agents — vincular equipe ao projeto
 router.post('/:id/agents', authenticateToken, (req, res) => {
   const { workspace_path } = req.body
   if (!workspace_path) return res.status(400).json({ data: null, error: 'workspace_path required' })
@@ -233,7 +476,7 @@ router.post('/:id/agents', authenticateToken, (req, res) => {
   }
 })
 
-// DELETE /api/projects/:id/agents — desvincular agente
+// DELETE /api/projects/:id/agents — desvincular equipe
 router.delete('/:id/agents', authenticateToken, (req, res) => {
   const { workspace_path } = req.body
 
@@ -299,7 +542,7 @@ router.put('/:id', authenticateToken, (req, res) => {
   }
 })
 
-// GET /api/projects/:id/agents-context — retorna agentes disponíveis para injeção no contexto do planejador
+// GET /api/projects/:id/agents-context — retorna agentes disponíveis para injeção no contexto do planejador (agentes dentro de equipes)
 router.get('/:id/agents-context', authenticateToken, (req, res) => {
   try {
     // Verify project exists
@@ -352,7 +595,7 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
   }
 })
 
-// GET /api/projects/:id/planning-context — retorna contexto completo para o agente planejador
+// GET /api/projects/:id/planning-context — retorna contexto completo para a equipe planejadora
 router.get('/:id/planning-context', authenticateToken, async (req, res) => {
   console.log('[GET /api/projects/:id/planning-context] Called with id:', req.params.id)
   try {
@@ -678,7 +921,7 @@ router.get('/:id', authenticateToken, (req, res) => {
   return res.json({ data: project, error: null })
 })
 
-// POST /api/projects/:id/generate-agent — gera um novo agente usando Claude Code e a agent-creator skill
+// POST /api/projects/:id/generate-agent — gera uma nova equipe usando Claude Code e a agent-creator skill
 router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
   try {
     const { role = 'coder', name, description = '', environment_id } = req.body
@@ -882,7 +1125,7 @@ router.post('/:projectId/environments/:envId/generate-context', authenticateToke
   }
 })
 
-// POST /api/projects/:projectId/default-agents — criar agentes padrão (coder e/ou planner) para um ambiente
+// POST /api/projects/:projectId/default-agents — criar equipes padrão (coder e/ou planner) para um ambiente
 router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
   try {
     const { environment_id, create_coder = true, create_planner = true } = req.body
@@ -940,40 +1183,30 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
         fs.writeFileSync(gitignorePath, '.agent-docs/\n')
       }
 
+      // Resolve team template by role for CLAUDE.md and permissions
+      const teamIdByRole = role === 'planner' ? 'plan-team'
+        : role === 'reviewer' ? 'staging-team'
+        : role === 'coder' ? 'dev-team'
+        : null
+      const teamTemplate = teamIdByRole ? getTeamTemplateById(teamIdByRole) : null
+
       // Create CLAUDE.md
       const claudeMdPath = path.join(workspacePath, 'CLAUDE.md')
       if (!fs.existsSync(claudeMdPath)) {
         let content: string
-        if (role === 'planner') {
-          content = `# ${agentName} — Planner
 
-You are the planning agent for the **${project.name}** project.
-
-## Context
-- Project: ${project.name}
-- Environment: ${env.name}
-- Type: ${env.type ?? 'local-wsl'}
-- Project path: ${projectPath}
-
-## Responsibilities
-- Analyze requirements and explore the codebase
-- Break complex tasks into atomic, executable steps
-- Define clear dependencies between tasks
-- Produce precise, executable workflow plans
-
-## Output
-Wrap your plan in \`<plan>\` tags with valid JSON following the weave plan schema.
-
-## Principles
-- Never plan blindly — always read the relevant code first
-- Each task must be self-contained with all context the executor needs
-- Prefer smaller, focused tasks over large monolithic ones
-- Include verification tasks at the end of every plan
-`
+        if (teamTemplate) {
+          // Use the team template CLAUDE.md with variable substitution
+          content = renderTeamClaudeMd(teamTemplate, {
+            agentName,
+            projectName: project.name,
+            workspacePath,
+          })
         } else {
-          content = `# ${agentName} — Coder
+          // Fallback: simple default CLAUDE.md for unrecognized roles
+          content = `# ${agentName} — ${role}
 
-You are the coding agent for the **${project.name}** project.
+You are an agent for the **${project.name}** project.
 
 ## Context
 - Project: ${project.name}
@@ -982,16 +1215,10 @@ You are the coding agent for the **${project.name}** project.
 - Project path: ${projectPath}
 
 ## Responsibilities
-- Read existing code patterns before implementing anything new
-- Follow the project's conventions for naming, structure, and formatting
-- Write production-ready code
-- Always run builds and tests after implementing changes
-- Commit changes with clear, descriptive messages
-
-## Principles
-- Prefer editing existing files over creating new ones when reasonable
-- Never leave TODO comments or placeholder code
-- If something is unclear, read more code — don't guess
+- Read relevant files before making changes
+- Follow existing patterns and conventions
+- Run builds and tests after code changes
+- Commit with clear, descriptive messages
 `
         }
         fs.writeFileSync(claudeMdPath, content)
@@ -1013,8 +1240,8 @@ You are the coding agent for the **${project.name}** project.
             ...defaultEnv
           },
           permissions: {
-            allow: ['Read', 'Edit', 'Write', 'Bash', 'Glob'],
-            deny: [],
+            allow: teamTemplate?.permissions.allow ?? ['Read', 'Edit', 'Write', 'Bash', 'Glob'],
+            deny: teamTemplate?.permissions.deny ?? [],
             additionalDirectories: [projectPath]
           }
         }
@@ -1050,6 +1277,12 @@ You are the coding agent for the **${project.name}** project.
       createAgentWorkspace(coderPath, 'agent-coder', 'coder', env.project_path, false)
       // Update the environment's agent_workspace now that the user has confirmed creation
       db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(coderPath, environment_id)
+      // Seed native agents for this team type
+      try {
+        seedNativeAgentsForTeam(coderPath, env.name)
+      } catch (err) {
+        console.error('[default-agents] Failed to seed native agents for coder:', err)
+      }
       created.push({ type: 'coder', workspace_path: coderPath })
     }
 
@@ -1057,6 +1290,12 @@ You are the coding agent for the **${project.name}** project.
     if (create_planner) {
       const plannerPath = envAgentPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
       createAgentWorkspace(plannerPath, 'agent-planner', 'planner', env.project_path, true)
+      // Seed native agents for this team type
+      try {
+        seedNativeAgentsForTeam(plannerPath, env.name)
+      } catch (err) {
+        console.error('[default-agents] Failed to seed native agents for planner:', err)
+      }
       created.push({ type: 'planner', workspace_path: plannerPath })
     }
 

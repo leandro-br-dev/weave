@@ -132,8 +132,8 @@ The Agent Client is a Python-based execution engine that orchestrates multi-agen
 
 **Key Functions**:
 - `poll_kanban_tasks()` - Poll for pending kanban tasks
-- `process_kanban_task()` - Process single kanban task
-- `extract_plan_from_text()` - Extract plan from agent output
+- `process_kanban_task()` - Process single kanban task (Blackboard pattern)
+- `load_plan_from_file()` - Load plan from workflow directory (plan.json)
 - `build_planning_prompt()` - Build prompt for planning agent
 - `normalize_plan_tasks()` - Normalize task configuration
 
@@ -283,13 +283,16 @@ Find planner workspace
 Build planning prompt with context
     │
     ▼
-Run planning agent via SDK
+Pre-create workflow directory (Blackboard)
     │
     ▼
-Extract plan from agent output
+Run planning agent via SDK (agent saves plan.json to workflow dir)
     │
     ▼
-daemon_client.create_plan_from_data(plan_data)
+Load plan from workflow directory (plan.json)
+    │
+    ▼
+daemon_client.create_plan_from_data(plan_data, workflow_id)
     │
     ▼
 Link workflow to kanban task

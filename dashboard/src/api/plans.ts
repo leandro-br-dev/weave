@@ -34,7 +34,16 @@ export interface Plan {
   result_notes?: string;
   structured_output?: {
     type: string;
-    content: any;
+    content: {
+      improvedContent?: string;
+      claudeMd?: string;
+      agentContent?: string;
+      result_status?: string;
+      result_notes?: string;
+      issues?: Array<{ severity: string; description: string; location?: string }>;
+      next_steps?: string;
+      [key: string]: any;
+    };
     result_status?: string;
     result_notes?: string;
     issues?: Array<{ severity: string; description: string; location?: string }>;
@@ -249,6 +258,26 @@ export const useReworkPlan = () => {
       apiClient.post<Plan>(`/api/plans/${id}/rework`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
+    },
+  });
+};
+
+// ── Workflow Files (blackboard) ──────────────────────────────────────────────
+
+export interface WorkflowFiles {
+  state: string | null;
+  plan_json: any | null;
+  errors: string | null;
+}
+
+export const useGetWorkflowFiles = (planId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ['plans', planId, 'workflow-files'],
+    queryFn: () => apiClient.get<WorkflowFiles>(`/api/plans/${planId}/workflow-files`),
+    enabled: enabled && !!planId,
+    refetchInterval: (query) => {
+      const plan = query.state.data as Plan | undefined;
+      return plan?.status === 'running' ? 5000 : false;
     },
   });
 };

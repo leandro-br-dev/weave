@@ -1,5 +1,5 @@
 {
-      "title": "Agents",
+      "title": "Teams",
       "description": "Manage your AI agent teams and configurations",
       "filters": {
         "allProjects": "All Projects"
@@ -9,41 +9,41 @@
         "description": "Description"
       },
       "list": {
-        "title": "Agents",
-        "empty": "No agents found",
-        "createNew": "Create New Agent",
-        "searchPlaceholder": "Search agents...",
+        "title": "Teams",
+        "empty": "No teams found",
+        "createNew": "Create New Team",
+        "searchPlaceholder": "Search teams...",
         "filter": {
           "status": "Filter by Status",
           "type": "Filter by Type"
         }
       },
       "create": {
-        "title": "Create Agent",
-        "name": "Agent Name",
+        "title": "Create Team",
+        "name": "Team Name",
         "description": "Description",
-        "type": "Agent Type",
+        "type": "Team Type",
         "model": "AI Model",
         "systemPrompt": "System Prompt",
         "temperature": "Temperature",
         "maxTokens": "Max Tokens",
         "tools": "Tools",
         "capabilities": "Capabilities",
-        "save": "Create Agent",
+        "save": "Create Team",
         "cancel": "Cancel"
       },
       "edit": {
-        "title": "Edit Agent",
-        "save": "Update Agent",
+        "title": "Edit Team",
+        "save": "Update Team",
         "cancel": "Cancel"
       },
       "delete": {
-        "title": "Delete Agent",
-        "confirm": "Are you sure you want to delete agent \"{{name}}\"? This action cannot be undone.",
-        "success": "Agent deleted successfully"
+        "title": "Delete Team",
+        "confirm": "Are you sure you want to delete team \"{{name}}\"? This action cannot be undone.",
+        "success": "Team deleted successfully"
       },
       "configure": {
-        "title": "Configure Agent",
+        "title": "Configure Team",
         "general": "General Settings",
         "behavior": "Behavior Settings",
         "tools": "Tools & Integrations",
@@ -62,14 +62,14 @@
         "custom": "Custom"
       },
       "header": {
-        "generateAgent": "Generate Agent",
+        "generateAgent": "Generate Team",
         "generate": "Generate",
         "generating": "Generating...",
-        "newAgent": "New Agent",
+        "newAgent": "New Team",
         "new": "New"
       },
       "table": {
-        "agentName": "Agent Name",
+        "agentName": "Team Name",
         "project": "Project",
         "role": "Role",
         "model": "Model",
@@ -77,8 +77,8 @@
         "view": "View"
       },
       "showing": {
-        "fromProject": "Showing {{count}} agent{{plural}} from {{project}}",
-        "fromAll": "Showing {{count}} agent{{plural}} from all projects"
+        "fromProject": "Showing {{count}} team{{plural}} from {{project}}",
+        "fromAll": "Showing {{count}} team{{plural}} from all projects"
       },
       "tabs": {
         "claudeMd": "CLAUDE.md",
@@ -117,22 +117,47 @@
         "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
       },
       "agentsTab": {
-        "title": "Sub-Agents ({{count}})",
+        "title": "Agents ({{count}})",
         "newAgent": "New Agent",
         "nativeAgents": "Native Agents",
         "installed": "Installed",
         "installing": "Installing...",
         "add": "Add",
         "noNativeAgents": "No native agents available",
-        "customSubAgents": "Custom Sub-Agents",
-        "noSubAgents": "No sub-agents configured",
+        "customSubAgents": "Custom Agents",
+        "noSubAgents": "No agents configured",
         "saving": "Saving...",
         "save": "Save",
         "cancel": "Cancel",
         "name": "Name",
         "content": "Content",
         "editAgent": "Edit agent",
-        "deleteAgent": "Delete agent"
+        "deleteAgent": "Delete agent",
+        "deleteTitle": "Delete Agent",
+        "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+        "importMd": "Import .md / .txt",
+        "improveWithAi": "Improve with AI",
+        "improvementStarted": "AI Improvement Started",
+        "improvementStartedDesc": "Agent \"{{name}}\" is being analyzed and improved...",
+        "improvementComplete": "Improvement Complete!",
+        "improvementCompleteDesc": "Review the AI-suggested changes below.",
+        "improvementError": "Improvement Error",
+        "noContent": "No agent content found to improve.",
+        "improvementStarting": "Starting AI Improvement...",
+        "improvementInProgress": "AI is Improving Agent \"{{name}}\"...",
+        "improvementInitializing": "Initializing team connection...",
+        "improvementWait": "This may take 2-5 minutes. Please wait.",
+        "agentSaved": "Agent Saved",
+        "agentSavedDesc": "Agent \"{{name}}\" has been updated successfully.",
+        "teamTypePlan": "Planning",
+        "teamTypePlanDesc": "Read-only agents for codebase analysis, architecture, and workflow planning",
+        "teamTypeDev": "Development",
+        "teamTypeDevDesc": "Agents for implementing features, writing tests, and managing git",
+        "teamTypeStaging": "Staging & Validation",
+        "teamTypeStagingDesc": "Agents for build validation, code review, and PR management",
+        "teamTypeRoot": "General",
+        "teamTypeRootDesc": "General-purpose native agents",
+        "agentsCount": "{{count}} agent(s)"
       },
       "environmentsTab": {
         "loading": "Loading environments...",
@@ -140,14 +165,14 @@
         "linkDescription": "Link environments to auto-populate additionalDirectories in settings.local.json",
         "linkEnvironment": "Link Environment",
         "noEnvironmentsLinked": "No environments linked",
-        "noEnvironmentsLinkedDesc": "Link an environment to automatically add its project_path to the agent's additionalDirectories permissions.",
+        "noEnvironmentsLinkedDesc": "Link an environment to automatically add its project_path to the team's additionalDirectories permissions.",
         "unlinkEnvironment": "Unlink environment",
         "linkModalTitle": "Link Environment",
-        "linkModalProjectDesc": "Select an environment from this agent's project. Its project_path will be automatically added to additionalDirectories.",
-        "linkModalAllDesc": "Select an environment to link to this agent. Its project_path will be automatically added to additionalDirectories.",
+        "linkModalProjectDesc": "Select an environment from this team's project. Its project_path will be automatically added to additionalDirectories.",
+        "linkModalAllDesc": "Select an environment to link to this team. Its project_path will be automatically added to additionalDirectories.",
         "noEnvironmentsForProject": "No environments found for this project.",
         "createInProjects": "Create one in Projects",
-        "noAvailableEnvironments": "No available environments to link. All environments are already linked to this agent.",
+        "noAvailableEnvironments": "No available environments to link. All environments are already linked to this team.",
         "environmentLabel": "Environment",
         "environmentAllLabel": "Environment (all projects)",
         "selectEnvironment": "Select an environment...",

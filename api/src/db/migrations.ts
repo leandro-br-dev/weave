@@ -469,4 +469,95 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_plans_user_id ON plans(user_id)`,
     ],
   },
+  {
+    version: 33,
+    description: 'Environments — add default_team column to track auto-created team',
+    up: [
+      `ALTER TABLE environments ADD COLUMN default_team TEXT`,
+    ],
+  },
+  {
+    version: 34,
+    description: 'Environments — add env_type column to distinguish plan/dev/staging purpose',
+    up: [
+      `ALTER TABLE environments ADD COLUMN env_type TEXT DEFAULT 'dev'`,
+    ],
+  },
+  {
+    version: 35,
+    description: 'Repair — set default_team for environments that have agent_workspace but no default_team',
+    up: [
+      `UPDATE environments SET default_team = agent_workspace WHERE default_team IS NULL AND agent_workspace IS NOT NULL AND agent_workspace != ''`,
+    ],
+  },
+  {
+    version: 36,
+    description: 'Team native agents — store sub-agent definitions injected from native-agents/ when a team is created',
+    up: [
+      `CREATE TABLE IF NOT EXISTS team_native_agents (
+        id TEXT PRIMARY KEY,
+        team_workspace_path TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        model TEXT NOT NULL DEFAULT '',
+        tools TEXT NOT NULL DEFAULT '',
+        color TEXT NOT NULL DEFAULT 'blue',
+        system_prompt TEXT NOT NULL DEFAULT '',
+        team_type TEXT NOT NULL DEFAULT '',
+        source_path TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(team_workspace_path, slug)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_team_native_agents_workspace ON team_native_agents(team_workspace_path)`,
+    ],
+  },
+  {
+    version: 37,
+    description: 'Kanban — expand column CHECK to support new pipeline phases (planning, in_dev, validation) and rename in_progress',
+    up: [
+      // Step 1: Migrate existing in_progress → in_dev (they're semantically equivalent)
+      `UPDATE kanban_tasks SET column = 'in_dev' WHERE column = 'in_progress'`,
+
+      // Step 2: Recreate table with expanded CHECK constraint
+      `CREATE TABLE IF NOT EXISTS kanban_tasks_new (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        column TEXT NOT NULL DEFAULT 'backlog' CHECK(column IN ('backlog','planning','in_dev','validation','done')),
+        priority INTEGER NOT NULL DEFAULT 3 CHECK(priority BETWEEN 1 AND 5),
+        order_index INTEGER NOT NULL DEFAULT 0,
+        workflow_id TEXT REFERENCES plans(id) ON DELETE SET NULL,
+        result_status TEXT CHECK(result_status IN ('success','partial','needs_rework')),
+        result_notes TEXT DEFAULT '',
+        pipeline_status TEXT DEFAULT 'idle' CHECK(pipeline_status IN ('idle','planning','awaiting_approval','running','done','failed')),
+        planning_started_at TEXT,
+        error_message TEXT DEFAULT '',
+        attachments TEXT DEFAULT '[]',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL
+      )`,
+      `INSERT OR IGNORE INTO kanban_tasks_new (
+        id, project_id, title, description, column, priority, order_index,
+        workflow_id, result_status, result_notes, pipeline_status, planning_started_at,
+        error_message, attachments, created_at, updated_at, user_id
+      ) SELECT
+        id, project_id, title, description, column, priority, order_index,
+        workflow_id, result_status, result_notes, pipeline_status, planning_started_at,
+        error_message, attachments, created_at, updated_at, user_id
+      FROM kanban_tasks`,
+      `DROP TABLE kanban_tasks`,
+      `ALTER TABLE kanban_tasks_new RENAME TO kanban_tasks`,
+      `CREATE INDEX IF NOT EXISTS idx_kanban_tasks_user_id ON kanban_tasks(user_id)`,
+    ],
+  },
+  {
+    version: 38,
+    description: 'Plans — add workflow_path column to store the per-workflow directory path',
+    up: [
+      `ALTER TABLE plans ADD COLUMN workflow_path TEXT`,
+    ],
+  },
 ];

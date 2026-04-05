@@ -155,7 +155,7 @@ describe('Kanban API', () => {
     it('should update result_status and result_notes fields', async () => {
       // Create a test task
       const task = createTestKanbanTask(projectId, {
-        column: 'in_progress'
+        column: 'in_dev'
       })
       const createResponse = await request(app)
         .post(`/api/kanban/${projectId}`)
@@ -184,7 +184,7 @@ describe('Kanban API', () => {
     it('should update all fields simultaneously', async () => {
       // Create a test task
       const task = createTestKanbanTask(projectId, {
-        column: 'in_progress'
+        column: 'in_dev'
       })
       const createResponse = await request(app)
         .post(`/api/kanban/${projectId}`)

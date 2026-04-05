@@ -4,7 +4,7 @@
     "taskNameRequired": "Nome da tarefa é obrigatório",
     "taskPromptRequired": "Prompt da tarefa é obrigatório",
     "workingDirectoryRequired": "Diretório de trabalho é obrigatório",
-    "agentWorkspaceRequired": "Time do agente é obrigatório"
+    "agentWorkspaceRequired": "Equipe é obrigatória"
   },
   "backToPlans": "Voltar aos Planos",
   "plans": "Planos",
@@ -38,7 +38,7 @@
       "selectPlaceholder": "Selecione um agente...",
       "selectProjectFirst": "Selecione um projeto primeiro",
       "noAgents": "Nenhum agente disponível",
-      "createWorkspaceLink": "Criar um time"
+      "createWorkspaceLink": "Criar uma equipe"
     },
     "environment": {
       "label": "Ambiente",

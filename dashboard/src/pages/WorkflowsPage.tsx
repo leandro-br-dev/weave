@@ -345,37 +345,37 @@ export default function WorkflowsPage() {
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('name')}
                     >
-                      Name{getSortIcon('name')}
+                      {t('pages.workflows.list.table.name')}{getSortIcon('name')}
                     </th>
                     <th
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('status')}
                     >
-                      Status{getSortIcon('status')}
+                      {t('pages.workflows.list.table.status')}{getSortIcon('status')}
                     </th>
                     <th
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('tasks')}
                     >
-                      Tasks{getSortIcon('tasks')}
+                      {t('pages.workflows.list.table.tasks')}{getSortIcon('tasks')}
                     </th>
                     <th
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('duration')}
                     >
-                      Duration{getSortIcon('duration')}
+                      {t('pages.workflows.list.table.duration')}{getSortIcon('duration')}
                     </th>
                     <th
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('client')}
                     >
-                      Client{getSortIcon('client')}
+                      {t('pages.workflows.list.table.client')}{getSortIcon('client')}
                     </th>
                     <th
                       className={`px-4 py-3 text-left text-xs font-medium ${withDarkMode(tableColors.headerText, darkModeTableColors.headerText)} uppercase tracking-wide cursor-pointer ${withDarkMode(interactiveStates.hoverBg, darkModeInteractiveStates.hoverBg)} select-none`}
                       onClick={() => handleSort('created_at')}
                     >
-                      When{getSortIcon('created_at')}
+                      {t('pages.workflows.list.table.when')}{getSortIcon('created_at')}
                     </th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -443,7 +443,7 @@ export default function WorkflowsPage() {
                           <button
                             onClick={() => handleExport(plan)}
                             className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}
-                            title="Export as JSON"
+                            title={t('pages.workflows.list.table.export')}
                           >
                             ↓
                           </button>
@@ -499,19 +499,19 @@ export default function WorkflowsPage() {
 
                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                       <div>
-                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Tasks:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>{t('pages.workflows.list.table.tasks')}:</span>{' '}
                         <span className="font-medium">{tasks.length}</span>
                       </div>
                       <div>
-                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Duration:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>{t('pages.workflows.list.table.duration')}:</span>{' '}
                         <span className="font-medium">{duration !== null ? formatDuration(duration) : '—'}</span>
                       </div>
                       <div>
-                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Client:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>{t('pages.workflows.list.table.client')}:</span>{' '}
                         <span className="font-mono">{plan.client_id?.split('-')[0] ?? '—'}</span>
                       </div>
                       <div>
-                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>Created:</span>{' '}
+                        <span className={withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}>{t('pages.workflows.list.table.created')}:</span>{' '}
                         <span className="font-medium">
                           {new Date(plan.created_at).toLocaleDateString('pt-BR', {
                             day: '2-digit',

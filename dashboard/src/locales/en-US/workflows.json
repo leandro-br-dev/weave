@@ -31,7 +31,13 @@
           "nextRun": "Next Run",
           "actions": "Actions",
           "trigger": "Trigger",
-          "schedule": "Schedule"
+          "schedule": "Schedule",
+          "tasks": "Tasks",
+          "duration": "Duration",
+          "client": "Client",
+          "when": "When",
+          "export": "Export as JSON",
+          "created": "Created"
         }
       },
       "header": {

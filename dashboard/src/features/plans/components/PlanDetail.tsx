@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { getAttachmentUrl, type AttachmentResponse } from '@/api/uploads';
 import { getApiUrl, getActiveToken } from '@/api/client';
 import { ImageLightbox } from '@/components/ImageLightbox';
+import { WorkflowFilesPanel } from './WorkflowFilesPanel';
 
 // Hook to fetch plan attachment details
 function usePlanAttachments(planId: string | undefined, attachmentIds: string[] | undefined) {
@@ -189,7 +190,7 @@ function EditPlanModal({ plan, onClose }: EditPlanModalProps) {
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-gray-200">
-          <Button variant="secondary" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}>{t('common.buttons.cancel')}</Button>
           <Button variant="primary" size="sm" onClick={handleSave} loading={editPlan.isPending}>
             {t('planDetail.saveChanges')}
           </Button>
@@ -320,14 +321,26 @@ export function PlanDetail() {
     }
   }, [logs, isRunning, streamStatus]);
 
-  // Show improvement modal when plan has improvedContent
+  /** Extract improvement content from structured_output regardless of shape. */
+  function getImprovedContent(): string | undefined {
+    const so = plan?.structured_output;
+    if (!so) return undefined;
+    if (so.improvedContent) return so.improvedContent;
+    if (so.content) {
+      return so.content.agentContent ?? so.content.claudeMd ?? so.content.improvedContent;
+    }
+    return undefined;
+  }
+
+  // Show improvement modal when plan has improvement content
   useEffect(() => {
+    const content = getImprovedContent();
     if (
       plan?.status === 'success' &&
-      plan?.structured_output?.improvedContent &&
+      content &&
       !hasShownImprovement
     ) {
-      setImprovedContent(plan.structured_output.improvedContent);
+      setImprovedContent(content);
       setShowImprovementModal(true);
       setHasShownImprovement(true);
     }
@@ -524,11 +537,12 @@ export function PlanDetail() {
                     {resumePlan.isPending ? t('planDetail.resuming') : t('planDetail.resume')}
                   </button>
                 )}
-                {plan.structured_output?.improvedContent && !plan.structured_output?.improvementApproved && (
+                {getImprovedContent() && !plan.structured_output?.improvementApproved && (
                   <button
                     onClick={() => {
-                      if (plan.structured_output?.improvedContent) {
-                        setImprovedContent(plan.structured_output.improvedContent);
+                      const content = getImprovedContent();
+                      if (content) {
+                        setImprovedContent(content);
                         setShowImprovementModal(true);
                       }
                     }}
@@ -653,7 +667,7 @@ export function PlanDetail() {
                 </dd>
               </div>
             )}
-            {plan.structured_output?.improvedContent && (
+            {getImprovedContent() && (
               <>
                 <div>
                   <dt className="text-sm font-medium text-gray-500">{t('planDetail.improvementStatus')}</dt>
@@ -839,6 +853,9 @@ export function PlanDetail() {
           </dl>
         </div>
       </div>
+
+      {/* Workflow Context (Blackboard) */}
+      {id && <WorkflowFilesPanel planId={id} />}
 
       {/* Result */}
       {plan.result && (

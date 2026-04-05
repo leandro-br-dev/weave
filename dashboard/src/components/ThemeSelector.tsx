@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Sun, Moon, Monitor, Check } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { Theme } from '@/contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import {
   darkModeDropdownColors,
   bgColors,
@@ -29,55 +30,61 @@ interface ThemeOption {
   description: string;
 }
 
-const themeOptions: ThemeOption[] = [
-  {
-    value: 'light',
-    label: 'Light',
-    icon: Sun,
-    description: 'Light mode'
-  },
-  {
-    value: 'dark',
-    label: 'Dark',
-    icon: Moon,
-    description: 'Dark mode'
-  },
-  {
-    value: 'system',
-    label: 'System',
-    icon: Monitor,
-    description: 'Follow system preference'
-  }
-];
+function getThemeOptions(t: (key: string) => string): ThemeOption[] {
+  return [
+    {
+      value: 'light',
+      label: t('common.common.themeLight'),
+      icon: Sun,
+      description: t('common.common.themeLightDescription')
+    },
+    {
+      value: 'dark',
+      label: t('common.common.themeDark'),
+      icon: Moon,
+      description: t('common.common.themeDarkDescription')
+    },
+    {
+      value: 'system',
+      label: t('common.common.themeSystem'),
+      icon: Monitor,
+      description: t('common.common.themeSystemDescription')
+    }
+  ];
+}
 
 export function ThemeSelector({ className = '', layout = 'vertical' }: ThemeSelectorProps) {
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { t } = useTranslation();
 
   const isHorizontal = layout === 'horizontal';
   const isCompact = layout === 'compact' || layout === 'sidebar';
 
   // Sidebar layout: single button with dropdown
   if (isCompact) {
-    return <SidebarThemeSelector theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} className={className} />;
+    return <SidebarThemeSelector theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} className={className} t={t} />;
   }
 
   // Horizontal / vertical layouts: keep original behavior showing all options
-  return <AllOptionsSelector theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} isHorizontal={isHorizontal} className={className} />;
+  return <AllOptionsSelector theme={theme} resolvedTheme={resolvedTheme} setTheme={setTheme} isHorizontal={isHorizontal} className={className} t={t} />;
 }
 
 function SidebarThemeSelector({
   theme,
   resolvedTheme,
   setTheme,
-  className
+  className,
+  t
 }: {
   theme: Theme;
   resolvedTheme: string;
   setTheme: (theme: Theme) => void;
   className: string;
+  t: (key: string) => string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const themeOptions = getThemeOptions(t);
   const currentOption = themeOptions.find(o => o.value === theme) || themeOptions[0];
   const CurrentIcon = currentOption.icon;
 
@@ -156,14 +163,17 @@ function AllOptionsSelector({
   resolvedTheme,
   setTheme,
   isHorizontal,
-  className
+  className,
+  t
 }: {
   theme: Theme;
   resolvedTheme: string;
   setTheme: (theme: Theme) => void;
   isHorizontal: boolean;
   className: string;
+  t: (key: string) => string;
 }) {
+  const themeOptions = getThemeOptions(t);
   const baseContainerClass = isHorizontal
     ? 'flex items-center gap-2'
     : 'flex flex-col gap-2';
@@ -211,7 +221,7 @@ function AllOptionsSelector({
                 <Icon className="h-4 w-4" />
                 {option.value === 'system' && theme === 'system' && (
                   <span className={`absolute -top-1 -right-1 text-[8px] font-bold ${withDarkMode('bg-orange-600', 'dark:bg-orange-500')} ${textColors.inverted} rounded px-1 py-0.5 min-w-[32px] text-center`}>
-                    {resolvedTheme === 'dark' ? 'Dark' : 'Light'}
+                    {resolvedTheme === 'dark' ? t('common.common.themeDark') : t('common.common.themeLight')}
                   </span>
                 )}
               </div>

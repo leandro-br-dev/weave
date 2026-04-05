@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   bgColors,
   darkModeBgColors,
@@ -11,9 +11,10 @@ import {
   interactiveStates,
   darkModeInteractiveStates,
   withDarkMode,
+  darkModeDropdownColors,
 } from '@/lib/colors';
 
-type Layout = 'horizontal' | 'vertical';
+type Layout = 'horizontal' | 'vertical' | 'sidebar';
 
 interface LanguageSelectorProps {
   className?: string;
@@ -63,6 +64,17 @@ export function LanguageSelector({ className = '', layout = 'vertical' }: Langua
     i18n.changeLanguage(lng);
     // Language is automatically persisted to localStorage by i18next's LanguageDetector
   };
+
+  // Sidebar layout: single button with dropdown
+  if (layout === 'sidebar') {
+    return (
+      <SidebarLanguageSelector
+        currentLanguage={currentLanguage}
+        changeLanguage={changeLanguage}
+        className={className}
+      />
+    );
+  }
 
   const isHorizontal = layout === 'horizontal';
   const baseContainerClass = isHorizontal
@@ -128,6 +140,78 @@ export function LanguageSelector({ className = '', layout = 'vertical' }: Langua
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function SidebarLanguageSelector({
+  currentLanguage,
+  changeLanguage,
+  className,
+}: {
+  currentLanguage: string;
+  changeLanguage: (lng: string) => void;
+  className: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const currentOption = languageOptions.find(o => o.code === currentLanguage) || languageOptions[0];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className={`relative w-full ${className}`} ref={dropdownRef}>
+      {/* Selected language button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${withDarkMode('hover:text-white', 'hover:text-white')} ${withDarkMode(interactiveStates.hoverBg, 'hover:bg-gray-800')} transition-colors`}
+      >
+        <div className={`w-8 h-8 rounded-lg ${withDarkMode('bg-gray-700', darkModeBgColors.tertiary)} flex items-center justify-center flex-shrink-0`}>
+          <span className="text-base">{currentOption.flag}</span>
+        </div>
+        <span className="text-sm font-medium truncate flex-1 text-left">
+          {currentOption.nativeName}
+        </span>
+      </button>
+
+      {/* Dropdown */}
+      {isOpen && (
+        <div className={`absolute bottom-full left-0 right-0 mb-1 ${withDarkMode('bg-gray-800', darkModeBgColors.secondary)} rounded-lg border ${withDarkMode('border-gray-700', darkModeDropdownColors.border)} py-1 shadow-lg z-50`}>
+          {languageOptions.map((option) => {
+            const isActive = currentLanguage === option.code;
+            return (
+              <button
+                key={option.code}
+                onClick={() => {
+                  changeLanguage(option.code);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2 transition-colors ${
+                  isActive
+                    ? `${withDarkMode('text-white', darkModeTextColors.primary)} ${withDarkMode('bg-gray-700', darkModeBgColors.tertiary)}`
+                    : `${withDarkMode('text-gray-300', darkModeTextColors.secondary)} ${withDarkMode('hover:text-white', 'hover:text-white')} ${withDarkMode('hover:bg-gray-700', darkModeDropdownColors.itemHover)}`
+                }`}
+              >
+                <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm">{option.flag}</span>
+                </div>
+                <span className="text-sm flex-1 text-left">{option.nativeName}</span>
+                {isActive && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -35,8 +35,22 @@
         "projectColor": "Project Color",
         "projectColorHint": "Choose a color to visually identify this project",
         "gitUrl": "Git Repository URL",
+        "gitUrlHintWithEnvs": "Optional. If provided, environments will be cloned from this repository. Otherwise, empty directories with a local git repo will be created.",
         "createDefaultEnvs": "Create default environments",
-        "createDefaultEnvsDesc": "Automatically create plan, dev, and staging environments from the repository",
+        "createDefaultEnvsDesc": "Automatically create selected environments",
+        "envTypes": "Select environments",
+        "envType_plan": "Plan",
+        "envType_planDesc": "Read-only reference",
+        "envType_dev": "Dev",
+        "envType_devDesc": "Development work",
+        "envType_staging": "Staging",
+        "envType_stagingDesc": "Review & testing",
+        "basePath": "Storage Location",
+        "basePathPlaceholder": "/home/user/projects",
+        "basePathHint": "Base directory where environments will be created. Each environment will be placed in a subfolder (plan, dev, staging).",
+        "gitToken": "Git Access Token",
+        "gitTokenPlaceholder": "ghp_xxxxxxxxxxxx",
+        "gitTokenHint": "Optional. Personal access token for cloning private repositories. If omitted, the system will use gh CLI credentials or the GIT_TOKEN environment variable.",
         "creating": "Creating...",
         "createProject": "Create Project"
       },
@@ -72,22 +86,22 @@
         "settings": "Settings"
       },
       "defaultAgents": {
-        "title": "Create Default Agents",
-        "description": "You can create default agents to get started quickly. The planner agent is essential for the pipeline workflow to function correctly.",
+        "title": "Create Default Teams",
+        "description": "You can create default teams to get started quickly. The planner team is essential for the pipeline workflow to function correctly.",
         "coder": {
-          "label": "Coder Agent",
+          "label": "Coder Team",
           "description": "Implements features and fixes following project patterns"
         },
         "planner": {
-          "label": "Planner Agent",
+          "label": "Planner Team",
           "description": "Plans and breaks down tasks into executable workflows. Required for pipeline operations."
         },
         "requiredBadge": "Recommended",
         "create": "Create Selected",
         "skip": "Skip",
-        "creating": "Creating agents...",
-        "success": "Agents created successfully!",
-        "error": "Failed to create agents"
+        "creating": "Creating teams...",
+        "success": "Teams created successfully!",
+        "error": "Failed to create teams"
       },
       "status": {
         "planning": "Planning",
@@ -108,13 +122,21 @@
         "empty": "No environments yet. Create one to get started."
       },
       "agents": {
-        "title": "Agents",
-        "empty": "No agents yet. Use the Agents page to create agents for this project.",
+        "title": "Teams",
+        "empty": "No teams yet. Use the Teams page to create teams for this project.",
         "view": "View"
       },
       "pipelineSettings": {
         "title": "Pipeline Settings",
         "autoApprove": "Auto-approve workflows",
         "autoApproveDesc": "Generated plans start automatically"
+      },
+      "repair": {
+        "buttonTooltip": "Repair: create missing environments & teams",
+        "title": "Repair teams for \"{{name}}\"?",
+        "description": "This will:\n• Create missing plan/dev/staging environments\n• Bootstrap default teams (Plan Team, Dev Team, Staging Team)\n• Generate CLAUDE.md and settings for each team",
+        "confirmLabel": "Repair",
+        "resultTitle": "Team repair complete for \"{{name}}\"",
+        "ok": "OK"
       }
 }

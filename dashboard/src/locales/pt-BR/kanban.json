@@ -89,7 +89,8 @@
         "templates": "Templates",
         "backlog": "Backlog",
         "planning": "Planejamento",
-        "in_progress": "Em Progresso",
+        "in_dev": "Em Desenvolvimento",
+        "validation": "Em Validação",
         "done": "Concluído"
       },
       "modal": {
@@ -120,8 +121,8 @@
       },
       "limits": {
         "title": "Limites da Coluna",
-        "planningLimit": "Limite de Planning",
-        "inProgressLimit": "Limite de In Progress",
+        "planningLimit": "Limite de Planejamento",
+        "inDevLimit": "Limite de Em Desenvolvimento",
         "setLimit": "Definir limite",
         "current": "Atual",
         "max": "Máximo",
@@ -135,5 +136,12 @@
         "success": "✓ Sucesso",
         "partial": "◐ Parcial",
         "needs_rework": "✗ Precisa Refazer"
+      },
+      "gates": {
+        "label": "Avançar automaticamente",
+        "planToDev": "Plan → Dev",
+        "devToStaging": "Dev → Validação",
+        "stagingToDone": "Validação → Concluído",
+        "tooltip": "Ative para avançar automaticamente de {{from}} para {{to}}"
       }
 }

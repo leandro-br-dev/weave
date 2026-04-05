@@ -4,7 +4,7 @@ import { Button, Select } from '@/components'
 import { FileAttachmentInput, type FileAttachment } from '@/components/FileAttachmentInput'
 import { useCreateQuickAction } from '@/api/quickActions'
 import { useGetProjects } from '@/api/projects'
-import { useGetWorkspaces } from '@/api/teams'
+import { useGetWorkspaces, useGetTeamEnvironments } from '@/api/teams'
 import { useGetPlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'
@@ -39,7 +39,6 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
   const [projectId, setProjectId] = useState('')
   const [teamId, setTeamId] = useState('')
   const [environmentId, setEnvironmentId] = useState('')
-  const [nativeSkill, setNativeSkill] = useState('planning')
   const [message, setMessage] = useState('')
   const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const [planId, setPlanId] = useState<string | null>(null)
@@ -53,12 +52,26 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
   const { data: allWorkspaces = [] } = useGetWorkspaces(projectId ? { project_id: projectId } : undefined)
   const selectedProject = projects.find(p => p.id === projectId)
   const environments = selectedProject?.environments ?? []
+  const { data: teamEnvironments = [] } = useGetTeamEnvironments(teamId)
 
-  // When workspace changes, reset environment
+  // When workspace changes, auto-select the first linked environment (if any)
   const handleWorkspaceChange = (wsId: string) => {
     setTeamId(wsId)
     setEnvironmentId('')
   }
+
+  // Auto-select the team's first linked environment when it becomes available
+  useEffect(() => {
+    if (teamId && teamEnvironments.length > 0 && !environmentId) {
+      // Try to match with project environments
+      const match = teamEnvironments.find(te =>
+        environments.some(e => e.id === te.id)
+      )
+      if (match) {
+        setEnvironmentId(match.id)
+      }
+    }
+  }, [teamId, teamEnvironments, environmentId, environments])
 
   // Poll for structured_output when running
   const { data: plan } = useGetPlan(planId ?? '')
@@ -142,7 +155,6 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
       team_id: teamId,
       environment_id: environmentId || undefined,
       project_id: projectId || undefined,
-      native_skill: nativeSkill || undefined,
       attachment_ids: attachmentIds.length > 0 ? attachmentIds : undefined,
     })
     setPlanId(result.id)
@@ -212,29 +224,13 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
                 </Select>
               )}
 
-              {/* Native Skill */}
-              <Select
-                label={t('components.quickAction.mode')}
-                value={nativeSkill}
-                onChange={e => setNativeSkill(e.target.value)}
-              >
-                <option value="">{t('components.quickAction.generalMode')}</option>
-                <option value="planning">{t('components.quickAction.planningMode')}</option>
-                <option value="reviewer">{t('components.quickAction.reviewMode')}</option>
-                <option value="debugger">{t('components.quickAction.debugMode')}</option>
-              </Select>
-
               {/* Message */}
               <div className="space-y-1">
                 <label className={`block text-xs font-medium ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>{t('components.quickAction.requestRequired')}</label>
                 <textarea
                   value={message}
                   onChange={e => setMessage(e.target.value)}
-                  placeholder={nativeSkill === 'planning'
-                    ? t('components.quickAction.planningPlaceholder')
-                    : nativeSkill === 'reviewer'
-                    ? t('components.quickAction.reviewPlaceholder')
-                    : t('components.quickAction.debugPlaceholder')}
+                  placeholder={t('components.quickAction.defaultPlaceholder')}
                   className={`w-full border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 ${withDarkMode(interactiveStates.focusRing, darkModeInteractiveStates.focusRing)}`}
                   rows={4}
                 />

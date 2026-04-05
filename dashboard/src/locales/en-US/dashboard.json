@@ -8,7 +8,7 @@
     "quickActions": "Quick Actions"
   },
   "metrics": {
-    "totalAgents": "Total Agents",
+    "totalAgents": "Total Teams",
     "activeWorkflows": "Active Workflows",
     "pendingApprovals": "Pending Approvals",
     "completedTasks": "Completed Tasks"

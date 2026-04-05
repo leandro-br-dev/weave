@@ -235,7 +235,7 @@ def create_kanban_tasks(project_id: str, count: int) -> List[Dict[str, Any]]:
     Returns:
         List of kanban task data dicts
     """
-    columns = ["backlog", "todo", "planning", "in_progress", "done"]
+    columns = ["backlog", "planning", "in_dev", "validation", "done"]
     return [
         create_kanban_task_data(
             project_id,

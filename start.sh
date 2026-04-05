@@ -340,6 +340,7 @@ fi
 cd "$ROOT/client"
 source venv/bin/activate
 export WEAVE_URL="http://localhost:$API_PORT"
+export WEAVE_API_URL="http://localhost:$API_PORT"
 export WEAVE_DAEMON_PID_FILE="$PID_FILE"
 python main.py --daemon &
 DAEMON_PID=$!

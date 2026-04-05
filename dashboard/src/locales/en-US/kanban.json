@@ -89,7 +89,8 @@
         "templates": "Templates",
         "backlog": "Backlog",
         "planning": "Planning",
-        "in_progress": "In Progress",
+        "in_dev": "In Dev",
+        "validation": "Validation",
         "done": "Done"
       },
       "modal": {
@@ -121,7 +122,7 @@
       "limits": {
         "title": "Column Limits",
         "planningLimit": "Planning limit",
-        "inProgressLimit": "In Progress limit",
+        "inDevLimit": "In Dev limit",
         "setLimit": "Set limit",
         "current": "Current",
         "max": "Max",
@@ -135,5 +136,12 @@
         "success": "✓ Success",
         "partial": "◐ Partial",
         "needs_rework": "✗ Needs Rework"
+      },
+      "gates": {
+        "label": "Auto-advance",
+        "planToDev": "Plan → Dev",
+        "devToStaging": "Dev → Validation",
+        "stagingToDone": "Validation → Done",
+        "tooltip": "Enable to automatically advance tasks from {{from}} to {{to}}"
       }
 }

@@ -1,4 +1,12 @@
-"""Processa kanban tasks ativas, gera planos via planning agent e cria workflows."""
+"""Processa kanban tasks ativas, gera planos via planning agent e cria workflows.
+
+Motor de transição de fases:
+  - Planning  → Plan Team (planner): analisa e gera plano
+  - In Dev    → Dev Team (coder): executa o plano
+  - Validation → Staging Team (reviewer): build, QA, PR review
+
+Gates controlam transição automática entre fases.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +14,21 @@ import asyncio
 import inspect
 import json
 import os
-import re
 from datetime import datetime, timezone
 
 from orchestrator import logger
 from orchestrator.cron_utils import next_run_from_cron
+from orchestrator.team_trigger import (
+    find_team_workspace,
+    find_project_settings,
+    trigger_dev_team,
+    trigger_staging_team,
+    trigger_plan_team,
+    handle_team_completion,
+    _handle_needs_rework,
+    PHASE_ROLE_MAP,
+    PHASE_LABEL_MAP,
+)
 
 
 async def process_scheduled_tasks(client) -> None:
@@ -78,67 +96,54 @@ async def process_scheduled_tasks(client) -> None:
         logger.warning(f'[Scheduler] Error: {e}')
 
 
-def extract_plan_from_text(text: str, fallback_name: str = '') -> dict | None:
+def load_plan_from_file(file_path: str, fallback_name: str = '') -> dict | None:
     """
-    Extrai JSON de plano entre tags <plan>...</plan>.
+    Load plan JSON from a file (Blackboard pattern).
+
+    Reads the plan.json file that the planning agent saved directly to the
+    workflow directory, instead of parsing <plan> tags from stdout.
 
     Args:
-        text: Texto que pode conter um plano em formato JSON
-        fallback_name: Nome a usar se o plano não tiver campo 'name'
+        file_path: Absolute path to the plan.json file
+        fallback_name: Name to use if the plan has no 'name' field
 
     Returns:
-        Dicionário do plano se encontrado e válido, None caso contrário
+        Dictionary with the plan data, or None if not found/invalid
     """
-    # Normaliza: remove code fences que possam envolver <plan>
-    # Ex: ```\n<plan>...\n</plan>\n``` → <plan>...\n</plan>
-    normalized = re.sub(r'```[\w]*\s*(<plan>[\s\S]*?</plan>)\s*```', r'\1', text)
+    if not os.path.exists(file_path):
+        logger.warning(f'[KanbanPipeline] Plan file not found: {file_path}')
+        return None
 
-    # Encontra todos os blocos <plan>...</plan>
-    plan_pattern = r'<plan>\s*(\{[\s\S]*?\})\s*</plan>'
-    matches = re.finditer(plan_pattern, normalized)
+    try:
+        with open(file_path, 'r') as f:
+            raw = f.read().strip()
 
-    for match in matches:
-        raw = match.group(1).strip()
+        if not raw:
+            logger.warning(f'[KanbanPipeline] Plan file is empty: {file_path}')
+            return None
 
-        # Tenta extrair apenas o JSON (pode ter texto antes/depios)
-        # Procura pelo primeiro { e último }
-        first_brace = raw.find('{')
-        if first_brace == -1:
-            continue
+        parsed = json.loads(raw)
+        name = parsed.get('name', '')
+        tasks = parsed.get('tasks', [])
 
-        last_brace = raw.rfind('}')
-        if last_brace == -1:
-            continue
+        if name == 'Descriptive plan name':
+            logger.info('[KanbanPipeline] Skipping template placeholder plan')
+            return None
 
-        json_str = raw[first_brace:last_brace + 1]
+        if not isinstance(tasks, list) or len(tasks) == 0:
+            logger.info('[KanbanPipeline] Plan has no tasks, skipping')
+            return None
 
-        try:
-            parsed = json.loads(json_str)
-            name = parsed.get('name', '')
-            tasks = parsed.get('tasks', [])
+        # Accept plan without name — use fallback
+        if not name and fallback_name:
+            parsed['name'] = fallback_name
+            logger.info(f'[KanbanPipeline] Plan has no name, using fallback: {fallback_name}')
 
-            if name == 'Descriptive plan name':
-                logger.info('[KanbanPipeline] Skipping template placeholder plan')
-                continue
-
-            if not isinstance(tasks, list) or len(tasks) == 0:
-                logger.info(f'[KanbanPipeline] Plan has no tasks, skipping')
-                continue
-
-            # Aceita plano sem nome — usa fallback
-            if not name and fallback_name:
-                parsed['name'] = fallback_name
-                logger.info(f'[KanbanPipeline] Plan has no name, using fallback: {fallback_name}')
-
-            logger.info(f'[KanbanPipeline] Valid plan found: "{parsed.get("name")}" ({len(tasks)} tasks)')
-            return parsed
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.info(f'[KanbanPipeline] JSON parse failed: {type(e).__name__}: {e}')
-            logger.debug(f'[KanbanPipeline] Failed JSON string (first 200 chars): {json_str[:200]}')
-            continue
-
-    logger.warning(f'[KanbanPipeline] No valid <plan> found. <plan> count: {text.count("<plan>")}')
-    return None
+        logger.info(f'[KanbanPipeline] Valid plan loaded from file: "{parsed.get("name")}" ({len(tasks)} tasks)')
+        return parsed
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f'[KanbanPipeline] Failed to load plan from {file_path}: {type(e).__name__}: {e}')
+        return None
 
 
 def normalize_plan_tasks(plan_data: dict, planning_context: dict = None) -> dict:
@@ -228,6 +233,7 @@ async def build_planning_prompt(
     planning_context: dict,
     skill_content: str,
     workflow_context: str = '',
+    workflow_dir: str = '',
 ) -> str:
     """Monta o prompt completo para o agente planejador."""
     project = planning_context.get('project', {})
@@ -292,6 +298,27 @@ For reviewer/tester agents: same pattern
 
 '''
 
+    # Blackboard instruction: tell the agent WHERE to save the plan
+    blackboard_section = ''
+    if workflow_dir:
+        blackboard_section = f'''
+## Blackboard: Save Your Plan
+
+You MUST save your final plan as a JSON file to this exact path:
+
+```
+{workflow_dir}/plan.json
+```
+
+After saving, you MUST validate it by running this command in the terminal:
+
+```bash
+weave-validate plan {workflow_dir}/plan.json
+```
+
+If the validation returns an error (exit code 1), fix the JSON and run the validation again until it succeeds before finishing.
+'''
+
     return f'''{skill_content}
 
 ---
@@ -302,9 +329,9 @@ For reviewer/tester agents: same pattern
 {agents_section}
 {task_section}
 {cwd_instruction}
-
+{blackboard_section}
 Analyze the task, read the relevant codebase using the project_path above, and generate a precise execution plan.
-Output the plan using the <plan>...</plan> format as defined in the skill above.'''
+Save the plan to `{workflow_dir}/plan.json` and validate it with `weave-validate plan {workflow_dir}/plan.json`.'''
 
 
 async def find_planner_workspace(project_id: str, client) -> str | None:
@@ -356,6 +383,9 @@ async def process_kanban_task(task: dict, client) -> None:
     """
     Processa uma kanban task: roda planning agent e cria workflow.
 
+    Uses the Blackboard pattern: the planning agent saves plan.json directly
+    to a pre-created workflow directory and validates it with weave-validate.
+
     Args:
         task: Kanban task data
         client: DaemonClient instance
@@ -388,7 +418,18 @@ async def process_kanban_task(task: dict, client) -> None:
         logger.info('[KanbanPipeline] Step 2: fetching full project planning context...')
         planning_context = await client.get_project_planning_context(project_id)
         workflow_context = planning_context.get('workflow_context', '')
+        project_name = planning_context.get('project', {}).get('name', 'unknown')
         logger.info(f'[KanbanPipeline] Context: {len(planning_context.get("agents", []))} agents, {len(planning_context.get("environments", []))} environments')
+
+        # ── Blackboard: pre-create workflow directory ──
+        logger.info('[KanbanPipeline] Step 2b: pre-creating workflow directory (Blackboard)...')
+        workflow_prep = await client.prepare_workflow(project_id, project_name)
+        workflow_id = workflow_prep.get('id')
+        workflow_dir = workflow_prep.get('workflow_path', '')
+        if not workflow_id or not workflow_dir:
+            raise ValueError('Failed to pre-create workflow directory for Blackboard pattern')
+
+        logger.info(f'[KanbanPipeline] Workflow directory ready: {workflow_dir} (id={workflow_id})')
 
         # Lê SKILL.md (sempre, independente de setting_sources)
         logger.info('[KanbanPipeline] Step 3: loading planning skill...')
@@ -400,26 +441,32 @@ async def process_kanban_task(task: dict, client) -> None:
             logger.info(f'[KanbanPipeline] Loaded planning skill ({len(skill_content)} chars)')
         else:
             logger.warning(f'[KanbanPipeline] Planning skill not found at {skill_path}')
-            skill_content = 'Generate a precise execution plan in <plan>...</plan> format.'
+            skill_content = 'Generate a precise execution plan and save it as plan.json to the workflow directory.'
 
         logger.info('[KanbanPipeline] Step 4: building planning prompt...')
         prompt = await build_planning_prompt({
             'title': title,
             'description': description
-        }, planning_context, skill_content, workflow_context)
+        }, planning_context, skill_content, workflow_context, workflow_dir=workflow_dir)
         logger.info(f'[KanbanPipeline] Prompt length: {len(prompt)} chars')
 
         # Executa o planning agent via SDK
         logger.info('[KanbanPipeline] Step 5: importing SDK and preparing options...')
-        from claude_agent_sdk import query, ClaudeAgentOptions
+        from claude_agent_sdk import query, ClaudeAgentOptions, PermissionResultAllow, ToolPermissionContext
 
         # Get valid SDK fields
         valid_fields = set(inspect.signature(ClaudeAgentOptions.__init__).parameters.keys()) - {"self"}
+
+        async def _kanban_can_use_tool(tool_name, tool_input, context):
+            """Auto-approve all tools in kanban pipeline — no interactive user."""
+            logger.info(f"[KanbanPipeline] Auto-approved tool '{tool_name}'")
+            return PermissionResultAllow()
 
         opts_kwargs = {
             "cwd": planner_workspace,
             "permission_mode": "acceptEdits",
             "setting_sources": ["project", "local"],
+            "can_use_tool": _kanban_can_use_tool,
         }
         # Filtra apenas campos válidos
         opts_kwargs = {k: v for k, v in opts_kwargs.items() if k in valid_fields}
@@ -428,7 +475,11 @@ async def process_kanban_task(task: dict, client) -> None:
 
         full_response = ""
         logger.info('[KanbanPipeline] Step 6: running planning agent...')
-        async for event in query(prompt=prompt, options=opts):
+
+        async def _string_to_async_iterable(text):
+            yield {"type": "user", "session_id": "", "message": {"role": "user", "content": text}, "parent_tool_use_id": None}
+
+        async for event in query(prompt=_string_to_async_iterable(prompt), options=opts):
             event_type = type(event).__name__
             if event_type == "AssistantMessage":
                 for block in getattr(event, "content", []):
@@ -439,7 +490,7 @@ async def process_kanban_task(task: dict, client) -> None:
                 if result_text:
                     full_response += result_text
 
-        logger.info(f'[KanbanPipeline] Step 7: planning agent response length: {len(full_response)}')
+        logger.info(f'[KanbanPipeline] Step 7: planning agent finished, response length: {len(full_response)}')
 
         # Salva resposta para diagnóstico
         log_path = f'/tmp/kanban_agent_response_{task_id[:8]}.txt'
@@ -447,24 +498,19 @@ async def process_kanban_task(task: dict, client) -> None:
             f.write(full_response)
         logger.info(f'[KanbanPipeline] Response saved to {log_path}')
 
-        # Log dos primeiros 500 chars e dos últimos 500 chars
-        logger.info(f'[KanbanPipeline] Response start: {repr(full_response[:500])}')
-        logger.info(f'[KanbanPipeline] Response end: {repr(full_response[-500:])}')
-        logger.info(f'[KanbanPipeline] Has <plan>: {"<plan>" in full_response}')
-        logger.info(f'[KanbanPipeline] Has </plan>: {"</plan>" in full_response}')
-
-        # Extrai o plano da resposta
-        logger.info('[KanbanPipeline] Step 8: extracting plan from response...')
-        plan_data = extract_plan_from_text(full_response, fallback_name=title)
+        # ── Blackboard: read plan from file instead of parsing stdout ──
+        plan_file_path = os.path.join(workflow_dir, 'plan.json')
+        logger.info(f'[KanbanPipeline] Step 8: reading plan from Blackboard: {plan_file_path}')
+        plan_data = load_plan_from_file(plan_file_path, fallback_name=title)
         if not plan_data:
-            raise ValueError("Planning agent did not produce a valid <plan> block")
+            raise ValueError(f"Planning agent did not save a valid plan.json to {plan_file_path}")
 
         # Normaliza schema das tasks
         plan_data = normalize_plan_tasks(plan_data, planning_context=planning_context)
         logger.info(f'[KanbanPipeline] Tasks after normalization: {[(t["id"], t["name"][:30]) for t in plan_data["tasks"]]}')
 
         logger.info(
-            f"[KanbanPipeline] Step 9: plan extracted: {plan_data['name']} "
+            f"[KanbanPipeline] Step 9: plan loaded: {plan_data['name']} "
             f"({len(plan_data['tasks'])} tasks)"
         )
 
@@ -481,8 +527,9 @@ async def process_kanban_task(task: dict, client) -> None:
         auto_approve = project_settings.get("auto_approve_workflows", False)
         plan_data["status"] = "pending" if auto_approve else "awaiting_approval"
 
-        # Cria o workflow
+        # Cria o workflow — reusing the pre-created workflow_id
         logger.info(f'[KanbanPipeline] Step 10: creating workflow from plan (status={plan_data["status"]})...')
+        plan_data["workflow_id"] = workflow_id
         created_plan = await client.create_plan_from_data(plan_data)
         plan_id = created_plan.get("id")
         if not plan_id:
@@ -511,9 +558,9 @@ async def process_kanban_task(task: dict, client) -> None:
 
         # Auto-aprova se configurado
         if auto_approve:
-            logger.info(f'[KanbanPipeline] Step 13: moving task {task_id} to in_progress (workflow already pending)...')
+            logger.info(f'[KanbanPipeline] Step 13: moving task {task_id} to in_dev (workflow already pending)...')
             patch_result = await client._put(f'/kanban/{project_id}/{task_id}', {
-                'column': 'in_progress',
+                'column': 'in_dev',
                 'pipeline_status': 'running',
             })
             if patch_result is None:
@@ -521,7 +568,7 @@ async def process_kanban_task(task: dict, client) -> None:
             else:
                 logger.info(f'[KanbanPipeline] PUT result: {patch_result}')
             logger.success(
-                f"[KanbanPipeline] Workflow pending, task moved to in_progress: {plan_id}"
+                f"[KanbanPipeline] Workflow pending, task moved to in_dev: {plan_id}"
             )
         else:
             logger.info(f'[KanbanPipeline] Step 13: workflow awaiting manual approval: {plan_id}')
@@ -544,7 +591,10 @@ async def sync_workflow_status(client) -> None:
     Sincroniza status de workflows vinculados a kanban tasks.
 
     Verifica se workflows vinculados a kanban tasks concluíram e atualiza
-    o status das tasks correspondentes, considerando result_status da review.
+    o status das tasks correspondentes, considerando result_status da review
+    e as configurações de gates (auto-advance).
+
+    Usa handle_team_completion() do team_trigger para decisão de transição.
 
     Args:
         client: DaemonClient instance
@@ -555,6 +605,16 @@ async def sync_workflow_status(client) -> None:
             project_id = project.get("id")
             if not project_id:
                 continue
+
+            # Parse project settings
+            project_settings = {}
+            try:
+                ps = project.get('settings', {})
+                if isinstance(ps, str):
+                    ps = json.loads(ps)
+                project_settings = ps
+            except Exception:
+                pass
 
             # Busca tasks com pipeline 'running' ou 'awaiting_approval'
             try:
@@ -593,43 +653,32 @@ async def sync_workflow_status(client) -> None:
                     plan_status = plan.get("status")
                     result_status = plan.get("result_status")  # success|partial|needs_rework|None
                     task_id = task["id"]
+                    current_column = task.get('column', '')
 
                     logger.debug(f'[KanbanPipeline] Plan {workflow_id}: status={plan_status}, result_status={result_status}')
 
+                    # ── Workflow completed successfully ──
                     if plan_status == "success":
-                        if result_status == "needs_rework":
-                            # Volta para backlog e cria nova task de rework
-                            await _handle_needs_rework(task, plan, project_id, client)
-                        else:
-                            # success ou partial → move para done
-                            result_label = ' (partial)' if result_status == 'partial' else ''
-                            notes = plan.get('result_notes', '')
-                            patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
-                                'column': 'done',
-                                'pipeline_status': 'done',
-                                'result_status': result_status or 'success',
-                                'result_notes': notes,
-                            })
-                            logger.info(f'[KanbanPipeline] Moved to done: {task_id}, patch={patch_resp}')
+                        # Usa handle_team_completion para decidir transição com base nos gates
+                        await handle_team_completion(task, plan, project_settings, project_id, client)
 
+                    # ── Workflow failed ──
                     elif plan_status == "failed" and task.get("pipeline_status") != "failed":
-                        await client.update_kanban_pipeline(
-                            project_id, task_id,
-                            pipeline_status="failed",
-                            error_message="Workflow failed"
-                        )
+                        # Usa handle_team_completion que move para fase anterior
+                        await handle_team_completion(task, plan, project_settings, project_id, client)
 
+                    # ── Plan approved by user (status changed to pending/running) ──
                     elif plan_status in ("pending", "running") and task.get("pipeline_status") in ("awaiting_approval",):
                         # Usuário aprovou manualmente no dashboard — move coluna e atualiza status
-                        # Bug 3 fix: Só move se ainda não estiver em in_progress para evitar loop
-                        if task.get('column') != 'in_progress':
+                        # Bug 3 fix: Só move se ainda não estiver em in_dev para evitar loop
+                        if task.get('column') != 'in_dev':
                             patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
-                                "column": "in_progress",
+                                "column": "in_dev",
                                 "pipeline_status": "running"
                             })
-                            logger.info(f"[KanbanPipeline] Task approved and moved to in_progress: {task_id}, patch={patch_resp}")
+                            logger.info(f"[KanbanPipeline] Task approved and moved to in_dev: {task_id}, patch={patch_resp}")
                         else:
-                            # Coluna já é in_progress mas pipeline_status ainda está errado — corrige só o status
+                            # Coluna já é in_dev mas pipeline_status ainda está errado — corrige só o status
                             patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
                                 "pipeline_status": "running"
                             })
@@ -641,52 +690,18 @@ async def sync_workflow_status(client) -> None:
         logger.warning(f"[KanbanPipeline] Sync error: {e}")
 
 
-async def _handle_needs_rework(task: dict, plan: dict, project_id: str, client) -> None:
-    """Retorna task para backlog e cria nova task de rework com contexto."""
-    task_id = task['id']
-    result_notes = plan.get('result_notes', '')
-    plan_name = plan.get('name', 'Unknown')
-
-    # Volta a task atual para backlog com anotação
-    response = await client._put(f'/kanban/{project_id}/{task_id}', {
-        'column': 'backlog',
-        'pipeline_status': 'idle',
-        'workflow_id': None,
-        'result_status': 'needs_rework',
-        'result_notes': result_notes,
-        'error_message': '',
-    })
-
-    if response:
-        logger.info(f'[KanbanPipeline] Task returned to backlog for rework: {task_id} (column={response.get("column")}, pipeline_status={response.get("pipeline_status")})')
-    else:
-        logger.error(f'[KanbanPipeline] Failed to return task to backlog: {task_id}')
-
-    # Cria nova task de rework no backlog
-    rework_title = f'[Rework] {task.get("title", "Task")}'
-    rework_description = (
-        f'The previous workflow "{plan_name}" completed with needs_rework status.\n\n'
-        f'**Reviewer notes:**\n{result_notes}\n\n'
-        f'**Original task description:**\n{task.get("description", "")}'
-    )
-
-    try:
-        await client._post(f'/kanban/{project_id}', {
-            'title': rework_title,
-            'description': rework_description,
-            'column': 'backlog',
-            'priority': max(1, task.get('priority', 3) - 1),  # aumenta prioridade
-        })
-        logger.info(f'[KanbanPipeline] Rework task created for {task_id}')
-    except Exception as e:
-        logger.warning(f'Failed to create rework task: {e}')
-
-    logger.warning(f'[KanbanPipeline] Task needs rework, moved to backlog: {task_id}')
+# NOTE: _handle_needs_rework moved to team_trigger.py (shared module)
+# Re-exported via import at the top of this file
 
 
 async def auto_move_tasks(project_id: str, settings: dict, client) -> None:
     """
     Move tasks automaticamente entre colunas quando habilitado.
+
+    Respeita os gates de auto-advance configurados no projeto:
+    - auto_advance_plan_to_dev (default true)
+    - auto_advance_dev_to_staging (default true)
+    - auto_advance_staging_to_done (default false)
 
     Args:
         project_id: ID do projeto
@@ -695,6 +710,11 @@ async def auto_move_tasks(project_id: str, settings: dict, client) -> None:
     """
     if not settings.get('auto_move_enabled', False):
         return
+
+    # Read gate settings
+    auto_advance_plan_to_dev = settings.get('auto_advance_plan_to_dev', True)
+    auto_advance_dev_to_staging = settings.get('auto_advance_dev_to_staging', True)
+    auto_advance_staging_to_done = settings.get('auto_advance_staging_to_done', False)
 
     try:
         tasks_resp = await client._get(f'/kanban/{project_id}')
@@ -732,7 +752,7 @@ async def auto_move_tasks(project_id: str, settings: dict, client) -> None:
                 logger.debug(f'[AutoMove] Global workflow limit reached ({len(running_plans)}/{max_concurrent_workflows})')
                 return
 
-        # Verifica se há tasks em planning
+        # ── Transition 1: Backlog → Planning ──
         in_planning = [t for t in tasks if t.get('column') == 'planning']
         effective_planning_limit = max_planning_tasks if max_planning_tasks > 0 else float('inf')
 
@@ -754,12 +774,11 @@ async def auto_move_tasks(project_id: str, settings: dict, client) -> None:
                 })
                 logger.info(f'[AutoMove] Moved "{next_task["title"]}" backlog → planning')
 
-        # Check in_progress limit
-        in_progress = [t for t in tasks if t.get('column') == 'in_progress']
-        effective_in_progress_limit = max_in_progress_tasks if max_in_progress_tasks > 0 else float('inf')
+        # ── Transition 2: Planning → In Dev (respects auto_advance_plan_to_dev gate) ──
+        in_dev = [t for t in tasks if t.get('column') == 'in_dev']
+        effective_in_dev_limit = max_in_progress_tasks if max_in_progress_tasks > 0 else float('inf')
 
-        if len(in_progress) < effective_in_progress_limit:
-            # Move planning task with workflow_id to in_progress
+        if auto_advance_plan_to_dev and len(in_dev) < effective_in_dev_limit:
             planning_with_workflow = sorted(
                 [t for t in tasks if t.get('column') == 'planning' and t.get('workflow_id')],
                 key=lambda t: (t.get('priority', 99), t.get('created_at', ''))
@@ -767,16 +786,68 @@ async def auto_move_tasks(project_id: str, settings: dict, client) -> None:
             if planning_with_workflow:
                 next_task = planning_with_workflow[0]
                 await client._put(f'/kanban/{project_id}/{next_task["id"]}', {
-                    'column': 'in_progress',
+                    'column': 'in_dev',
                 })
-                logger.info(f'[AutoMove] Moved "{next_task["title"]}" planning → in_progress')
+                logger.info(f'[AutoMove] Moved "{next_task["title"]}" planning → in_dev')
+        elif not auto_advance_plan_to_dev:
+            logger.debug('[AutoMove] Gate blocked: planning → in_dev (auto_advance_plan_to_dev=false)')
+
+        # ── Transition 3: In Dev → Validation (respects auto_advance_dev_to_staging gate) ──
+        if auto_advance_dev_to_staging:
+            in_dev_with_done_workflow = [
+                t for t in tasks
+                if t.get('column') == 'in_dev'
+                and t.get('workflow_id')
+            ]
+            for t in in_dev_with_done_workflow:
+                # Check if workflow completed
+                plan_resp = await client._get(f'/plans/{t["workflow_id"]}')
+                plan = None
+                if isinstance(plan_resp, dict):
+                    plan = plan_resp.get('data', plan_resp) if 'data' in plan_resp else plan_resp
+                elif isinstance(plan_resp, list):
+                    plan = plan_resp[0] if plan_resp else None
+
+                if plan and plan.get('status') == 'success' and plan.get('result_status') != 'needs_rework':
+                    await client._put(f'/kanban/{project_id}/{t["id"]}', {
+                        'column': 'validation',
+                    })
+                    logger.info(f'[AutoMove] Moved "{t["title"]}" in_dev → validation (workflow completed)')
+                    break  # Move one at a time
+        else:
+            logger.debug('[AutoMove] Gate blocked: in_dev → validation (auto_advance_dev_to_staging=false)')
+
+        # ── Transition 4: Validation → Done (respects auto_advance_staging_to_done gate) ──
+        if auto_advance_staging_to_done:
+            in_validation = sorted(
+                [t for t in tasks if t.get('column') == 'validation'],
+                key=lambda t: (t.get('priority', 99), t.get('created_at', ''))
+            )
+            if in_validation:
+                next_task = in_validation[0]
+                await client._put(f'/kanban/{project_id}/{next_task["id"]}', {
+                    'column': 'done',
+                    'pipeline_status': 'done',
+                })
+                logger.info(f'[AutoMove] Moved "{next_task["title"]}" validation → done')
+        else:
+            logger.debug('[AutoMove] Gate blocked: validation → done (auto_advance_staging_to_done=false)')
+
     except Exception as e:
         logger.warning(f'[AutoMove] Error: {e}')
 
 
 async def poll_kanban_tasks(client) -> None:
     """
-    Verifica todos os projetos por kanban tasks ativas sem workflow.
+    Verifica todos os projetos por kanban tasks ativas e aciona times conforme a fase.
+
+    Pipeline:
+      1. Processa tasks agendadas (recorrência)
+      2. Auto-move tasks baseado em gates
+      3. PLANNING: processa tasks sem workflow (trigger Plan Team via process_kanban_task)
+      4. IN_DEV: detecta tasks com workflow aprovado e aciona Dev Team
+      5. VALIDATION: detecta tasks com workflow dev concluído e aciona Staging Team
+      6. Sincroniza status de workflows ativos (completion → gate transitions)
 
     Args:
         client: DaemonClient instance
@@ -802,12 +873,19 @@ async def poll_kanban_tasks(client) -> None:
             # Auto-move antes de processar
             await auto_move_tasks(project_id, settings, client)
 
+            # ── Phase 1: PLANNING — Tasks sem workflow ──
             pending = await client.get_pending_kanban_tasks(project_id)
             for task in pending:
                 # Processa em background sem bloquear o daemon loop
                 asyncio.create_task(_run_kanban_task(task, client))
 
-        # Sincroniza status de workflows ativos
+            # ── Phase 2: IN_DEV — Trigger Dev Team ──
+            await _process_in_dev_tasks(project_id, settings, client)
+
+            # ── Phase 3: VALIDATION — Trigger Staging Team ──
+            await _process_validation_tasks(project_id, settings, client)
+
+        # Sincroniza status de workflows ativos (completion → gate transitions)
         await sync_workflow_status(client)
     except Exception as e:
         logger.warning(f"[KanbanPipeline] Poll error: {e}")
@@ -815,6 +893,228 @@ async def poll_kanban_tasks(client) -> None:
 
 # Rastreia tasks em processamento para evitar duplicatas
 _running_kanban_tasks: set = set()
+
+# Rastreia tasks que já tiveram Dev Team acionado (evita re-trigger)
+_running_dev_tasks: set = set()
+
+# Rastreia tasks que já tiveram Staging Team acionado (evita re-trigger)
+_running_staging_tasks: set = set()
+
+
+async def _process_in_dev_tasks(project_id: str, settings: dict, client) -> None:
+    """
+    Detecta tasks em in_dev com workflow aprovado que ainda não foram executadas
+    e aciona o Dev Team.
+
+    Uma task em in_dev com workflow_id mas sem execução ativa significa que o plano
+    foi gerado (pelo Plan Team) e aprovado (manualmente ou via auto-approve), mas o
+    Dev Team ainda não foi acionado para executá-lo.
+
+    O Dev Team é acionado criando um plano de execução com as tasks do workflow
+    original. O daemon detecta este novo plano e o executa automaticamente.
+
+    Args:
+        project_id: ID do projeto
+        settings: Configurações do projeto
+        client: DaemonClient instance
+    """
+    global _running_dev_tasks
+
+    try:
+        tasks_resp = await client._get(f'/kanban/{project_id}')
+        if isinstance(tasks_resp, dict):
+            tasks = tasks_resp.get('data', [])
+        elif isinstance(tasks_resp, list):
+            tasks = tasks_resp
+        else:
+            return
+
+        for task in tasks:
+            task_id = task.get('id')
+            column = task.get('column')
+            pipeline_status = task.get('pipeline_status')
+            workflow_id = task.get('workflow_id')
+
+            # Condições para acionar Dev Team:
+            # 1. Task está em in_dev
+            # 2. Tem workflow_id (plano gerado pelo Plan Team)
+            # 3. Pipeline não está running (não está em execução)
+            # 4. Não está falha
+            # 5. Não está já sendo processada
+            if (
+                column == 'in_dev'
+                and workflow_id
+                and pipeline_status not in ('running', 'failed')
+                and task_id not in _running_dev_tasks
+            ):
+                # Verifica se o plano original (do Plan Team) foi aprovado
+                plan_resp = await client._get(f'/plans/{workflow_id}')
+                if isinstance(plan_resp, dict):
+                    plan = plan_resp.get('data', plan_resp) if 'data' in plan_resp else plan_resp
+                else:
+                    plan = None
+
+                if not plan or not isinstance(plan, dict):
+                    continue
+
+                plan_status = plan.get('status')
+
+                # Se o plano ainda está awaiting_approval, não aciona o Dev Team
+                if plan_status == 'awaiting_approval':
+                    logger.debug(f'[KanbanPipeline] Task {task_id} plan still awaiting approval')
+                    continue
+
+                # Se o plano já está running/success, o Dev Team já foi ou está sendo executado
+                if plan_status in ('running',):
+                    logger.debug(f'[KanbanPipeline] Task {task_id} workflow already running')
+                    continue
+
+                # Se o plano já completou com sucesso, o sync_workflow_status vai cuidar
+                if plan_status == 'success':
+                    continue
+
+                # Plano aprovado (pending) ou re-executável — aciona Dev Team
+                _running_dev_tasks.add(task_id)
+                logger.info(
+                    f'[KanbanPipeline][Dev Team] Triggering execution for task {task_id} '
+                    f'(workflow {workflow_id[:8]}, plan status: {plan_status})'
+                )
+
+                # Marca pipeline como running
+                await client.update_kanban_pipeline(
+                    project_id, task_id,
+                    pipeline_status='running'
+                )
+
+                # Extrai tasks do plano original
+                try:
+                    plan_tasks_json = plan.get('tasks', '[]')
+                    plan_tasks = json.loads(plan_tasks_json) if isinstance(plan_tasks_json, str) else plan_tasks_json
+                except Exception:
+                    plan_tasks = []
+
+                # Aciona Dev Team
+                dev_plan_id = await trigger_dev_team(
+                    task={'id': task_id, 'project_id': project_id, 'title': task.get('title', ''), 'description': task.get('description', '')},
+                    plan_data={'tasks': plan_tasks, 'name': plan.get('name', '')},
+                    client=client,
+                )
+
+                if not dev_plan_id:
+                    logger.error(f'[KanbanPipeline][Dev Team] Failed to create execution plan for task {task_id}')
+                    await client.update_kanban_pipeline(
+                        project_id, task_id,
+                        pipeline_status='failed',
+                        error_message='Failed to trigger Dev Team — no coder workspace found'
+                    )
+
+                # Remove do tracking (o sync_workflow_status vai cuidar do completion)
+                _running_dev_tasks.discard(task_id)
+
+    except Exception as e:
+        logger.warning(f'[KanbanPipeline] Error processing in_dev tasks: {e}')
+
+
+async def _process_validation_tasks(project_id: str, settings: dict, client) -> None:
+    """
+    Detecta tasks em validation sem pipeline ativo e aciona o Staging Team.
+
+    Uma task em validation com pipeline_status='idle' significa que o Dev Team
+    terminou (com sucesso) e a task foi movida para validation. Agora o
+    Staging Team precisa executar build validation e QA.
+
+    O Staging Team é acionado criando um plano de validação. O daemon detecta
+    este plano e o executa automaticamente.
+
+    Args:
+        project_id: ID do projeto
+        settings: Configurações do projeto
+        client: DaemonClient instance
+    """
+    global _running_staging_tasks
+
+    try:
+        tasks_resp = await client._get(f'/kanban/{project_id}')
+        if isinstance(tasks_resp, dict):
+            tasks = tasks_resp.get('data', [])
+        elif isinstance(tasks_resp, list):
+            tasks = tasks_resp
+        else:
+            return
+
+        for task in tasks:
+            task_id = task.get('id')
+            column = task.get('column')
+            pipeline_status = task.get('pipeline_status')
+
+            # Condições para acionar Staging Team:
+            # 1. Task está em validation
+            # 2. Pipeline está idle (aguardando validação)
+            # 3. Não está falha
+            # 4. Não está já sendo processada pelo Staging Team
+            if (
+                column == 'validation'
+                and pipeline_status == 'idle'
+                and task_id not in _running_staging_tasks
+            ):
+                _running_staging_tasks.add(task_id)
+
+                logger.info(
+                    f'[KanbanPipeline][Staging Team] Triggering validation for task {task_id}'
+                )
+
+                # Marca pipeline como running
+                await client.update_kanban_pipeline(
+                    project_id, task_id,
+                    pipeline_status='running'
+                )
+
+                # Busca o plano do Dev Team para contexto
+                dev_plan = {}
+                dev_workflow_id = task.get('workflow_id')
+                if dev_workflow_id:
+                    try:
+                        plan_resp = await client._get(f'/plans/{dev_workflow_id}')
+                        if isinstance(plan_resp, dict):
+                            dev_plan = plan_resp.get('data', plan_resp) if 'data' in plan_resp else plan_resp
+                            if not isinstance(dev_plan, dict):
+                                dev_plan = {}
+                    except Exception:
+                        pass
+
+                # Aciona Staging Team
+                staging_plan_id = await trigger_staging_team(
+                    task=task,
+                    dev_plan=dev_plan,
+                    client=client,
+                )
+
+                if not staging_plan_id:
+                    logger.error(f'[KanbanPipeline][Staging Team] Failed to create staging plan for task {task_id}')
+                    await client.update_kanban_pipeline(
+                        project_id, task_id,
+                        pipeline_status='failed',
+                        error_message='Failed to trigger Staging Team — no reviewer workspace found'
+                    )
+                else:
+                    # Vincula o plano do Staging Team à task para rastreabilidade
+                    # O sync_workflow_status vai usar este workflow_id para monitorar
+                    # Nota: usamos o staging_plan_id como novo workflow_id
+                    # pois o Dev Team workflow já completou
+                    await client.update_kanban_pipeline(
+                        project_id, task_id,
+                        workflow_id=staging_plan_id,
+                    )
+                    logger.success(
+                        f'[KanbanPipeline][Staging Team] Staging workflow {staging_plan_id[:8]} '
+                        f'linked to task {task_id}'
+                    )
+
+                # Remove do tracking (o sync_workflow_status vai cuidar do completion)
+                _running_staging_tasks.discard(task_id)
+
+    except Exception as e:
+        logger.warning(f'[KanbanPipeline] Error processing validation tasks: {e}')
 
 
 async def _run_kanban_task(task: dict, client) -> None:

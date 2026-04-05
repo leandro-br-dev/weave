@@ -99,6 +99,40 @@ export function useGetAgentTemplates() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Team Templates — pre-configured multi-agent teams (Plan, Dev, Staging)
+// ---------------------------------------------------------------------------
+
+export type TeamSubAgent = {
+  name: string
+  role: TeamRole
+  description: string
+  suggestedModel: string
+}
+
+export type TeamPermissions = {
+  allow: string[]
+  deny: string[]
+}
+
+export type TeamTemplate = {
+  id: string
+  name: string
+  label: string
+  description: string
+  role: TeamRole
+  subAgents: TeamSubAgent[]
+  permissions: TeamPermissions
+}
+
+export function useGetTeamTemplates() {
+  return useQuery({
+    queryKey: ['team-templates'],
+    queryFn: () => apiClient.get<TeamTemplate[]>('/api/teams/team-templates'),
+    staleTime: Infinity,
+  })
+}
+
 export function useDeleteTeam() {
   const qc = useQueryClient()
   return useMutation({
@@ -339,10 +373,21 @@ export function useImproveClaudeMd() {
   })
 }
 
+export type NativeAgent = {
+  name: string
+  description: string
+  model: string
+  tools: string | string[]
+  color: string
+  file: string
+  teamType: string
+  relativePath: string
+}
+
 export function useGetNativeAgents() {
   return useQuery({
     queryKey: ['native-agents'] as const,
-    queryFn: () => apiClient.get<Array<{ name: string; description: string; model: string; tools: string[]; color: string; file: string }>>('/api/teams/native-agents'),
+    queryFn: () => apiClient.get<NativeAgent[]>('/api/teams/native-agents'),
   })
 }
 
@@ -351,9 +396,31 @@ export function useInstallNativeAgent() {
   return useMutation({
     mutationFn: ({ teamId, agentName }: { teamId: string; agentName: string }) =>
       apiClient.post<{ installed: boolean }>(
-        `/api/teams/${teamId}/native-agents/${agentName}`
+        `/api/teams/${teamId}/native-agents/${encodeURIComponent(agentName)}`
       ),
     onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: teamKeys.detail(vars.teamId) }),
+  })
+}
+
+export function useImportCustomAgent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ teamId, agentName, content }: { teamId: string; agentName: string; content: string }) =>
+      apiClient.put<{ saved: boolean }>(
+        `/api/teams/${teamId}/agents/${encodeURIComponent(agentName)}`,
+        { content }
+      ),
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: teamKeys.detail(vars.teamId) }),
+  })
+}
+
+export function useImproveAgent() {
+  return useMutation({
+    mutationFn: ({ teamId, agentName, currentContent }: { teamId: string; agentName: string; currentContent: string }) =>
+      apiClient.post<{ planId: string; taskId: string; message: string }>(
+        `/api/teams/${teamId}/improve-agent`,
+        { agentName, currentContent }
+      ),
   })
 }
 
@@ -364,6 +431,11 @@ export type Plan = {
   status: PlanStatus
   structured_output?: {
     improvedContent?: string
+    content?: {
+      improvedContent?: string
+      claudeMd?: string
+      agentContent?: string
+    }
   }
   error?: string
 }
@@ -381,6 +453,18 @@ export function useImprovementStatus(
   const [improvedContent, setImprovedContent] = React.useState<string | null>(null)
   const [isImproving, setIsImproving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+
+  /** Extract improvement content from structured_output regardless of shape. */
+  function extractImprovedContent(so: Plan['structured_output']): string | undefined {
+    if (!so) return undefined
+    // Direct legacy format: { improvedContent: "..." }
+    if (so.improvedContent) return so.improvedContent
+    // Wrapped format from save_structured_output: { content: { agentContent | claudeMd | improvedContent } }
+    if (so.content) {
+      return so.content.agentContent ?? so.content.claudeMd ?? so.content.improvedContent
+    }
+    return undefined
+  }
 
   React.useEffect(() => {
     // Don't poll if not enabled or no planId
@@ -408,9 +492,9 @@ export function useImprovementStatus(
     log(`🚀 Starting improvement status polling`, {
       planId,
       enabled,
-      maxPollAttempts: 60,
+      maxPollAttempts: 300,
       pollInterval: '2s',
-      maxWaitTime: '2.5 minutes'
+      maxWaitTime: '11 minutes'
     })
 
     setIsImproving(true)
@@ -420,8 +504,8 @@ export function useImprovementStatus(
     let cancelled = false
     let pollingCount = 0
     let successStatusReachedAt: number | null = null
-    const MAX_POLL_ATTEMPTS = 60 // Maximum 2 minutes (60 * 2 seconds)
-    const SUCCESS_STATUS_POLL_TIMEOUT = 15 // Additional 30 seconds (15 * 2 seconds) after status='success' to wait for structured_output
+    const MAX_POLL_ATTEMPTS = 300 // Maximum 10 minutes (300 * 2 seconds) — improvement plans can take 3-5+ minutes
+    const SUCCESS_STATUS_POLL_TIMEOUT = 30 // Additional 60 seconds (30 * 2 seconds) after status='success' to wait for structured_output
 
     const intervalId = setInterval(async () => {
       try {
@@ -434,11 +518,12 @@ export function useImprovementStatus(
         }
 
         // Detailed logging of each poll attempt
+        const improved = extractImprovedContent(plan.structured_output)
         log(`📡 Poll attempt ${pollingCount}/${MAX_POLL_ATTEMPTS + SUCCESS_STATUS_POLL_TIMEOUT}`, {
           planId,
           status: plan.status,
           hasStructuredOutput: !!plan.structured_output,
-          hasImprovedContent: !!plan.structured_output?.improvedContent,
+          hasImprovedContent: !!improved,
           elapsedTime: `${pollingCount * 2}s`,
           successStatusReached: successStatusReachedAt !== null
         })
@@ -466,14 +551,15 @@ export function useImprovementStatus(
               planId,
               pollAttempt: pollingCount,
               hasStructuredOutput: !!plan.structured_output,
-              hasImprovedContent: !!plan.structured_output?.improvedContent
+              hasImprovedContent: !!extractImprovedContent(plan.structured_output)
             })
           }
 
-          // Check if we have the structured_output with improvedContent
-          if (plan.structured_output?.improvedContent) {
+          // Check if we have the structured_output with improvement content
+          const improvedContent = extractImprovedContent(plan.structured_output)
+          if (improvedContent) {
             // Success! We have both status='success' AND structured_output
-            const contentLength = plan.structured_output.improvedContent.length
+            const contentLength = improvedContent.length
             log(`🎉 Improvement complete!`, {
               planId,
               totalPollAttempts: pollingCount,
@@ -484,7 +570,7 @@ export function useImprovementStatus(
             })
             clearInterval(intervalId)
             setIsImproving(false)
-            setImprovedContent(plan.structured_output.improvedContent)
+            setImprovedContent(improvedContent)
             return
           }
 
@@ -510,12 +596,13 @@ export function useImprovementStatus(
             // Try one last direct fetch before giving up
             try {
               log(`🔄 Attempting one last direct fetch before giving up...`)
-              const finalPlan = await apiClient.get<{ structured_output?: { improvedContent?: string } }>(`/api/plans/${planId}`)
-              if (finalPlan.structured_output?.improvedContent) {
+              const finalPlan = await apiClient.get<Plan>(`/api/plans/${planId}`)
+              const finalContent = extractImprovedContent(finalPlan.structured_output)
+              if (finalContent) {
                 log(`✅ Found structured_output in final fetch!`)
                 clearInterval(intervalId)
                 setIsImproving(false)
-                setImprovedContent(finalPlan.structured_output.improvedContent)
+                setImprovedContent(finalContent)
                 return
               }
             } catch (err) {
@@ -545,12 +632,13 @@ export function useImprovementStatus(
           // Try one last direct fetch before giving up
           try {
             log(`🔄 Attempting one last direct fetch before giving up...`)
-            const finalPlan = await apiClient.get<{ structured_output?: { improvedContent?: string } }>(`/api/plans/${planId}`)
-            if (finalPlan.structured_output?.improvedContent) {
+            const finalPlan = await apiClient.get<Plan>(`/api/plans/${planId}`)
+            const finalContent = extractImprovedContent(finalPlan.structured_output)
+            if (finalContent) {
               log(`✅ Found structured_output in final fetch!`)
               clearInterval(intervalId)
               setIsImproving(false)
-              setImprovedContent(finalPlan.structured_output.improvedContent)
+              setImprovedContent(finalContent)
               return
             }
           } catch (err) {

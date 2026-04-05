@@ -9,7 +9,7 @@ export interface KanbanTask {
   project_settings?: Record<string, any>;
   title: string;
   description: string;
-  column: 'backlog' | 'planning' | 'in_progress' | 'done';
+  column: 'backlog' | 'planning' | 'in_dev' | 'validation' | 'done';
   priority: 1 | 2 | 3 | 4 | 5;
   order_index: number;
   workflow_id: string | null;
@@ -56,7 +56,8 @@ export const COLUMNS = [
   { id: 'templates', label: 'Templates' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'planning', label: 'Planning' },
-  { id: 'in_progress', label: 'In Progress' },
+  { id: 'in_dev', label: 'In Dev' },
+  { id: 'validation', label: 'Validation' },
   { id: 'done', label: 'Done' },
 ] as const;
 
@@ -352,7 +353,26 @@ export function useDeleteTemplate() {
 export function useCanAdvance(projectId: string | undefined) {
   return useQuery({
     queryKey: ['kanban', 'can-advance', projectId],
-    queryFn: () => apiFetch<{ can_advance: boolean; reason: string; current_counts: { running_workflows: number; planning_tasks: number; in_progress_tasks: number }; limits: { max_concurrent_workflows: number; max_planning_tasks: number; max_in_progress_tasks: number } }>(`/api/kanban/${projectId}/can-advance`),
+    queryFn: () => apiFetch<{
+      can_advance: boolean;
+      reason: string;
+      current_counts: {
+        running_workflows: number;
+        planning_tasks: number;
+        in_dev_tasks: number;
+        validation_tasks: number;
+      };
+      limits: {
+        max_concurrent_workflows: number;
+        max_planning_tasks: number;
+        max_in_progress_tasks: number;
+      };
+      gates: {
+        auto_advance_plan_to_dev: boolean;
+        auto_advance_dev_to_staging: boolean;
+        auto_advance_staging_to_done: boolean;
+      };
+    }>(`/api/kanban/${projectId}/can-advance`),
     enabled: !!projectId,
     refetchInterval: 15000,
   })
