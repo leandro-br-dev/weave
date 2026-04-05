@@ -318,9 +318,6 @@ export default function KanbanPage() {
     const projectId = autoMoveProjectId || autoApproveProjectId;
     if (!projectId) return;
 
-    const project = projects.find(p => p.id === projectId);
-    const s = project?.settings;
-
     if (gate === 'plan_to_dev') setGatePlanToDev(enabled);
     if (gate === 'dev_to_staging') setGateDevToStaging(enabled);
     if (gate === 'staging_to_done') setGateStagingToDone(enabled);
@@ -722,7 +719,7 @@ export default function KanbanPage() {
                   );
                 }
 
-                return visibleColumns.flatMap((column, idx) => {
+                return visibleColumns.flatMap((column) => {
                   const elements: React.ReactNode[] = [];
 
                   // Render column
