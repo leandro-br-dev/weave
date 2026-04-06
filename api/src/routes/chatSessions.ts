@@ -28,6 +28,26 @@ router.post('/', authenticateToken, (req, res) => {
   return res.status(201).json({ data: { id, name, workspace_path }, error: null })
 })
 
+// GET /api/sessions/unread-count — count assistant messages not yet read
+router.get('/unread-count', authenticateToken, (_req, res) => {
+  const count = db.prepare(
+    "SELECT COUNT(*) as cnt FROM chat_messages m " +
+    "JOIN chat_sessions s ON s.id = m.session_id " +
+    "WHERE m.role = 'assistant' " +
+    "AND (s.last_read_at IS NULL OR m.created_at > s.last_read_at)"
+  ).get() as { cnt: number }
+
+  return res.json({ data: { count: count.cnt }, error: null })
+})
+
+// PATCH /api/sessions/mark-read — mark all messages as read up to now
+router.patch('/mark-read', authenticateToken, (_req, res) => {
+  db.prepare(
+    "UPDATE chat_sessions SET last_read_at = datetime('now') WHERE last_read_at IS NULL OR last_read_at < datetime('now')"
+  ).run()
+  return res.json({ data: { success: true }, error: null })
+})
+
 // GET /api/sessions/pending — daemon polling (sessões running sem sdk_session_id, ou running com)
 router.get('/pending', authenticateToken, (_req, res) => {
   const sessions = db.prepare(

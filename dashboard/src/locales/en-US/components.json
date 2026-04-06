@@ -111,5 +111,14 @@
     "remove": "Remove",
     "image": "Image",
     "file": "File"
+  },
+  "improvementInstructions": {
+    "title": "Improve with AI",
+    "description": "Optionally provide specific instructions to guide the AI improvement.",
+    "instructionsLabel": "Instructions (optional)",
+    "placeholder": "e.g., \"Focus on making the instructions more concise\" or \"Add error handling guidelines\"...",
+    "hint": "Leave empty for a general improvement, or describe specific changes you'd like.",
+    "cancel": "Cancel",
+    "confirm": "Improve"
   }
 }

@@ -1472,7 +1472,7 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const { currentContent } = req.body
+  const { currentContent, userInstructions } = req.body
 
   if (!currentContent || typeof currentContent !== 'string') {
     return res.status(400).json({ data: null, error: 'currentContent is required' })
@@ -1516,6 +1516,11 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
       console.error(`[teams] Failed to create workflow directory for improvement plan ${planId}:`, dirError)
     }
 
+    // Build user instructions section if provided
+    const userInstructionsSection = userInstructions && userInstructions.trim()
+      ? `\n## User Instructions\n\nThe user has provided specific instructions for this improvement. Follow these directions carefully:\n\n${userInstructions.trim()}\n`
+      : ''
+
     // Create improvement prompt
     const prompt = `You are an expert at writing clear, concise, and effective CLAUDE.md files for AI coding agents. Your task is to improve the following CLAUDE.md content while maintaining its core purpose and structure.
 
@@ -1529,7 +1534,7 @@ ${currentClaudeMdContent || '(No existing CLAUDE.md file)'}
 
 User-provided content to improve:
 ${currentContent}
-
+${userInstructionsSection}
 Guidelines for improvement:
 1. Make instructions clearer and more specific
 2. Improve organization and readability
@@ -1594,7 +1599,7 @@ router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const { agentName, currentContent } = req.body
+  const { agentName, currentContent, userInstructions } = req.body
 
   if (!agentName || typeof agentName !== 'string') {
     return res.status(400).json({ data: null, error: 'agentName is required' })
@@ -1655,6 +1660,11 @@ router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
       console.error(`[teams] Failed to create workflow directory for improvement plan ${planId}:`, dirError)
     }
 
+    // Build user instructions section if provided
+    const agentUserInstructionsSection = userInstructions && userInstructions.trim()
+      ? `\n## User Instructions\n\nThe user has provided specific instructions for this improvement. Follow these directions carefully:\n\n${userInstructions.trim()}\n`
+      : ''
+
     // Create improvement prompt
     const prompt = `You are an expert at writing clear, concise, and effective agent definitions for AI coding agents (Claude Code). Your task is to improve the following agent definition while maintaining its core purpose and structure.
 
@@ -1671,7 +1681,7 @@ ${otherAgentsContext || '(No other agents on this team)'}
 
 Current agent definition to improve:
 ${currentContent}
-
+${agentUserInstructionsSection}
 Guidelines for improvement:
 1. Make the agent's purpose and triggers clearer and more specific
 2. Improve YAML frontmatter (name, description, model, tools, color)

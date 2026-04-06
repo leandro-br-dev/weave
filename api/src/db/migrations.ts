@@ -560,4 +560,11 @@ export const migrations: Migration[] = [
       `ALTER TABLE plans ADD COLUMN workflow_path TEXT`,
     ],
   },
+  {
+    version: 39,
+    description: 'Chat sessions — add last_read_at column to track unread assistant messages',
+    up: [
+      `ALTER TABLE chat_sessions ADD COLUMN last_read_at TEXT`,
+    ],
+  },
 ];

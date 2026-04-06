@@ -111,5 +111,14 @@
     "remove": "Remover",
     "image": "Imagem",
     "file": "Arquivo"
+  },
+  "improvementInstructions": {
+    "title": "Melhorar com IA",
+    "description": "Opcionalmente, forneça instruções específicas para orientar a melhoria pela IA.",
+    "instructionsLabel": "Instruções (opcional)",
+    "placeholder": "ex: \"Foque em tornar as instruções mais concisas\" ou \"Adicione diretrizes de tratamento de erros\"...",
+    "hint": "Deixe vazio para uma melhoria geral, ou descreva as mudanças específicas que deseja.",
+    "cancel": "Cancelar",
+    "confirm": "Melhorar"
   }
 }

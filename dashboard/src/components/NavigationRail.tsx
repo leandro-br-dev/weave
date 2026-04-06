@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetProjects } from '@/api/projects'
-import { useGetSessions } from '@/api/sessions'
+import { useGetSessions, useGetUnreadCount } from '@/api/sessions'
 import { useGetWorkspaces } from '@/api/teams'
 import { useGetPlans } from '@/api/plans'
 import { useAuth } from '@/contexts/AuthContext'
@@ -69,6 +69,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
   // Fetch data for panels
   const { data: projects = [] } = useGetProjects()
   const { data: sessions = [] } = useGetSessions()
+  const { data: unreadData } = useGetUnreadCount()
   const { data: workspaces = [] } = useGetWorkspaces()
   const { data: plans = [] } = useGetPlans()
 
@@ -249,7 +250,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             isActive={location.pathname === '/chat'}
             onClick={() => handleNavClick('/chat')}
             onInfoClick={() => handleInfoClick('chat')}
-            badge={sessions.length > 0 ? sessions.length : undefined}
+            badge={(unreadData?.count ?? 0) > 0 ? unreadData.count : undefined}
             collapsed={collapsed}
           />
           <SidebarButton

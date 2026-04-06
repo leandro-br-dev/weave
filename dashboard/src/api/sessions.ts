@@ -9,6 +9,23 @@ export function useGetSessions() {
   })
 }
 
+export function useGetUnreadCount() {
+  return useQuery({
+    queryKey: ['sessions', 'unread-count'],
+    queryFn: () => apiFetch<{ count: number }>('/api/sessions/unread-count'),
+    refetchInterval: 10000,
+  })
+}
+
+export function useMarkMessagesRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiFetch('/api/sessions/mark-read', { method: 'PATCH' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions', 'unread-count'] }),
+  })
+}
+
 export function useGetSession(id: string) {
   return useQuery({
     queryKey: ['session', id],

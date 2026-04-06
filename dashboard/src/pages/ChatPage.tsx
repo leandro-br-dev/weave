@@ -5,7 +5,7 @@ import {
   Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown, FileAttachmentInput
 } from '@/components'
 import type { FileAttachment } from '@/components'
-import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession } from '@/api/sessions'
+import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession, useMarkMessagesRead } from '@/api/sessions'
 import { useGetProjects } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/teams'
 import { useCreatePlan } from '@/api/plans'
@@ -98,6 +98,14 @@ export default function ChatPage() {
   const uploadFiles = useUploadFiles()
   const deleteMessage = useDeleteMessage()
   const clearHistory = useClearHistory()
+  const markRead = useMarkMessagesRead()
+
+  // Mark messages as read when user opens a chat session
+  useEffect(() => {
+    if (selectedId) {
+      markRead.mutate()
+    }
+  }, [selectedId])
 
   // SSE for real-time updates
   useEffect(() => {

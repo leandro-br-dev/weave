@@ -4,7 +4,7 @@ import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, type EnvironmentVariableValue } from '@/components'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, type EnvironmentVariableValue } from '@/components'
 import { getActiveToken, getApiUrl } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -879,6 +879,7 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
   const [value, setValue] = useState(content || '')
   const [improvedContent, setImprovedContent] = useState('')
   const [showImprovementModal, setShowImprovementModal] = useState(false)
+  const [showInstructionsDialog, setShowInstructionsDialog] = useState(false)
   const [improvementPlanId, setImprovementPlanId] = useState<string | null>(null)
   const [improvementError, setImprovementError] = useState<string | null>(null)
   const [showedStartToast, setShowedStartToast] = useState(false)
@@ -1004,7 +1005,13 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
     }
   }, [pollingError, showToast, improvementPlanId, teamId])
 
-  const handleImproveWithAI = async () => {
+  const handleImproveWithAI = () => {
+    // Open the instructions dialog instead of triggering immediately
+    setShowInstructionsDialog(true)
+  }
+
+  const handleImproveWithAIConfirm = async (instructions: string) => {
+    setShowInstructionsDialog(false)
     console.log(`[${new Date().toISOString()}] [ClaudeMdTab] 🚀 Triggering AI improvement`, {
       teamId,
       currentContentLength: value.length,
@@ -1017,6 +1024,7 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
       const result = await improveClaudeMd.mutateAsync({
         teamId,
         currentContent: value,
+        userInstructions: instructions || undefined,
       })
 
       console.log(`[${new Date().toISOString()}] [ClaudeMdTab] 📋 Improvement API response received`, {
@@ -1166,6 +1174,13 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
         onApprove={handleApproveImprovement}
         onDiscard={handleDiscardImprovement}
         isLoading={saveClaudeMd.isPending}
+      />
+
+      <ImprovementInstructionsDialog
+        open={showInstructionsDialog}
+        targetLabel="CLAUDE.md"
+        onConfirm={handleImproveWithAIConfirm}
+        onCancel={() => setShowInstructionsDialog(false)}
       />
     </div>
   )
@@ -1783,6 +1798,7 @@ function AgentsTab({ teamId, agents }: { teamId: string; agents: Array<{ name: s
   const [improvementPlanId, setImprovementPlanId] = useState<string | null>(null)
   const [improvedAgentContent, setImprovedAgentContent] = useState('')
   const [showAgentImprovementModal, setShowAgentImprovementModal] = useState(false)
+  const [showAgentInstructionsDialog, setShowAgentInstructionsDialog] = useState(false)
   const [agentImprovementError, setAgentImprovementError] = useState<string | null>(null)
   const [showedAgentStartToast, setShowedAgentStartToast] = useState(false)
   const hasShownAgentModalRef = useRef(false)
@@ -1975,14 +1991,20 @@ color: blue
 Descreva a especialidade e comportamento deste agente.
 `
 
-  const handleImproveAgent = async (agentNameToImprove: string) => {
+  const handleImproveAgent = (agentNameToImprove: string) => {
     setImprovingAgentName(agentNameToImprove)
+    setShowAgentInstructionsDialog(true)
+  }
+
+  const handleImproveAgentConfirm = async (instructions: string) => {
+    setShowAgentInstructionsDialog(false)
+    if (!improvingAgentName) return
     setAgentImprovementError(null)
     hasShownAgentModalRef.current = false
 
     try {
       // Fetch the current agent content
-      const agentResponse = await fetch(`${getApiUrl()}/api/teams/${teamId}/agents/${encodeURIComponent(agentNameToImprove)}`, {
+      const agentResponse = await fetch(`${getApiUrl()}/api/teams/${teamId}/agents/${encodeURIComponent(improvingAgentName)}`, {
         headers: { 'Authorization': `Bearer ${getActiveToken()}` }
       })
       if (!agentResponse.ok) throw new Error('Failed to fetch agent content')
@@ -1997,8 +2019,9 @@ Descreva a especialidade e comportamento deste agente.
 
       const result = await improveAgent.mutateAsync({
         teamId,
-        agentName: agentNameToImprove,
+        agentName: improvingAgentName,
         currentContent,
+        userInstructions: instructions || undefined,
       })
 
       if (result?.planId) {
@@ -2213,6 +2236,13 @@ Descreva a especialidade e comportamento deste agente.
         onApprove={handleApproveAgentImprovement}
         onDiscard={handleDiscardAgentImprovement}
         isLoading={saveAgent.isPending}
+      />
+
+      <ImprovementInstructionsDialog
+        open={showAgentInstructionsDialog}
+        targetLabel={improvingAgentName || undefined}
+        onConfirm={handleImproveAgentConfirm}
+        onCancel={() => { setShowAgentInstructionsDialog(false); setImprovingAgentName(null) }}
       />
     </div>
   )

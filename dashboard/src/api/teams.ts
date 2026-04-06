@@ -365,10 +365,10 @@ export const useUpdateWorkspaceModel = useUpdateTeamModel
 
 export function useImproveClaudeMd() {
   return useMutation({
-    mutationFn: ({ teamId, currentContent }: { teamId: string; currentContent: string }) =>
+    mutationFn: ({ teamId, currentContent, userInstructions }: { teamId: string; currentContent: string; userInstructions?: string }) =>
       apiClient.post<{ planId: string; taskId: string; message: string }>(
         `/api/teams/${teamId}/improve-claude-md`,
-        { currentContent }
+        { currentContent, userInstructions }
       ),
   })
 }
@@ -416,10 +416,10 @@ export function useImportCustomAgent() {
 
 export function useImproveAgent() {
   return useMutation({
-    mutationFn: ({ teamId, agentName, currentContent }: { teamId: string; agentName: string; currentContent: string }) =>
+    mutationFn: ({ teamId, agentName, currentContent, userInstructions }: { teamId: string; agentName: string; currentContent: string; userInstructions?: string }) =>
       apiClient.post<{ planId: string; taskId: string; message: string }>(
         `/api/teams/${teamId}/improve-agent`,
-        { agentName, currentContent }
+        { agentName, currentContent, userInstructions }
       ),
   })
 }
