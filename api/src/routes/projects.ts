@@ -239,14 +239,14 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
     env_vars ? JSON.stringify(env_vars) : null
   )
 
-  // Auto-bootstrap the default team for this environment
+  // Auto-bootstrap the default team for this environment using env_type (not name)
   let defaultTeam: string | null = null
   let teamId: string | null = null
   try {
     const bootResult = bootstrapTeamForEnvironment(
       req.params.id as string,
       id,
-      name,
+      resolvedEnvType,
       project_path,
       project.name,
     )
@@ -307,6 +307,44 @@ router.delete('/:projectId/environments/:envId', authenticateToken, (req, res) =
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
   db.prepare('DELETE FROM environments WHERE id=? AND project_id=?').run(req.params.envId, req.params.projectId)
   return res.json({ data: { deleted: true }, error: null })
+})
+
+// PUT /api/projects/:projectId/environments/:envId/default-team — set (or clear) the default team for an environment
+router.put('/:projectId/environments/:envId/default-team', authenticateToken, (req, res) => {
+  const { projectId, envId } = req.params
+  const { workspace_path } = req.body as { workspace_path?: string | null }
+
+  // Verify project + environment exist
+  const env = db.prepare('SELECT * FROM environments WHERE id=? AND project_id=?').get(envId, projectId) as any
+  if (!env) return res.status(404).json({ data: null, error: 'Environment not found' })
+
+  if (!workspace_path || workspace_path === null) {
+    // Clear the default team
+    db.prepare('UPDATE environments SET default_team = NULL WHERE id = ?').run(envId)
+    return res.json({ data: { default_team: null }, error: null })
+  }
+
+  // Validate that the workspace exists on disk
+  if (!fs.existsSync(workspace_path)) {
+    return res.status(400).json({ data: null, error: 'Workspace path does not exist on disk' })
+  }
+
+  // Link workspace to project (if not already)
+  db.prepare('INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)').run(projectId, workspace_path)
+
+  // Link workspace to the environment (if not already)
+  db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(workspace_path, envId)
+
+  // Set as default team
+  db.prepare('UPDATE environments SET default_team = ? WHERE id = ?').run(workspace_path, envId)
+
+  // Also update agent_workspace for backwards compatibility when role is coder
+  const roleRow = db.prepare('SELECT role FROM team_roles WHERE workspace_path = ?').get(workspace_path) as any
+  if (roleRow?.role === 'coder') {
+    db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(workspace_path, envId)
+  }
+
+  return res.json({ data: { default_team: workspace_path }, error: null })
 })
 
 // POST /api/projects/:projectId/repair-teams — backfill missing environments & default teams
@@ -1275,8 +1313,10 @@ You are an agent for the **${project.name}** project.
     if (create_coder) {
       const coderPath = envAgentPath(AGENTS_BASE_PATH, project.name, env.name)
       createAgentWorkspace(coderPath, 'agent-coder', 'coder', env.project_path, false)
-      // Update the environment's agent_workspace now that the user has confirmed creation
-      db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(coderPath, environment_id)
+      // Update the environment's agent_workspace and default_team now that the user has confirmed creation
+      db.prepare('UPDATE environments SET agent_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
+      // Also link this workspace to the specific environment in agent_environments table
+      db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(coderPath, environment_id)
       // Seed native agents for this team type
       try {
         seedNativeAgentsForTeam(coderPath, env.name)
@@ -1290,6 +1330,8 @@ You are an agent for the **${project.name}** project.
     if (create_planner) {
       const plannerPath = envAgentPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
       createAgentWorkspace(plannerPath, 'agent-planner', 'planner', env.project_path, true)
+      // Also link this workspace to the specific environment in agent_environments table
+      db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(plannerPath, environment_id)
       // Seed native agents for this team type
       try {
         seedNativeAgentsForTeam(plannerPath, env.name)

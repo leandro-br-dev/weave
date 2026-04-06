@@ -1153,7 +1153,7 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
   const ws = listAllWorkspaces().find(w => w.id === id)
   if (!ws) return res.status(404).json({ data: null, error: 'Not found' })
 
-  const { environment_id } = req.body
+  const { environment_id, set_as_default } = req.body
   if (!environment_id) return res.status(400).json({ data: null, error: 'environment_id required' })
 
   const env = db.prepare('SELECT * FROM environments WHERE id = ?').get(environment_id) as any
@@ -1162,6 +1162,16 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
   db.prepare(
     'INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)'
   ).run(ws.path, environment_id)
+
+  // If set_as_default is true, also set this workspace as the environment's default team
+  if (set_as_default) {
+    db.prepare('UPDATE environments SET default_team = ? WHERE id = ?').run(ws.path, environment_id)
+    // Also update agent_workspace for backwards compatibility if role is coder
+    const roleRow = db.prepare('SELECT role FROM team_roles WHERE workspace_path = ?').get(ws.path) as any
+    if (roleRow?.role === 'coder') {
+      db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(ws.path, environment_id)
+    }
+  }
 
   // Atualizar additionalDirectories no settings.local.json
   if (env.project_path) {
@@ -1178,6 +1188,15 @@ router.delete('/:id/environments', authenticateToken, (req, res) => {
   if (!ws) return res.status(404).json({ data: null, error: 'Not found' })
 
   const { environment_id } = req.body
+
+  // If this workspace is the default team for the environment, clear it
+  const env = db.prepare('SELECT default_team FROM environments WHERE id = ?').get(environment_id) as any
+  if (env && env.default_team === ws.path) {
+    db.prepare('UPDATE environments SET default_team = NULL WHERE id = ?').run(environment_id)
+    // Also clear agent_workspace if it matches
+    db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ? AND agent_workspace = ?').run('', environment_id, ws.path)
+  }
+
   db.prepare(
     'DELETE FROM agent_environments WHERE workspace_path = ? AND environment_id = ?'
   ).run(ws.path, environment_id)

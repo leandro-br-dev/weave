@@ -110,6 +110,21 @@ export function useDeleteEnvironment() {
   })
 }
 
+export function useSetDefaultTeam() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ projectId, envId, workspace_path }: { projectId: string; envId: string; workspace_path: string | null }) =>
+      apiFetch<{ default_team: string | null }>(
+        `/api/projects/${projectId}/environments/${envId}/default-team`,
+        { method: 'PUT', body: JSON.stringify({ workspace_path }) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['teams'] })
+    },
+  })
+}
+
 export function useGetAllEnvironments() {
   return useQuery({
     queryKey: ['projects', 'all-environments'],

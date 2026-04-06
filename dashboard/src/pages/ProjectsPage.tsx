@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, useRepairTeams, type RepairTeamsResult, type Environment } from '@/api/projects'
-import { useGetWorkspaces } from '@/api/teams'
-import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree, Wrench } from 'lucide-react'
+import { useGetProjects, useCreateProject, useDeleteProject, useUpdateProject, useCreateEnvironment, useUpdateEnvironment, useDeleteEnvironment, useUnlinkAgent, useGenerateContext, useRepairTeams, useSetDefaultTeam, type RepairTeamsResult, type Environment } from '@/api/projects'
+import { useGetWorkspaces, useGetTeams } from '@/api/teams'
+import { FolderOpen, Plus, Trash2, Edit2, ChevronDown, ChevronUp, Settings, FolderTree, Wrench, Users, Unlink } from 'lucide-react'
 import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ColorPicker, ColorSelectDropdown, ProjectIcon, ContextModal, DefaultAgentsModal } from '@/components'
 import {
   bgColors, darkModeBgColors,
@@ -22,6 +22,7 @@ export default function ProjectsPage() {
   const { t } = useTranslation()
   const { data: projects, isLoading, error } = useGetProjects()
   const { data: allWorkspaces } = useGetWorkspaces()
+  const { data: allTeams } = useGetTeams()
   const createProjectMutation = useCreateProject()
   const deleteProjectMutation = useDeleteProject()
   const updateProjectMutation = useUpdateProject()
@@ -31,6 +32,7 @@ export default function ProjectsPage() {
   const unlinkAgentMutation = useUnlinkAgent()
   const generateContextMutation = useGenerateContext()
   const repairTeamsMutation = useRepairTeams()
+  const setDefaultTeamMutation = useSetDefaultTeam()
 
   const [showNewProjectForm, setShowNewProjectForm] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -347,6 +349,14 @@ export default function ProjectsPage() {
     } catch (error) {
       setRepairConfirm(null)
       setRepairResults({ projectName: repairConfirm.name, results: [{ action: 'error', envName: '-', teamPath: '-', created: false, error: (error as Error).message }] })
+    }
+  }
+
+  const handleSetDefaultTeam = async (projectId: string, envId: string, workspacePath: string | null) => {
+    try {
+      await setDefaultTeamMutation.mutateAsync({ projectId, envId, workspace_path: workspacePath })
+    } catch (error) {
+      alert(`Failed to set default team: ${(error as Error).message}`)
     }
   }
 
@@ -804,12 +814,46 @@ export default function ProjectsPage() {
                                     <div>
                                       <span className="font-medium">Project path:</span> <code className={`${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)} px-1.5 py-0.5 rounded text-xs`}>{env.project_path}</code>
                                     </div>
-                                    {env.agent_workspace && (
-                                    <details className="mt-2">
-                                      <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Team path</summary>
-                                      <code className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} block mt-1 break-all`}>{env.agent_workspace}</code>
-                                    </details>
-                                    )}
+                                    {/* Default Team Selector */}
+                                    <div className="mt-2">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <Users size={12} className={withDarkMode(textColors.muted, darkModeTextColors.muted)} />
+                                        <span className="text-xs font-medium">Equipe padrão:</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <select
+                                          className={`flex-1 text-xs px-2 py-1.5 border ${withDarkMode(borderColors.thick, darkModeBorderColors.thick)} rounded-md ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} focus:ring-1 ${interactiveStates.focusRing} focus:border-transparent`}
+                                          value={env.default_team || ''}
+                                          onChange={(e) => handleSetDefaultTeam(project.id, env.id, e.target.value || null)}
+                                          disabled={setDefaultTeamMutation.isPending}
+                                        >
+                                          <option value="">— Nenhuma equipe vinculada —</option>
+                                          {allTeams
+                                            ?.filter(t => !t.project_id || t.project_id === project.id)
+                                            .map(team => (
+                                              <option key={team.path} value={team.path}>
+                                                {team.name} ({team.role}){team.path === env.default_team ? ' ✓' : ''}
+                                              </option>
+                                            ))}
+                                        </select>
+                                        {env.default_team && (
+                                          <button
+                                            onClick={() => handleSetDefaultTeam(project.id, env.id, null)}
+                                            className={`p-1 ${withDarkMode(textColors.muted, darkModeTextColors.muted)} ${withDarkMode('hover:text-red-500', 'dark:hover:text-red-400')} rounded transition-colors`}
+                                            title="Remover equipe padrão"
+                                            disabled={setDefaultTeamMutation.isPending}
+                                          >
+                                            <Unlink size={12} />
+                                          </button>
+                                        )}
+                                      </div>
+                                      {env.default_team && (
+                                        <details className="mt-1">
+                                          <summary className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} cursor-pointer ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}>Team path</summary>
+                                          <code className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} block mt-0.5 break-all`}>{env.default_team}</code>
+                                        </details>
+                                      )}
+                                    </div>
                                     {!env.agent_workspace && !env.default_team && (
                                       <div className={`mt-1 text-xs ${withDarkMode(warningColors.text, darkModeWarningColors.text)}`}>
                                         ⚠ No default team linked
