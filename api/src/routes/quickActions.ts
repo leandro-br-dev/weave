@@ -45,17 +45,23 @@ function listAllWorkspaces(): any[] {
       }
     }
 
-    // Environment agents: {project}/{env}/agent-coder/
+    // Environment agents: {project}/{env}/agent-coder/, agent-planner/, etc.
     const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
       .filter(d => d.isDirectory() && d.name !== 'agents')
 
     for (const envDir of envDirs) {
-      const agentCoderPath = path.join(projectPath, envDir.name, 'agent-coder')
-      if (fs.existsSync(agentCoderPath)) {
+      const envDirPath = path.join(projectPath, envDir.name)
+      // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
+      const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
+
+      for (const agentSubDir of agentSubDirs) {
+        const agentPath = path.join(envDirPath, agentSubDir.name)
+        const dirRole = agentSubDir.name.replace('agent-', '')
         results.push({
-          id: Buffer.from(agentCoderPath).toString('base64url'),
-          name: `${projectDir.name}/${envDir.name}`,
-          path: agentCoderPath,
+          id: Buffer.from(agentPath).toString('base64url'),
+          name: `${projectDir.name}/${envDir.name}/${dirRole}`,
+          path: agentPath,
           type: 'env-agent'
         })
       }
