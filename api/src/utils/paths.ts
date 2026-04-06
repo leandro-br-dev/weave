@@ -85,7 +85,7 @@ export function agentWorkspacePath(
   projectSlug: string,
   agentName: string
 ): string {
-  return path.join(basePath, slugify(projectSlug), 'agents', slugify(agentName))
+  return path.resolve(path.join(basePath, slugify(projectSlug), 'agents', slugify(agentName)))
 }
 
 /**
@@ -98,7 +98,7 @@ export function envAgentPath(
   projectSlug: string,
   envSlug: string
 ): string {
-  return path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-coder')
+  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-coder'))
 }
 
 /**
@@ -110,7 +110,7 @@ export function envAgentPlannerPath(
   projectSlug: string,
   envSlug: string
 ): string {
-  return path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-planner')
+  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-planner'))
 }
 
 /**

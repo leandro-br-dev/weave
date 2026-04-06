@@ -27,48 +27,60 @@ function listAllWorkspaces(): any[] {
 
   for (const projectDir of projectDirs) {
     const projectPath = path.join(AGENTS_BASE_PATH, projectDir.name)
-    const agentsDirPath = path.join(projectPath, 'agents')
 
     // New structure: {project}/agents/{agent-name}/
+    const agentsDirPath = path.join(projectPath, 'agents')
     if (fs.existsSync(agentsDirPath)) {
-      const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
-        .filter(d => d.isDirectory())
+      try {
+        const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
+          .filter(d => d.isDirectory())
 
-      for (const agentDir of agentDirs) {
-        const fullPath = path.join(agentsDirPath, agentDir.name)
-        results.push({
-          id: Buffer.from(fullPath).toString('base64url'),
-          name: agentDir.name,
-          path: fullPath,
-          type: 'agent'
-        })
+        for (const agentDir of agentDirs) {
+          const fullPath = path.resolve(path.join(agentsDirPath, agentDir.name))
+          results.push({
+            id: Buffer.from(fullPath).toString('base64url'),
+            name: agentDir.name,
+            path: fullPath,
+            type: 'agent'
+          })
+        }
+      } catch (err) {
+        console.error(`[quick-actions] Error scanning agents dir ${agentsDirPath}:`, err)
       }
     }
 
     // Environment agents: {project}/{env}/agent-coder/, agent-planner/, etc.
-    const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'agents')
+    try {
+      const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name !== 'agents')
 
-    for (const envDir of envDirs) {
-      const envDirPath = path.join(projectPath, envDir.name)
-      // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
-      const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
+      for (const envDir of envDirs) {
+        const envDirPath = path.join(projectPath, envDir.name)
+        try {
+          // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
+          const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+            .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
 
-      for (const agentSubDir of agentSubDirs) {
-        const agentPath = path.join(envDirPath, agentSubDir.name)
-        const dirRole = agentSubDir.name.replace('agent-', '')
-        results.push({
-          id: Buffer.from(agentPath).toString('base64url'),
-          name: `${projectDir.name}/${envDir.name}/${dirRole}`,
-          path: agentPath,
-          type: 'env-agent'
-        })
+          for (const agentSubDir of agentSubDirs) {
+            const agentPath = path.resolve(path.join(envDirPath, agentSubDir.name))
+            const dirRole = agentSubDir.name.replace('agent-', '')
+            results.push({
+              id: Buffer.from(agentPath).toString('base64url'),
+              name: `${projectDir.name}/${envDir.name}/${dirRole}`,
+              path: agentPath,
+              type: 'env-agent'
+            })
+          }
+        } catch (err) {
+          console.error(`[quick-actions] Error scanning env dir ${envDirPath}:`, err)
+        }
       }
+    } catch (err) {
+      console.error(`[quick-actions] Error scanning project dir ${projectPath}:`, err)
     }
 
     // Legacy structure: {project}/agent-coder/
-    const legacyAgentCoderPath = path.join(projectPath, 'agent-coder')
+    const legacyAgentCoderPath = path.resolve(path.join(projectPath, 'agent-coder'))
     if (fs.existsSync(legacyAgentCoderPath)) {
       results.push({
         id: Buffer.from(legacyAgentCoderPath).toString('base64url'),

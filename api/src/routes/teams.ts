@@ -19,7 +19,7 @@ const __dirname = path.dirname(__filename)
 const router = Router()
 
 function getWorkspacePath(project: string): string {
-  return path.join(AGENTS_BASE_PATH, project, 'agent-coder')
+  return path.resolve(path.join(AGENTS_BASE_PATH, project, 'agent-coder'))
 }
 
 interface WorkspaceInfo {
@@ -61,94 +61,106 @@ function listAllWorkspaces(): WorkspaceInfo[] {
 
     // New structure: {project}/agents/{agent-name}/
     if (fs.existsSync(agentsDirPath)) {
-      const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
-        .filter(d => d.isDirectory())
+      try {
+        const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
+          .filter(d => d.isDirectory())
 
-      for (const agentDir of agentDirs) {
-        const fullPath = path.join(agentsDirPath, agentDir.name)
-        const settingsPath = path.join(fullPath, '.claude', 'settings.local.json')
-        const claudeMdPath = path.join(fullPath, 'CLAUDE.md')
-        const settings = readJsonSafe(settingsPath)
+        for (const agentDir of agentDirs) {
+          const fullPath = path.resolve(path.join(agentsDirPath, agentDir.name))
+          const settingsPath = path.join(fullPath, '.claude', 'settings.local.json')
+          const claudeMdPath = path.join(fullPath, 'CLAUDE.md')
+          const settings = readJsonSafe(settingsPath)
 
-        // Fetch project_id from project_agents table
-        const projectLink = db.prepare(
-          'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
-        ).get(fullPath) as any
+          // Fetch project_id from project_agents table
+          const projectLink = db.prepare(
+            'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
+          ).get(fullPath) as any
 
-        // Fetch role from team_roles table
-        const roleRow = db.prepare(
-          'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
-        ).get(fullPath) as any
+          // Fetch role from team_roles table
+          const roleRow = db.prepare(
+            'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
+          ).get(fullPath) as any
 
-        // Read model from settings.local.json (ANTHROPIC_MODEL env var)
-        const model = settings?.env?.ANTHROPIC_MODEL || ''
+          // Read model from settings.local.json (ANTHROPIC_MODEL env var)
+          const model = settings?.env?.ANTHROPIC_MODEL || ''
 
-        results.push({
-          id: Buffer.from(fullPath).toString('base64url'),
-          name: agentDir.name,
-          path: fullPath,
-          exists: true,
-          hasSettings: fs.existsSync(settingsPath),
-          hasClaude: fs.existsSync(claudeMdPath),
-          baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
-          type: 'agent',
-          project_id: projectLink?.project_id ?? null,
-          role: roleRow?.role ?? 'coder',
-          model: model
-        })
+          results.push({
+            id: Buffer.from(fullPath).toString('base64url'),
+            name: agentDir.name,
+            path: fullPath,
+            exists: true,
+            hasSettings: fs.existsSync(settingsPath),
+            hasClaude: fs.existsSync(claudeMdPath),
+            baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
+            type: 'agent',
+            project_id: projectLink?.project_id ?? null,
+            role: roleRow?.role ?? 'coder',
+            model: model
+          })
+        }
+      } catch (err) {
+        console.error(`[teams] Error scanning agents dir ${agentsDirPath}:`, err)
       }
     }
 
     // Environment agents: {project}/{env}/agent-coder/ and {project}/{env}/agent-planner/
-    const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'agents')
+    try {
+      const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
+        .filter(d => d.isDirectory() && d.name !== 'agents')
 
-    for (const envDir of envDirs) {
-      const envDirPath = path.join(projectPath, envDir.name)
-      // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
-      const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
+      for (const envDir of envDirs) {
+        const envDirPath = path.join(projectPath, envDir.name)
+        try {
+          // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
+          const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+            .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
 
-      for (const agentSubDir of agentSubDirs) {
-        const agentPath = path.join(envDirPath, agentSubDir.name)
-        const settingsPath = path.join(agentPath, '.claude', 'settings.local.json')
-        const claudeMdPath = path.join(agentPath, 'CLAUDE.md')
-        const settings = readJsonSafe(settingsPath)
+          for (const agentSubDir of agentSubDirs) {
+            const agentPath = path.resolve(path.join(envDirPath, agentSubDir.name))
+            const settingsPath = path.join(agentPath, '.claude', 'settings.local.json')
+            const claudeMdPath = path.join(agentPath, 'CLAUDE.md')
+            const settings = readJsonSafe(settingsPath)
 
-        // Fetch project_id from project_agents table
-        const projectLink = db.prepare(
-          'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
-        ).get(agentPath) as any
+            // Fetch project_id from project_agents table
+            const projectLink = db.prepare(
+              'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
+            ).get(agentPath) as any
 
-        // Fetch role from team_roles table
-        const roleRow = db.prepare(
-          'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
-        ).get(agentPath) as any
+            // Fetch role from team_roles table
+            const roleRow = db.prepare(
+              'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
+            ).get(agentPath) as any
 
-        // Derive role from directory name as fallback
-        const dirRole = agentSubDir.name.replace('agent-', '') // 'coder' or 'planner'
+            // Derive role from directory name as fallback
+            const dirRole = agentSubDir.name.replace('agent-', '') // 'coder' or 'planner'
 
-        // Read model from settings.local.json (ANTHROPIC_MODEL env var)
-        const model = settings?.env?.ANTHROPIC_MODEL || ''
+            // Read model from settings.local.json (ANTHROPIC_MODEL env var)
+            const model = settings?.env?.ANTHROPIC_MODEL || ''
 
-        results.push({
-          id: Buffer.from(agentPath).toString('base64url'),
-          name: `${projectDir.name}/${envDir.name}/${dirRole}`,
-          path: agentPath,
-          exists: true,
-          hasSettings: fs.existsSync(settingsPath),
-          hasClaude: fs.existsSync(claudeMdPath),
-          baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
-          type: 'env-agent',
-          project_id: projectLink?.project_id ?? null,
-          role: roleRow?.role ?? dirRole,
-          model: model
-        })
+            results.push({
+              id: Buffer.from(agentPath).toString('base64url'),
+              name: `${projectDir.name}/${envDir.name}/${dirRole}`,
+              path: agentPath,
+              exists: true,
+              hasSettings: fs.existsSync(settingsPath),
+              hasClaude: fs.existsSync(claudeMdPath),
+              baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
+              type: 'env-agent',
+              project_id: projectLink?.project_id ?? null,
+              role: roleRow?.role ?? dirRole,
+              model: model
+            })
+          }
+        } catch (err) {
+          console.error(`[teams] Error scanning env dir ${envDirPath}:`, err)
+        }
       }
+    } catch (err) {
+      console.error(`[teams] Error scanning project dir ${projectPath}:`, err)
     }
 
     // Legacy structure: {project}/agent-coder/ (for backward compatibility)
-    const legacyAgentCoderPath = path.join(projectPath, 'agent-coder')
+    const legacyAgentCoderPath = path.resolve(path.join(projectPath, 'agent-coder'))
     if (fs.existsSync(legacyAgentCoderPath)) {
       const settingsPath = path.join(legacyAgentCoderPath, '.claude', 'settings.local.json')
       const claudeMdPath = path.join(legacyAgentCoderPath, 'CLAUDE.md')
@@ -278,8 +290,8 @@ router.get('/', authenticateToken, (req, res) => {
     const linked = db.prepare(
       'SELECT workspace_path FROM project_agents WHERE project_id = ?'
     ).all(project_id as string) as any[]
-    const linkedPaths = new Set(linked.map(l => l.workspace_path))
-    const filtered = all.filter(ws => linkedPaths.has(ws.path))
+    const linkedPaths = new Set(linked.map(l => path.resolve(l.workspace_path)))
+    const filtered = all.filter(ws => linkedPaths.has(path.resolve(ws.path)))
     return res.json({ data: filtered, error: null })
   }
   return res.json({ data: all, error: null })

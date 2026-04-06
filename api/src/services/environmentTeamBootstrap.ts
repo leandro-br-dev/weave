@@ -105,7 +105,7 @@ export function bootstrapTeamForEnvironment(
   const agentName = `agent-${role === 'planner' ? 'planner' : role === 'reviewer' ? 'reviewer' : 'coder'}`
   const envSlug = slugify(envName)
   const projectSlug = slugify(projectName)
-  const workspacePath = path.join(AGENTS_BASE_PATH, projectSlug, envSlug, agentName)
+  const workspacePath = path.resolve(path.join(AGENTS_BASE_PATH, projectSlug, envSlug, agentName))
 
   // If the workspace directory already exists, just link it (idempotent).
   const alreadyExists = fs.existsSync(workspacePath)
