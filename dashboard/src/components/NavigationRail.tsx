@@ -250,7 +250,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             isActive={location.pathname === '/chat'}
             onClick={() => handleNavClick('/chat')}
             onInfoClick={() => handleInfoClick('chat')}
-            badge={(unreadData?.count ?? 0) > 0 ? unreadData.count : undefined}
+            badge={(unreadData?.count ?? 0) > 0 ? unreadData?.count : undefined}
             collapsed={collapsed}
           />
           <SidebarButton
