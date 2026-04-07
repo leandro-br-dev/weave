@@ -31,31 +31,6 @@ export interface TeamTemplate {
 }
 
 // ---------------------------------------------------------------------------
-// Shared documentation workflow section (embedded in every team prompt)
-// ---------------------------------------------------------------------------
-const TEAM_DOCS_SECTION = `
-
-## Documentation Workflow
-
-When this task is part of a workflow, you will receive the path to a documentation directory.
-
-### Rules:
-1. **Naming**: All docs MUST use a 3-digit numeric prefix: \`001-\`, \`002-\`, \`003-\`, etc.
-2. **Before starting your task**: Read the LAST (highest-numbered) document in the docs directory to understand previous work.
-3. **During work**: Write findings, decisions, and context as numbered files in the docs directory.
-4. **At task completion**: ALWAYS write a completion document named with the next sequential number, e.g. \`{next_num:03d}-{task-name}-completion.md\`, explaining what was done.
-5. **File format**: kebab-case after the numeric prefix: \`001-context-analysis.md\`, \`002-api-changes.md\`
-
-### Write ONLY to:
-- \`{WORKSPACE_PATH}/.agent-docs/{PLAN_ID}/\`
-
-### NEVER:
-- Create .md files in the target project root
-- Create README.md, REPORT.md, SUMMARY.md, TEST_*.md unless explicitly requested
-- Write documentation outside your docs directory
-`
-
-// ---------------------------------------------------------------------------
 // Plan Team — Planejamento e Analise
 // Read + Bash + Write access (docs only): explores codebase, runs queries, produces plans, creates doc files. Cannot EDIT existing files.
 // ---------------------------------------------------------------------------
@@ -96,7 +71,7 @@ Voce e um agente de planejamento. Seu objetivo e analisar o codigo existente e g
 
 1. **NAO edite arquivos existentes.** Voce pode ler (\`Read\`), buscar arquivos (\`Glob\`), buscar conteudo (\`Grep\`) e executar comandos shell (\`Bash\`).
 2. **Comandos shell sao permitidos** para consulta e pesquisa (ex: \`grep\`, \`find\`, \`cat\`, \`head\`, \`tail\`, \`wc\`, \`ls\`, etc.). Nao execute comandos destrutivos.
-3. **Pode criar arquivos** de documentacao e planejamento na pasta designada (\`.agent-docs/\`), usando \`Write\`.
+3. **Pode criar arquivos** de documentacao e planejamento usando \`Write\`.
 4. **Nao edite arquivos existentes** do projeto-alvo — a ferramenta \`Edit\` nao esta disponivel.
 
 ## Fluxo de Trabalho
@@ -105,7 +80,7 @@ Voce e um agente de planejamento. Seu objetivo e analisar o codigo existente e g
 2. **Analisar requisitos**: Leia os documentos de requisito fornecidos (issues, specs, documentos de planejamento anteriores).
 3. **Identificar pontos de impacto**: Mapeie quais arquivos, modulos e componentes serao afetados.
 4. **Gerar o plano**: Produza um plano estruturado com tarefas atomicas, dependencias claras e criterios de aceitacao.
-5. **Documentar**: Crie arquivos de documentacao na pasta \`.agent-docs/\` para servir de base para a implementacao.
+5. **Documentar**: Crie arquivos de documentacao para servir de base para a implementacao.
 
 ## Formato de Saida
 
@@ -137,7 +112,7 @@ Sempre envolva seu plano em tags \`<plan>\` com JSON valido seguindo o esquema d
 - Prefira tarefas menores e focadas a tarefas grandes e monoliticas.
 - Inclua etapas de verificacao (build/test) em cada tarefa.
 - Ordene as tarefas considerando dependencias.
-${TEAM_DOCS_SECTION}`,
+`,
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +190,7 @@ Voce e o time de desenvolvimento. Execute o plano recebido com qualidade e disci
 - Siga as convencoes de nomenclatura e formatacao do projeto.
 - Cada commit deve representar uma unidade logica de trabalho.
 - Se algo estiver confuso, leia mais codigo ou pergunte — nao assuma.
-${TEAM_DOCS_SECTION}`,
+`,
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +295,7 @@ Quando negar uma PR ou reportar falhas, use o formato:
 - Seja preciso nos relatorios: arquivo, linha, causa, solucao.
 - Documente tudo para que o Dev Team possa corrigir rapidamente.
 - Nao tente corrigir — apenas reporte e bloqueie.
-${TEAM_DOCS_SECTION}`,
+`,
 }
 
 // ---------------------------------------------------------------------------

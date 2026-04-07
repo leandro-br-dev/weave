@@ -105,10 +105,16 @@ weave/
 │   └── vitest.config.ts            # Dashboard vitest configuration
 │
 ├── scripts/
-│   ├── coverage-report.sh          # Combined coverage reporting
-│   ├── setup-test-env.sh           # Test environment setup
-│   ├── teardown-test-env.sh        # Test environment cleanup
-│   └── reset-test-db.sh            # Test database reset
+│   ├── testing/
+│   │   ├── test-coverage.sh        # Combined coverage reporting
+│   │   ├── test-runner.sh          # Unified test runner
+│   │   ├── test-watch.sh           # Watch mode for tests
+│   │   ├── run-integration-tests.sh # Integration test runner
+│   │   └── test-kanban-endpoints.sh # Kanban API endpoint tests
+│   └── setup/
+│       ├── setup-test-env.sh       # Test environment setup
+│       ├── teardown-test-env.sh    # Test environment cleanup
+│       └── reset-test-db.sh        # Test database reset
 │
 ├── .github/
 │   └── workflows/
@@ -663,7 +669,7 @@ pytest --cov=client --cov-report=html
 npm test -- --coverage
 
 # Combined coverage
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 ```
 
 #### Run in Watch Mode
@@ -789,7 +795,7 @@ coverage-reports/
                     ▼
 ┌─────────────────────────────────────────────────┐
 │        Coverage Collection Script               │
-│  (scripts/coverage-report.sh)                   │
+│  (scripts/testing/test-coverage.sh)             │
 └─────────────────────────────────────────────────┘
                     │
                     ▼

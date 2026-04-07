@@ -24,7 +24,7 @@ Cloudflare Tunnel (formerly Argo Tunnel) creates a secure, outbound-only connect
 
 ```bash
 cd /root/projects/weave
-bash scripts/cloudflare-tunnel.sh
+bash scripts/deploy/cloudflare-tunnel.sh
 ```
 
 The script will:

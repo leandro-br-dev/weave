@@ -45,14 +45,6 @@ echo "  → Data directory:   $DATA_DIR"
 echo "  → Team workspaces:  $TEAMS_BASE_PATH"
 echo ""
 
-# ─── Migrate agent-* → team-* directories ──────────────────────────
-# Renames workspace dirs from old "agent-" prefix to new "team-" prefix
-# Idempotent — safe to run on every startup.
-if [ -f "$ROOT/scripts/migrate-agent-to-team-dirs.sh" ]; then
-  bash "$ROOT/scripts/migrate-agent-to-team-dirs.sh"
-fi
-echo ""
-
 # ─── Check for updates ───────────────────────────────────────────
 if command -v git >/dev/null 2>&1 && [ -d "$ROOT/.git" ]; then
   git -C "$ROOT" fetch origin --quiet 2>/dev/null || true
@@ -359,9 +351,9 @@ deactivate
 CLOUDFLARE_PID=""
 if [ "${CLOUDFLARE_TUNNEL_ENABLED:-false}" = "true" ]; then
   if ! command -v cloudflared >/dev/null 2>&1; then
-    echo '  ⚠ cloudflared not found — run: bash scripts/cloudflare-tunnel.sh'
+    echo '  ⚠ cloudflared not found — run: bash scripts/deploy/cloudflare-tunnel.sh'
   elif [ -z "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
-    echo '  ⚠ CLOUDFLARE_TUNNEL_TOKEN not set — run: bash scripts/cloudflare-tunnel.sh'
+    echo '  ⚠ CLOUDFLARE_TUNNEL_TOKEN not set — run: bash scripts/deploy/cloudflare-tunnel.sh'
   else
     echo '→ Starting Cloudflare Tunnel...'
     CF_FULL_DOMAIN="${CLOUDFLARE_FULL_DOMAIN:-weave.example.com}"

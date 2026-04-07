@@ -15,7 +15,7 @@ pytest
 npm test
 
 # Run with coverage
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 ```
 
 ## Documentation Index

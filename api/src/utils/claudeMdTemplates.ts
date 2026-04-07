@@ -7,28 +7,6 @@ export interface AgentTemplate {
 
 /** @deprecated Use TeamTemplate from teamTemplates.ts instead */
 
-const DOCS_SECTION = `
-
-## Documentation Workflow
-
-When this task is part of a workflow, you will receive the path to a documentation directory.
-
-### Rules:
-1. **Naming**: All docs MUST use a 3-digit numeric prefix: \`001-\`, \`002-\`, \`003-\`, etc.
-2. **Before starting your task**: Read the LAST (highest-numbered) document in the docs directory to understand previous work.
-3. **During work**: Write findings, decisions, and context as numbered files in the docs directory.
-4. **At task completion**: ALWAYS write a completion document named with the next sequential number, e.g. \`{next_num:03d}-{task-name}-completion.md\`, explaining what was done.
-5. **File format**: kebab-case after the numeric prefix: \`001-context-analysis.md\`, \`002-api-changes.md\`
-
-### Write ONLY to:
-- \`{WORKSPACE_PATH}/.agent-docs/{PLAN_ID}/\`
-
-### NEVER:
-- Create .md files in the target project root
-- Create README.md, REPORT.md, SUMMARY.md, TEST_*.md unless explicitly requested
-- Write documentation outside your docs directory
-`
-
 export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'planner',
@@ -56,7 +34,7 @@ When producing a plan, always wrap it in \`<plan>\` tags with valid JSON followi
 - Each task must be self-contained with all context the executor needs
 - Prefer smaller, focused tasks over large monolithic ones
 - Include build/test verification steps in every task
-${DOCS_SECTION}`,
+`,
   },
   {
     id: 'coder',
@@ -88,7 +66,7 @@ You are an implementation specialist. Your role is to write high-quality code th
 - Prefer editing existing files over creating new ones when reasonable
 - Never leave TODO comments or placeholder code
 - If something is unclear, read more code — don't guess
-${DOCS_SECTION}`,
+`,
   },
   {
     id: 'reviewer',
@@ -116,7 +94,7 @@ You are a code review specialist. Your role is to analyze changes critically and
 ## Output
 
 Wrap your review in \`<review>\` tags with JSON following the review schema: status, summary, and issues array with severity, file, description, and suggestion fields.
-${DOCS_SECTION}`,
+`,
   },
   {
     id: 'tester',
@@ -148,7 +126,7 @@ You are a testing specialist. Your role is to write comprehensive, maintainable 
 - One assertion per test when possible
 - Never mock what you don't own
 - If a test is hard to write, the code probably needs refactoring
-${DOCS_SECTION}`,
+`,
   },
   {
     id: 'debugger',
@@ -180,7 +158,7 @@ You are a debugging specialist. Your role is to diagnose failures, trace root ca
 ## Output
 
 For complex issues, wrap your diagnosis in \`<diagnosis>\` tags with JSON: root_cause, affected_files, fix_description, and produces_plan fields.
-${DOCS_SECTION}`,
+`,
   },
   {
     id: 'generic',
@@ -196,7 +174,7 @@ You are a general-purpose agent working on the {PROJECT_NAME} project.
 - Follow the existing patterns and conventions of the project
 - Run builds and tests after any code changes
 - Commit changes with clear messages describing what was done and why
-${DOCS_SECTION}`,
+`,
   },
 ]
 

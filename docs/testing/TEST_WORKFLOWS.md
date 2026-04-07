@@ -95,7 +95,7 @@ npm run test:all
 npm run test:all
 
 # 6. Check coverage
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 
 # 7. Fix any issues
 # - Fix failing tests
@@ -173,7 +173,7 @@ npm test --workspace=dashboard
 npm run test:all
 
 # 2. Generate coverage report
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 
 # 3. Check coverage thresholds
 # Look for lines like:
@@ -258,7 +258,7 @@ jobs:
         run: npm run test:all
 
       - name: Generate coverage
-        run: ./scripts/coverage-report.sh
+        run: ./scripts/testing/test-coverage.sh
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v3
@@ -291,7 +291,7 @@ jobs:
           npm run install:all
 
       - name: Run coverage
-        run: ./scripts/coverage-report.sh
+        run: ./scripts/testing/test-coverage.sh
 
       - name: Check thresholds
         run: |
@@ -607,7 +607,7 @@ npm update vitest @vitest/coverage-v8
 # - Update fixtures
 
 # 3. Review test coverage
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 open coverage-reports/htmlcov-python/index.html
 
 # 4. Remove or update skipped tests
@@ -673,7 +673,7 @@ git rm tests/test_to_remove.py
 npm run test:all
 
 # 5. Check coverage still meets thresholds
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 ```
 
 ---
@@ -687,7 +687,7 @@ npm run test:all
 npm run test:all
 
 # Run with coverage
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 
 # Run specific module
 pytest client/tests/

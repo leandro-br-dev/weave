@@ -150,7 +150,7 @@ Expose your weave to the internet using Cloudflare Tunnel - no port forwarding o
 ### Quick Setup
 
 ```bash
-bash scripts/cloudflare-tunnel.sh
+bash scripts/deploy/cloudflare-tunnel.sh
 ```
 
 This will:

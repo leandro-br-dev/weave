@@ -60,7 +60,7 @@
       "notConfigured": {
         "title": "Túnel Não Configurado",
         "description": "Para expor seu weave via internet, execute o script de configuração:",
-        "script": "bash scripts/cloudflare-tunnel.sh"
+        "script": "bash scripts/deploy/cloudflare-tunnel.sh"
       },
       "benefits": {
         "title": "Benefícios:",

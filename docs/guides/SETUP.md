@@ -18,7 +18,7 @@ After implementing the guidelines, we reduced this to just **2 files** (`README.
 
 We've implemented a multi-layered verification system:
 
-### 1. **Check Script** (`/scripts/check-root-md.sh`)
+### 1. **Check Script** (`/scripts/devtools/check-root-md.sh`)
 
 A bash script that:
 - ✅ Scans the project root for `.md` files
@@ -37,7 +37,7 @@ A bash script that:
 ```json
 {
   "scripts": {
-    "check:docs": "./scripts/check-root-md.sh",
+    "check:docs": "./scripts/devtools/check-root-md.sh",
     "precommit": "npm run check:docs"
   }
 }
@@ -65,7 +65,7 @@ Automatically runs the check before every commit:
 
 Run the setup script:
 ```bash
-./scripts/setup-docs-hook.sh
+./scripts/setup/setup-docs-hook.sh
 ```
 
 This will:
@@ -140,7 +140,7 @@ git commit --no-verify -m "Emergency fix"
    ↓
 3. Hook executes: npm run check:docs
    ↓
-4. NPM script runs: ./scripts/check-root-md.sh
+4. NPM script runs: ./scripts/devtools/check-root-md.sh
    ↓
 5. Script scans root for .md files
    ↓
@@ -232,7 +232,7 @@ git commit -m "Clean up test file"
 4. **Reinstall husky:**
    ```bash
    npm uninstall husky
-   ./scripts/setup-docs-hook.sh
+   ./scripts/setup/setup-docs-hook.sh
    ```
 
 ### Script Permission Denied
@@ -241,7 +241,7 @@ git commit -m "Clean up test file"
 
 **Solution:**
 ```bash
-chmod +x scripts/check-root-md.sh
+chmod +x scripts/devtools/check-root-md.sh
 ```
 
 ### False Positives
@@ -249,7 +249,7 @@ chmod +x scripts/check-root-md.sh
 **Problem:** Script reports violations for valid files.
 
 **Solution:**
-Edit `scripts/check-root-md.sh` and add exceptions to the find command:
+Edit `scripts/devtools/check-root-md.sh` and add exceptions to the find command:
 ```bash
 find "$PROJECT_ROOT" -maxdepth 1 -name '*.md' -type f \
   ! -name 'README.md' \
@@ -262,8 +262,10 @@ find "$PROJECT_ROOT" -maxdepth 1 -name '*.md' -type f \
 ```
 weave/
 ├── scripts/
-│   ├── check-root-md.sh          # Main verification script
-│   └── setup-docs-hook.sh        # Automatic setup script
+│   ├── devtools/
+│   │   └── check-root-md.sh      # Main verification script
+│   └── setup/
+│       └── setup-docs-hook.sh    # Automatic setup script
 ├── .husky/
 │   └── pre-commit                # Git hook (auto-generated)
 ├── package.json                  # Contains npm scripts
@@ -320,9 +322,9 @@ You can also use [pre-commit.ci](https://pre-commit.ci/) for automatic checks on
 
 If you need to modify the check logic:
 
-1. Edit `scripts/check-root-md.sh`
-2. Test manually: `./scripts/check-root-md.sh`
-3. Test with violations: `touch TEST.md && ./scripts/check-root-md.sh`
+1. Edit `scripts/devtools/check-root-md.sh`
+2. Test manually: `./scripts/devtools/check-root-md.sh`
+3. Test with violations: `touch TEST.md && ./scripts/devtools/check-root-md.sh`
 4. Commit your changes
 
 ### Adding New File Types
@@ -365,13 +367,13 @@ ROOT_MD_FILES=$(find "$PROJECT_ROOT" -maxdepth 1 -type f \( -name '*.md' ! -name
 A: Yes, use `git commit --no-verify`, but this is not recommended. Fix violations instead.
 
 **Q: What if I need a `.md` file in the root for a specific reason?**
-A: Edit `scripts/check-root-md.sh` to add an exception for that file.
+A: Edit `scripts/devtools/check-root-md.sh` to add an exception for that file.
 
 **Q: Does this work with all operating systems?**
 A: Yes, the script uses POSIX-compliant commands that work on Linux, macOS, and WSL.
 
 **Q: Can I customize the error messages?**
-A: Yes, edit `scripts/check-root-md.sh` and modify the echo statements.
+A: Yes, edit `scripts/devtools/check-root-md.sh` and modify the echo statements.
 
 **Q: How do I check if the hook is working?**
 A: Run `npm run check:docs` or create a test `.md` file and try to commit.

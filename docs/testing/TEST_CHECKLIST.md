@@ -64,7 +64,7 @@ This document provides comprehensive checklists for testing at different stages 
 
 - [ ] **Coverage is maintained or improved**
   ```bash
-  ./scripts/coverage-report.sh
+  ./scripts/testing/test-coverage.sh
   ```
   - [ ] Coverage meets thresholds (70% overall)
   - [ ] No significant coverage decreases
@@ -106,7 +106,7 @@ This document provides comprehensive checklists for testing at different stages 
 
 - [ ] **Coverage is adequate**
   ```bash
-  ./scripts/coverage-report.sh
+  ./scripts/testing/test-coverage.sh
   ```
   - [ ] Overall coverage ≥ 70%
   - [ ] New code coverage ≥ 80%
@@ -216,7 +216,7 @@ This document provides comprehensive checklists for testing at different stages 
 
 - [ ] **Coverage meets all thresholds**
   ```bash
-  ./scripts/coverage-report.sh
+  ./scripts/testing/test-coverage.sh
   ```
   - [ ] Lines ≥ 70%
   - [ ] Functions ≥ 70%
@@ -488,7 +488,7 @@ This document provides comprehensive checklists for testing at different stages 
 npm run test:all
 
 # 2. Check coverage (if significant changes)
-./scripts/coverage-report.sh
+./scripts/testing/test-coverage.sh
 
 # 3. Check linting
 npm run lint

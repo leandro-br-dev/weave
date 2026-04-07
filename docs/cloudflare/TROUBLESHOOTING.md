@@ -187,7 +187,7 @@ curl -X OPTIONS \
 
 1. **Configure o Cloudflare Tunnel**:
    ```bash
-   bash scripts/cloudflare-tunnel.sh
+   bash scripts/deploy/cloudflare-tunnel.sh
    ```
 
 2. **Atualize `api/.env`**:
@@ -303,7 +303,7 @@ Failed to create tunnel. Please check the output above.
 3. **Re-authenticate:**
    ```bash
    rm ~/.cloudflared/cert.pem
-   bash scripts/cloudflare-tunnel.sh
+   bash scripts/deploy/cloudflare-tunnel.sh
    ```
 
 ### Issue: DNS Routing Failed
@@ -350,7 +350,7 @@ Failed to route DNS for weave.charhub.app
 3. **Set DISPLAY for WSL:**
    ```bash
    export DISPLAY=:0
-   bash scripts/cloudflare-tunnel.sh
+   bash scripts/deploy/cloudflare-tunnel.sh
    ```
 
 ### Quick Verification Commands
@@ -407,7 +407,7 @@ If you need to start fresh:
 rm -rf ~/.cloudflared/
 
 # Re-run setup
-bash scripts/cloudflare-tunnel.sh
+bash scripts/deploy/cloudflare-tunnel.sh
 ```
 
 To remove a tunnel:
