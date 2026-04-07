@@ -8,7 +8,8 @@ export type Environment = {
   type: 'local-wsl' | 'local-windows' | 'ssh'
   env_type?: 'plan' | 'dev' | 'staging' | string | null
   project_path: string
-  agent_workspace: string
+  agent_workspace?: string  // deprecated: use team_workspace
+  team_workspace?: string
   ssh_config?: string | null
   env_vars?: string | null
   default_team?: string | null
@@ -18,7 +19,7 @@ export type Environment = {
 export type ProjectSettings = {
   auto_approve_workflows: boolean
   auto_move_enabled: boolean
-  planning_agent_workspace?: string
+  planning_team_workspace?: string
   max_concurrent_active_tasks?: number
   max_concurrent_workflows?: number    // 0 = unlimited (global max running workflows)
   max_planning_tasks?: number            // 0 = unlimited (per-project planning column limit, default 1)

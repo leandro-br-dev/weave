@@ -42,6 +42,16 @@ export function AgentImprovementModal({
     }
   }, [improvedContent]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen || isLoading) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDiscard()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isLoading, onDiscard])
+
   if (!isOpen) return null
 
   const handleApprove = () => {
@@ -54,8 +64,14 @@ export function AgentImprovementModal({
   }
 
   return (
-    <div className={`fixed inset-0 ${withDarkMode(modalColors.overlay, darkModeModalColors.overlay)} flex items-center justify-center z-50 p-4`}>
-      <div className={`${withDarkMode(modalColors.panel, darkModeModalColors.panel)} rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col`}>
+    <div
+      className={`fixed inset-0 ${withDarkMode(modalColors.overlay, darkModeModalColors.overlay)} flex items-center justify-center z-50 p-4 cursor-pointer`}
+      onClick={onDiscard}
+    >
+      <div
+        className={`${withDarkMode(modalColors.panel, darkModeModalColors.panel)} rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className={`flex items-center justify-between p-6 border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
           <div className="flex items-center gap-3">

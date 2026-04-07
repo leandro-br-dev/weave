@@ -54,7 +54,7 @@ async def test_planning_context():
             for env in context["environments"]:
                 print(f"  - {env.get('name')} ({env.get('type')})")
                 print(f"    Path: {env.get('project_path')}")
-                print(f"    Workspace: {env.get('agent_workspace')}")
+                print(f"    Workspace: {env.get('team_workspace')}")
             print()
 
         # Print agents

@@ -44,19 +44,22 @@ export function getUploadsDir(appEnv?: string): string {
 }
 
 /**
- * Base path for agent workspaces.
- * Priority: DATA_DIR env > AGENTS_BASE_PATH env > default
+ * Base path for team workspaces.
+ * Priority: DATA_DIR env > TEAMS_BASE_PATH env > AGENTS_BASE_PATH env (legacy) > default
  */
-export const AGENTS_BASE_PATH = (() => {
+export const TEAMS_BASE_PATH = (() => {
   const dataDir = process.env.DATA_DIR
   if (dataDir) return path.join(dataDir, 'projects')
-  const envPath = process.env.AGENTS_BASE_PATH
+  const envPath = process.env.TEAMS_BASE_PATH || process.env.AGENTS_BASE_PATH
   if (envPath) {
     // Expand ~ if present
     return envPath.startsWith('~') ? path.join(os.homedir(), envPath.slice(1)) : envPath
   }
   return getProjectsDir()
 })()
+
+/** @deprecated Use TEAMS_BASE_PATH instead */
+export const AGENTS_BASE_PATH = TEAMS_BASE_PATH
 
 /**
  * Expand ~ in a file path to user's home directory
@@ -89,28 +92,46 @@ export function agentWorkspacePath(
 }
 
 /**
- * Path for an environment's auto-generated agent.
- * Structure: {basePath}/{projectSlug}/{envSlug}/agent-coder/
+ * Path for an environment's auto-generated team workspace.
+ * Structure: {basePath}/{projectSlug}/{envSlug}/team-coder/
  * (environments keep the current structure — they are tied to a specific env)
  */
+export function envTeamPath(
+  basePath: string,
+  projectSlug: string,
+  envSlug: string
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'team-coder'))
+}
+
+/** @deprecated Use envTeamPath instead */
 export function envAgentPath(
   basePath: string,
   projectSlug: string,
   envSlug: string
 ): string {
-  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-coder'))
+  return envTeamPath(basePath, projectSlug, envSlug)
 }
 
 /**
- * Path for an environment's auto-generated planner agent.
- * Structure: {basePath}/{projectSlug}/{envSlug}/agent-planner/
+ * Path for an environment's auto-generated planner team workspace.
+ * Structure: {basePath}/{projectSlug}/{envSlug}/team-planner/
  */
+export function envTeamPlannerPath(
+  basePath: string,
+  projectSlug: string,
+  envSlug: string
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'team-planner'))
+}
+
+/** @deprecated Use envTeamPlannerPath instead */
 export function envAgentPlannerPath(
   basePath: string,
   projectSlug: string,
   envSlug: string
 ): string {
-  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'agent-planner'))
+  return envTeamPlannerPath(basePath, projectSlug, envSlug)
 }
 
 /**

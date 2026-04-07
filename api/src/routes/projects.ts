@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.js'
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
-import { envAgentPath, envAgentPlannerPath, AGENTS_BASE_PATH } from '../utils/paths.js'
+import { envTeamPath, envTeamPlannerPath, AGENTS_BASE_PATH } from '../utils/paths.js'
 import { getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
 import { createDefaultEnvironments, isValidGitUrl, ENV_TYPE_NAMES } from '../services/gitClone.js'
 import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv } from '../services/environmentTeamBootstrap.js'
@@ -140,7 +140,7 @@ router.post('/', authenticateToken, (req, res) => {
         if (result.success) {
           const envId = uuid()
           db.prepare(`
-            INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+            INSERT INTO environments (id, project_id, name, type, env_type, project_path, team_workspace, ssh_config, env_vars)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             envId,
@@ -149,7 +149,7 @@ router.post('/', authenticateToken, (req, res) => {
             'local-wsl',
             result.name, // env_type matches the semantic name (plan, dev, staging)
             result.project_path,
-            '', // agent_workspace is set by bootstrapTeamForEnvironment
+            '', // team_workspace is set by bootstrapTeamForEnvironment
             null,
             null
           )
@@ -160,7 +160,7 @@ router.post('/', authenticateToken, (req, res) => {
             type: 'local-wsl',
             env_type: result.name,
             project_path: result.project_path,
-            agent_workspace: '',
+            team_workspace: '',
             branch: result.branch,
           })
         }
@@ -175,7 +175,7 @@ router.post('/', authenticateToken, (req, res) => {
           for (const env of environments) {
             const boot = bootstrapResults.find((b) => b.envName === env.name)
             if (boot) {
-              env.agent_workspace = boot.workspacePath
+              env.team_workspace = boot.workspacePath
               env.default_team = boot.workspacePath
               env.team_id = boot.teamId
             }
@@ -223,18 +223,18 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
 
   // Agent workspace is created only when the user confirms via the /default-agents endpoint (modal).
   // Leave empty until then so no directory is implied or auto-populated.
-  const agent_workspace = ''
+  const team_workspace = ''
 
   const id = uuid()
   db.prepare(`
-    INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+    INSERT INTO environments (id, project_id, name, type, env_type, project_path, team_workspace, ssh_config, env_vars)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, req.params.id, name,
     type ?? 'local-wsl',
     resolvedEnvType,
     project_path,
-    agent_workspace,
+    team_workspace,
     ssh_config ? JSON.stringify(ssh_config) : null,
     env_vars ? JSON.stringify(env_vars) : null
   )
@@ -264,7 +264,7 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
       type: type ?? 'local-wsl',
       env_type: resolvedEnvType,
       project_path,
-      agent_workspace: defaultTeam ?? agent_workspace,
+      team_workspace: defaultTeam ?? team_workspace,
       default_team: defaultTeam,
       team_id: teamId,
     },
@@ -278,8 +278,8 @@ router.put('/:projectId/environments/:envId', authenticateToken, (req, res) => {
   // Verify project exists
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId)
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
-  // Note: agent_workspace is auto-generated and cannot be updated
-  const currentEnv = db.prepare('SELECT agent_workspace FROM environments WHERE id=? AND project_id=?').get(req.params.envId, req.params.projectId) as any
+  // Note: team_workspace is auto-generated and cannot be updated
+  const currentEnv = db.prepare('SELECT team_workspace FROM environments WHERE id=? AND project_id=?').get(req.params.envId, req.params.projectId) as any
   if (!currentEnv) {
     return res.status(404).json({ data: null, error: 'Environment not found' })
   }
@@ -338,10 +338,10 @@ router.put('/:projectId/environments/:envId/default-team', authenticateToken, (r
   // Set as default team
   db.prepare('UPDATE environments SET default_team = ? WHERE id = ?').run(workspace_path, envId)
 
-  // Also update agent_workspace for backwards compatibility when role is coder
+  // Also update team_workspace for backwards compatibility when role is coder
   const roleRow = db.prepare('SELECT role FROM team_roles WHERE workspace_path = ?').get(workspace_path) as any
   if (roleRow?.role === 'coder') {
-    db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(workspace_path, envId)
+    db.prepare('UPDATE environments SET team_workspace = ? WHERE id = ?').run(workspace_path, envId)
   }
 
   return res.json({ data: { default_team: workspace_path }, error: null })
@@ -433,7 +433,7 @@ router.post('/:projectId/repair-teams', authenticateToken, (req, res) => {
         // Insert environment record
         const envId = uuid()
         db.prepare(`
-          INSERT INTO environments (id, project_id, name, type, env_type, project_path, agent_workspace, ssh_config, env_vars)
+          INSERT INTO environments (id, project_id, name, type, env_type, project_path, team_workspace, ssh_config, env_vars)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           envId, projectId, envType, 'local-wsl', envType,
@@ -651,7 +651,7 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
 
     // Fetch environments
     const environments = db.prepare(`
-      SELECT id, name, type, project_path, agent_workspace
+      SELECT id, name, type, project_path, team_workspace
       FROM environments
       WHERE project_id = ?
       ORDER BY created_at ASC
@@ -990,7 +990,7 @@ router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
 
     // Paths
     const workspacePath = env
-      ? path.join(env.agent_workspace, 'agents', agentSlug)
+      ? path.join(env.team_workspace, 'agents', agentSlug)
       : path.join(AGENTS_BASE_PATH, projectSlug, 'agents', agentSlug)
 
     // Planner workspace — usa o planner do projeto ou o padrão
@@ -1235,7 +1235,7 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
         if (teamTemplate) {
           // Use the team template CLAUDE.md with variable substitution
           content = renderTeamClaudeMd(teamTemplate, {
-            agentName,
+            teamName: agentName,
             projectName: project.name,
             workspacePath,
           })
@@ -1243,7 +1243,7 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
           // Fallback: simple default CLAUDE.md for unrecognized roles
           content = `# ${agentName} — ${role}
 
-You are an agent for the **${project.name}** project.
+You are a team workspace for the **${project.name}** project.
 
 ## Context
 - Project: ${project.name}
@@ -1296,12 +1296,12 @@ You are an agent for the **${project.name}** project.
       ).run(workspacePath, role)
     }
 
-    // Create Coder agent
+    // Create Coder team
     if (create_coder) {
-      const coderPath = envAgentPath(AGENTS_BASE_PATH, project.name, env.name)
-      createAgentWorkspace(coderPath, 'agent-coder', 'coder', env.project_path)
-      // Update the environment's agent_workspace and default_team now that the user has confirmed creation
-      db.prepare('UPDATE environments SET agent_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
+      const coderPath = envTeamPath(AGENTS_BASE_PATH, project.name, env.name)
+      createAgentWorkspace(coderPath, 'team-coder', 'coder', env.project_path)
+      // Update the environment's team_workspace and default_team now that the user has confirmed creation
+      db.prepare('UPDATE environments SET team_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
       // Also link this workspace to the specific environment in agent_environments table
       db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(coderPath, environment_id)
       // Seed native agents for this team type
@@ -1313,10 +1313,10 @@ You are an agent for the **${project.name}** project.
       created.push({ type: 'coder', workspace_path: coderPath })
     }
 
-    // Create Planner agent
+    // Create Planner team
     if (create_planner) {
-      const plannerPath = envAgentPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
-      createAgentWorkspace(plannerPath, 'agent-planner', 'planner', env.project_path)
+      const plannerPath = envTeamPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
+      createAgentWorkspace(plannerPath, 'team-planner', 'planner', env.project_path)
       // Also link this workspace to the specific environment in agent_environments table
       db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(plannerPath, environment_id)
       // Seed native agents for this team type

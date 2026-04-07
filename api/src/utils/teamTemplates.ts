@@ -26,7 +26,7 @@ export interface TeamTemplate {
   role: string
   subAgents: SubAgentTemplate[]
   permissions: TeamPermissions
-  /** CLAUDE.md content for this team. May contain {AGENT_NAME}, {PROJECT_NAME}, {WORKSPACE_PATH} variables. */
+  /** CLAUDE.md content for this team. May contain {TEAM_NAME}, {PROJECT_NAME}, {WORKSPACE_PATH} variables. */
   claudeMd: string
 }
 
@@ -84,7 +84,7 @@ export const PLAN_TEAM: TeamTemplate = {
     allow: ['Read', 'Glob', 'Grep', 'Bash', 'Skill', 'Write'],
     deny: ['Edit'],
   },
-  claudeMd: `# {AGENT_NAME} — Plan Team
+  claudeMd: `# {TEAM_NAME} — Plan Team
 
 > **Modo: PLANEJAMENTO** — Você pode ler, pesquisar e executar comandos shell. Pode criar arquivos de documentacao e planejamento, mas **NAO pode editar** arquivos existentes.
 
@@ -175,7 +175,7 @@ export const DEV_TEAM: TeamTemplate = {
     allow: ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
     deny: [],
   },
-  claudeMd: `# {AGENT_NAME} — Dev Team
+  claudeMd: `# {TEAM_NAME} — Dev Team
 
 ## Missao
 
@@ -247,7 +247,7 @@ export const STAGING_TEAM: TeamTemplate = {
     allow: ['Read', 'Glob', 'Grep', 'Bash(npm run *)', 'Bash(npx *)', 'Bash(git log*)', 'Bash(git diff*)', 'Bash(git status*)', 'Bash(git merge*)', 'Bash(git commit*)', 'Bash(git checkout*)'],
     deny: ['Edit', 'Write', 'Bash(sudo:*)', 'Bash(git push --force)', 'Bash(rm -rf*)', 'Bash(rm -r /)*'],
   },
-  claudeMd: `# {AGENT_NAME} — Staging Team (Quality Gatekeeper)
+  claudeMd: `# {TEAM_NAME} — Staging Team (Quality Gatekeeper)
 
 > **Nada vai para producao com erro.**
 
@@ -339,16 +339,17 @@ export function getTeamTemplateById(id: string): TeamTemplate | undefined {
  * Render a team template's CLAUDE.md content by substituting variables.
  *
  * Supported variables:
- * - {AGENT_NAME} — the agent/workspace name
+ * - {TEAM_NAME} — the team/workspace name
  * - {PROJECT_NAME} — the project name
- * - {WORKSPACE_PATH} — the absolute path to the agent workspace
+ * - {WORKSPACE_PATH} — the absolute path to the team workspace
  */
 export function renderTeamClaudeMd(
   team: TeamTemplate,
-  vars: { agentName: string; projectName: string; workspacePath: string }
+  vars: { teamName: string; projectName: string; workspacePath: string }
 ): string {
   return team.claudeMd
-    .replace(/\{AGENT_NAME\}/g, vars.agentName)
+    .replace(/\{TEAM_NAME\}/g, vars.teamName)
+    .replace(/\{AGENT_NAME\}/g, vars.teamName) // backward compat
     .replace(/\{PROJECT_NAME\}/g, vars.projectName)
     .replace(/\{WORKSPACE_PATH\}/g, vars.workspacePath)
 }

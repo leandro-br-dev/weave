@@ -142,13 +142,13 @@ export function agentWorkspacePath(
   return path.join(basePath, projectSlug, 'agents', agentSlug)
 }
 
-// Generate environment agent path
-export function envAgentPath(
+// Generate environment team workspace path
+export function envTeamPath(
   basePath: string,
   projectName: string,
   envName: string
 ): string {
-  return path.join(basePath, slugify(projectName), envName, 'agent-coder')
+  return path.join(basePath, slugify(projectName), envName, 'team-coder')
 }
 
 // Slugify string

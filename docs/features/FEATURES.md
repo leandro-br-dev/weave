@@ -111,22 +111,22 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
 For each agent, create a workspace with the appropriate role:
 
 ```bash
-AGENTS_BASE_PATH="/root/projects/weave/projects"
+TEAMS_BASE_PATH="/root/projects/weave/projects"
 PROJECT_NAME="myapp"
 
 # Create agents directory
-mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents"
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents"
 
 # Create planner agent
-mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/planner/.claude"
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/planner/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
 # Create coder agent
-mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/coder/.claude"
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/coder/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
 # Create reviewer agent
-mkdir -p "$AGENTS_BASE_PATH/$PROJECT_NAME/agents/reviewer/.claude"
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/reviewer/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 ```
 
@@ -138,19 +138,19 @@ PROJECT_ID="<from step 1>"
 # Link planner agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/planner\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/planner\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
 # Link coder agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/coder\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/coder\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
 # Link reviewer agent
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$AGENTS_BASE_PATH/$PROJECT_NAME/agents/reviewer\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/reviewer\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 ```
 
@@ -575,7 +575,7 @@ The Planning Context feature provides planner agents with complete project infor
         "name": "Environment Name",
         "type": "local-wsl",
         "project_path": "/path/to/project",
-        "agent_workspace": "/path/to/workspace"
+        "team_workspace": "/path/to/workspace"
       }
     ],
     "agents": [
@@ -642,7 +642,7 @@ async def get_project_planning_context(self, project_id: str) -> dict:
 🌍 ENVIRONMENTS:
   - Develop (local-wsl)
     Path: /root/projects/weave
-    Workspace: /root/projects/weave/projects/weave/agent-coder
+    Workspace: /root/projects/weave/projects/weave/team-coder
 
 🤖 AGENTS:
   - coder-backend (role: coder)
@@ -700,7 +700,7 @@ Authorization: Bearer <your-token>
         "name": "Environment Name",
         "type": "local-wsl",
         "project_path": "/path/to/project",
-        "agent_workspace": "/path/to/workspace"
+        "team_workspace": "/path/to/workspace"
       }
     ],
     "agents": [

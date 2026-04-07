@@ -29,7 +29,7 @@ This starts the API (port 3000), dashboard (port 5173), and agent daemon. Open h
    - **Name**: e.g. `Development`
    - **Type**: `local-wsl`, `local-windows`, or `ssh`
    - **Project Path**: where your project files are (e.g. `/root/projects/my-app`)
-5. The agent workspace is created automatically with CLAUDE.md and settings.local.json
+5. The team workspace is created automatically with CLAUDE.md and settings.local.json
 
 ### Managing Agents
 
@@ -65,7 +65,7 @@ This starts the API (port 3000), dashboard (port 5173), and agent daemon. Open h
       "name": "Task name",
       "prompt": "What the agent should do",
       "cwd": "/root/projects/my-project",
-      "workspace": "/root/projects/weave/projects/my-project/dev/agent-coder",
+      "workspace": "/root/projects/weave/projects/my-project/dev/team-coder",
       "tools": ["Read", "Write", "Edit", "Bash", "Glob"],
       "permission_mode": "acceptEdits",
       "depends_on": []
@@ -170,8 +170,8 @@ weave is a three-component system:
 projects/
 └── <project-slug>/
     └── <env-slug>/
-        └── agent-coder/
-            ├── CLAUDE.md                 ← agent identity
+        └── team-coder/
+            ├── CLAUDE.md                 ← team identity
             └── .claude/
                 ├── settings.local.json   ← env vars + permissions
                 ├── skills/<n>/SKILL.md
@@ -258,7 +258,7 @@ python main.py --daemon
 #### api/.env
 ```
 WEAVE_TOKEN=dev-token-change-in-production
-AGENTS_BASE_PATH=/root/projects/weave/projects
+TEAMS_BASE_PATH=/root/projects/weave/projects
 APPROVAL_TIMEOUT_MINUTES=10
 PLAN_TIMEOUT_MINUTES=120  # 2 hours (must match client's PLAN_TIMEOUT_SECONDS/60)
 PORT=3000
@@ -309,8 +309,8 @@ Schema is auto-created on first API start via `db.exec()` in `src/db/index.ts`.
 Created automatically when an environment is added to a project:
 
 ```
-projects/<project-slug>/<env-slug>/agent-coder/
-├── CLAUDE.md                     # Agent instructions (edit via /agents)
+projects/<project-slug>/<env-slug>/team-coder/
+├── CLAUDE.md                     # Team instructions (edit via /agents)
 └── .claude/
     ├── settings.local.json       # Permissions + env vars
     ├── skills/

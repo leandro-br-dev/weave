@@ -25,7 +25,7 @@ class Task:
 
     # Agent identity
     agent_file: str | None = None  # Path to a .md file — injected as system_prompt (like CLAUDE.md)
-    workspace: str | None = None  # Path to agent-coder dir with settings.local.json (e.g., /root/projects/agent-client-working/projects/weave/agent-coder)
+    workspace: str | None = None  # Path to team workspace dir with settings.local.json (e.g., /root/projects/agent-client-working/projects/weave/team-coder)
     env_context: str | None = None  # Environment context string for prompt injection (e.g., "Dev Environment (local-wsl)\nProject path: /root/project1")
     # Skills and sub-agents: place files in <cwd>/.claude/skills/ and <cwd>/.claude/agents/
     # The SDK picks them up natively — no orchestrator involvement needed.

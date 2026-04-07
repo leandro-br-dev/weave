@@ -5,6 +5,8 @@ export interface AgentTemplate {
   content: string
 }
 
+/** @deprecated Use TeamTemplate from teamTemplates.ts instead */
+
 const DOCS_SECTION = `
 
 ## Documentation Workflow
@@ -203,6 +205,7 @@ export function renderTemplate(
   vars: { agentName: string; projectName: string }
 ): string {
   return template.content
+    .replace(/\{TEAM_NAME\}/g, vars.agentName)
     .replace(/\{AGENT_NAME\}/g, vars.agentName)
     .replace(/\{PROJECT_NAME\}/g, vars.projectName)
 }

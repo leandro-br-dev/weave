@@ -160,8 +160,8 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       }
     }
 
-    // Legacy structure: {project}/agent-coder/
-    const legacyPath = path.join(projectPath, 'agent-coder')
+    // Legacy structure: {project}/team-coder/
+    const legacyPath = path.join(projectPath, 'team-coder')
     if (fs.existsSync(legacyPath)) {
       const ws = readWorkspace(legacyPath)
       if (ws) {
@@ -170,17 +170,27 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       }
     }
 
-    // Environment-based agents: {project}/{env-slug}/agent-coder|agent-planner/
+    // Also check for legacy agent-coder structure
+    const legacyAgentPath = path.join(projectPath, 'agent-coder')
+    if (fs.existsSync(legacyAgentPath) && !fs.existsSync(legacyPath)) {
+      const ws = readWorkspace(legacyAgentPath)
+      if (ws) {
+        ws.relative_path = path.relative(basePath, legacyAgentPath)
+        workspaces.push(ws)
+      }
+    }
+
+    // Environment-based teams: {project}/{env-slug}/team-coder|team-planner/
     const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
       .filter(d => d.isDirectory() && d.name !== 'agents')
 
     for (const envDir of envDirs) {
-      for (const agentType of ['agent-coder', 'agent-planner']) {
-        const agentPath = path.join(projectPath, envDir.name, agentType)
-        if (fs.existsSync(agentPath) && fs.statSync(agentPath).isDirectory()) {
-          const ws = readWorkspace(agentPath)
+      for (const teamType of ['team-coder', 'team-planner', 'agent-coder', 'agent-planner']) {
+        const teamPath = path.join(projectPath, envDir.name, teamType)
+        if (fs.existsSync(teamPath) && fs.statSync(teamPath).isDirectory()) {
+          const ws = readWorkspace(teamPath)
           if (ws) {
-            ws.relative_path = path.relative(basePath, agentPath)
+            ws.relative_path = path.relative(basePath, teamPath)
             workspaces.push(ws)
           }
         }
@@ -401,7 +411,7 @@ router.post('/import', authenticateToken, (req, res) => {
 
       // ---- 2. Environments ---------------------------------------------------
       const insertEnv = db.prepare(`
-        INSERT OR IGNORE INTO environments (id, project_id, name, type, project_path, agent_workspace, ssh_config, env_vars, created_at)
+        INSERT OR IGNORE INTO environments (id, project_id, name, type, project_path, team_workspace, ssh_config, env_vars, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
@@ -416,7 +426,7 @@ router.post('/import', authenticateToken, (req, res) => {
           e.name,
           e.type || 'local-wsl',
           e.project_path || '',
-          e.agent_workspace || '',
+          e.team_workspace || '',
           e.ssh_config || null,
           e.env_vars || null,
           e.created_at || new Date().toISOString(),

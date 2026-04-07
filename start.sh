@@ -36,12 +36,21 @@ else
 fi
 export DATA_DIR
 
-AGENTS_BASE_PATH="$DATA_DIR/projects"
-export AGENTS_BASE_PATH
-mkdir -p "$AGENTS_BASE_PATH"
+TEAMS_BASE_PATH="$DATA_DIR/projects"
+export TEAMS_BASE_PATH
+export AGENTS_BASE_PATH="$TEAMS_BASE_PATH"  # backward compatibility
+mkdir -p "$TEAMS_BASE_PATH"
 mkdir -p "$DATA_DIR/logs"
 echo "  → Data directory:   $DATA_DIR"
-echo "  → Agent workspaces: $AGENTS_BASE_PATH"
+echo "  → Team workspaces:  $TEAMS_BASE_PATH"
+echo ""
+
+# ─── Migrate agent-* → team-* directories ──────────────────────────
+# Renames workspace dirs from old "agent-" prefix to new "team-" prefix
+# Idempotent — safe to run on every startup.
+if [ -f "$ROOT/scripts/migrate-agent-to-team-dirs.sh" ]; then
+  bash "$ROOT/scripts/migrate-agent-to-team-dirs.sh"
+fi
 echo ""
 
 # ─── Check for updates ───────────────────────────────────────────
@@ -320,7 +329,7 @@ fi
 sleep 2
 
 # ─── Start Daemon ────────────────────────────────────────────────
-echo '→ Starting Agent Daemon...'
+echo '→ Starting Team Daemon...'
 
 # Each APP_ENV gets its own PID file — prevents dev from killing prod daemon
 PID_FILE="$DATA_DIR/logs/daemon.pid"

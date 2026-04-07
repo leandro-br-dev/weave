@@ -113,8 +113,8 @@ export function CreatePlanForm() {
       selectedEnvId: envId,
       cwd: env?.project_path ?? t.cwd,
       env_context: env ? `${env.name} (${env.type})\nProject path: ${env.project_path}` : '',
-      // Auto-fill workspace with agent_workspace from environment only if an agent has been created
-      workspace: env?.agent_workspace || t.workspace,
+      // Auto-fill workspace with team_workspace from environment only if a team has been created
+      workspace: env?.team_workspace || env?.agent_workspace || t.workspace,
     }));
   };
 
@@ -441,9 +441,9 @@ export function CreatePlanForm() {
                             updateTask(index, 'workspace', e.target.value)
                             // If no environment selected, pre-fill CWD with parent directory (project root)
                             if (ws && !task.selectedEnvId) {
-                              // Workspace path is /root/projects/weave/projects/{name}/agent-coder
+                              // Workspace path is /root/projects/weave/projects/{name}/team-coder
                               // We want the parent: /root/projects/weave/projects/{name}
-                              const projectRoot = ws.path.split('/agent-coder')[0]
+                              const projectRoot = ws.path.split(/\/team-coder|\/agent-coder/)[0]
                               updateTask(index, 'cwd', projectRoot)
                             }
                           }}

@@ -567,4 +567,16 @@ export const migrations: Migration[] = [
       `ALTER TABLE chat_sessions ADD COLUMN last_read_at TEXT`,
     ],
   },
+  {
+    version: 40,
+    description: 'Rename agent_workspace → team_workspace in environments table to disambiguate teams from agents',
+    up: [
+      // Add the new column alongside the old one
+      `ALTER TABLE environments ADD COLUMN team_workspace TEXT`,
+      // Migrate data
+      `UPDATE environments SET team_workspace = agent_workspace WHERE agent_workspace IS NOT NULL`,
+      // Drop old column (SQLite ≥ 3.35.0)
+      `ALTER TABLE environments DROP COLUMN agent_workspace`,
+    ],
+  },
 ];

@@ -59,11 +59,11 @@ describe('CreatePlanForm', () => {
   ];
 
   const mockProjects = [
-    { id: 'proj1', name: 'Project 1', environments: [{ id: 'env1', project_id: 'proj1', name: 'Dev Environment', type: 'local-wsl', project_path: '/root/project1', agent_workspace: '/root/workspace1', created_at: '2024-01-01', project_name: 'Project 1' }] },
+    { id: 'proj1', name: 'Project 1', environments: [{ id: 'env1', project_id: 'proj1', name: 'Dev Environment', type: 'local-wsl', project_path: '/root/project1', team_workspace: '/root/workspace1', created_at: '2024-01-01', project_name: 'Project 1' }] },
   ];
 
   const mockEnvironments = [
-    { id: 'env1', project_id: 'proj1', name: 'Dev Environment', type: 'local-wsl', project_path: '/root/project1', agent_workspace: '/root/workspace1', created_at: '2024-01-01', project_name: 'Project 1' },
+    { id: 'env1', project_id: 'proj1', name: 'Dev Environment', type: 'local-wsl', project_path: '/root/project1', team_workspace: '/root/workspace1', created_at: '2024-01-01', project_name: 'Project 1' },
   ];
 
   beforeEach(() => {
@@ -231,7 +231,7 @@ describe('CreatePlanForm', () => {
     const cwdInput = screen.getByPlaceholderText('Derived from environment or agent workspace') as HTMLInputElement;
 
     await waitFor(() => {
-      // Should use project_path from environment, not agent_workspace
+      // Should use project_path from environment, not team_workspace
       expect(cwdInput.value).toBe('/root/project1');
     });
   });

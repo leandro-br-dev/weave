@@ -366,7 +366,7 @@ export default function ProjectsPage() {
     const missingEnvs = ['plan', 'dev', 'staging'].filter(t => !envTypes.has(t))
     if (missingEnvs.length > 0) return true
     // Also check if any existing env has no default team
-    return project.environments.some(e => !e.agent_workspace && !e.default_team)
+    return project.environments.some(e => !e.team_workspace && !e.agent_workspace && !e.default_team)
   }
 
   return (
@@ -854,7 +854,7 @@ export default function ProjectsPage() {
                                         </details>
                                       )}
                                     </div>
-                                    {!env.agent_workspace && !env.default_team && (
+                                    {!env.team_workspace && !env.agent_workspace && !env.default_team && (
                                       <div className={`mt-1 text-xs ${withDarkMode(warningColors.text, darkModeWarningColors.text)}`}>
                                         ⚠ No default team linked
                                       </div>

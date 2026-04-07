@@ -102,10 +102,10 @@ export function bootstrapTeamForEnvironment(
   }
 
   const role = teamTemplate.role
-  const agentName = `agent-${role === 'planner' ? 'planner' : role === 'reviewer' ? 'reviewer' : 'coder'}`
+  const teamName = `team-${role === 'planner' ? 'planner' : role === 'reviewer' ? 'reviewer' : 'coder'}`
   const envSlug = slugify(envName)
   const projectSlug = slugify(projectName)
-  const workspacePath = path.resolve(path.join(AGENTS_BASE_PATH, projectSlug, envSlug, agentName))
+  const workspacePath = path.resolve(path.join(AGENTS_BASE_PATH, projectSlug, envSlug, teamName))
 
   // If the workspace directory already exists, just link it (idempotent).
   const alreadyExists = fs.existsSync(workspacePath)
@@ -127,7 +127,7 @@ export function bootstrapTeamForEnvironment(
     // CLAUDE.md
     const claudeMdPath = path.join(workspacePath, 'CLAUDE.md')
     const claudeMdContent = renderTeamClaudeMd(teamTemplate, {
-      agentName,
+      teamName,
       projectName,
       workspacePath,
     })
@@ -187,10 +187,10 @@ export function bootstrapTeamForEnvironment(
       'UPDATE environments SET default_team = ? WHERE id = ?',
     ).run(workspacePath, envId)
 
-    // 5. If role is 'coder', also update agent_workspace so existing flows still work
+    // 5. If role is 'coder', also update team_workspace so existing flows still work
     if (role === 'coder') {
       db.prepare(
-        'UPDATE environments SET agent_workspace = ? WHERE id = ?',
+        'UPDATE environments SET team_workspace = ? WHERE id = ?',
       ).run(workspacePath, envId)
     }
   })

@@ -6,6 +6,7 @@ import { db } from '../db/index.js'
 import { agentWorkspacePath, envAgentPath, slugify, AGENTS_BASE_PATH } from '../utils/paths.js'
 import { updateAgentSettings, rebuildAgentSettings } from '../utils/agentSettings.js'
 import { AGENT_TEMPLATES, renderTemplate } from '../utils/claudeMdTemplates.js'
+/** @deprecated AGENT_TEMPLATES is deprecated — use TEAM_TEMPLATES from teamTemplates.ts */
 import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { getDefaultEnvironmentVariables, mergeEnvironmentVariables } from '../utils/environmentVariables.js'
@@ -19,7 +20,7 @@ const __dirname = path.dirname(__filename)
 const router = Router()
 
 function getWorkspacePath(project: string): string {
-  return path.resolve(path.join(AGENTS_BASE_PATH, project, 'agent-coder'))
+  return path.resolve(path.join(AGENTS_BASE_PATH, project, 'team-coder'))
 }
 
 interface WorkspaceInfo {
@@ -105,7 +106,7 @@ function listAllWorkspaces(): WorkspaceInfo[] {
       }
     }
 
-    // Environment agents: {project}/{env}/agent-coder/ and {project}/{env}/agent-planner/
+    // Environment teams: {project}/{env}/team-coder/ and {project}/{env}/team-planner/
     try {
       const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
         .filter(d => d.isDirectory() && d.name !== 'agents')
@@ -113,41 +114,41 @@ function listAllWorkspaces(): WorkspaceInfo[] {
       for (const envDir of envDirs) {
         const envDirPath = path.join(projectPath, envDir.name)
         try {
-          // Scan for all agent subdirectories (agent-coder, agent-planner, etc.)
-          const agentSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
-            .filter(d => d.isDirectory() && d.name.startsWith('agent-'))
+          // Scan for all team subdirectories (team-coder, team-planner, etc.)
+          const teamSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+            .filter(d => d.isDirectory() && (d.name.startsWith('team-') || d.name.startsWith('agent-')))
 
-          for (const agentSubDir of agentSubDirs) {
-            const agentPath = path.resolve(path.join(envDirPath, agentSubDir.name))
-            const settingsPath = path.join(agentPath, '.claude', 'settings.local.json')
-            const claudeMdPath = path.join(agentPath, 'CLAUDE.md')
+          for (const teamSubDir of teamSubDirs) {
+            const teamPath = path.resolve(path.join(envDirPath, teamSubDir.name))
+            const settingsPath = path.join(teamPath, '.claude', 'settings.local.json')
+            const claudeMdPath = path.join(teamPath, 'CLAUDE.md')
             const settings = readJsonSafe(settingsPath)
 
             // Fetch project_id from project_agents table
             const projectLink = db.prepare(
               'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
-            ).get(agentPath) as any
+            ).get(teamPath) as any
 
             // Fetch role from team_roles table
             const roleRow = db.prepare(
               'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
-            ).get(agentPath) as any
+            ).get(teamPath) as any
 
             // Fetch linked environment_id from agent_environments table
             const envLink = db.prepare(
               'SELECT environment_id FROM agent_environments WHERE workspace_path = ? LIMIT 1'
-            ).get(agentPath) as any
+            ).get(teamPath) as any
 
             // Derive role from directory name as fallback
-            const dirRole = agentSubDir.name.replace('agent-', '') // 'coder' or 'planner'
+            const dirRole = teamSubDir.name.replace(/^team-|^agent-/, '') // 'coder' or 'planner'
 
             // Read model from settings.local.json (ANTHROPIC_MODEL env var)
             const model = settings?.env?.ANTHROPIC_MODEL || ''
 
             results.push({
-              id: Buffer.from(agentPath).toString('base64url'),
+              id: Buffer.from(teamPath).toString('base64url'),
               name: `${projectDir.name}/${envDir.name}/${dirRole}`,
-              path: agentPath,
+              path: teamPath,
               exists: true,
               hasSettings: fs.existsSync(settingsPath),
               hasClaude: fs.existsSync(claudeMdPath),
@@ -167,30 +168,30 @@ function listAllWorkspaces(): WorkspaceInfo[] {
       console.error(`[teams] Error scanning project dir ${projectPath}:`, err)
     }
 
-    // Legacy structure: {project}/agent-coder/ (for backward compatibility)
-    const legacyAgentCoderPath = path.resolve(path.join(projectPath, 'agent-coder'))
-    if (fs.existsSync(legacyAgentCoderPath)) {
-      const settingsPath = path.join(legacyAgentCoderPath, '.claude', 'settings.local.json')
-      const claudeMdPath = path.join(legacyAgentCoderPath, 'CLAUDE.md')
+    // Legacy structure: {project}/team-coder/ (for backward compatibility)
+    const legacyTeamCoderPath = path.resolve(path.join(projectPath, 'team-coder'))
+    if (fs.existsSync(legacyTeamCoderPath)) {
+      const settingsPath = path.join(legacyTeamCoderPath, '.claude', 'settings.local.json')
+      const claudeMdPath = path.join(legacyTeamCoderPath, 'CLAUDE.md')
       const settings = readJsonSafe(settingsPath)
 
       // Fetch project_id from project_agents table
       const projectLink = db.prepare(
         'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
-      ).get(legacyAgentCoderPath) as any
+      ).get(legacyTeamCoderPath) as any
 
       // Fetch role from team_roles table
       const roleRow = db.prepare(
         'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
-      ).get(legacyAgentCoderPath) as any
+      ).get(legacyTeamCoderPath) as any
 
       // Read model from settings.local.json (ANTHROPIC_MODEL env var)
       const model = settings?.env?.ANTHROPIC_MODEL || ''
 
       results.push({
-        id: Buffer.from(legacyAgentCoderPath).toString('base64url'),
+        id: Buffer.from(legacyTeamCoderPath).toString('base64url'),
         name: projectDir.name,
-        path: legacyAgentCoderPath,
+        path: legacyTeamCoderPath,
         exists: true,
         hasSettings: fs.existsSync(settingsPath),
         hasClaude: fs.existsSync(claudeMdPath),
@@ -405,12 +406,12 @@ router.get('/:id', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
+  const teamPath = workspace.path
 
-  const settingsPath = path.join(coderPath, '.claude', 'settings.local.json')
-  const claudeMdPath = path.join(coderPath, 'CLAUDE.md')
-  const skillsPath = path.join(coderPath, '.claude', 'skills')
-  const agentsPath = path.join(coderPath, '.claude', 'agents')
+  const settingsPath = path.join(teamPath, '.claude', 'settings.local.json')
+  const claudeMdPath = path.join(teamPath, 'CLAUDE.md')
+  const skillsPath = path.join(teamPath, '.claude', 'skills')
+  const agentsPath = path.join(teamPath, '.claude', 'agents')
 
   const skills = fs.existsSync(skillsPath)
     ? fs.readdirSync(skillsPath, { withFileTypes: true })
@@ -440,12 +441,12 @@ router.get('/:id', authenticateToken, (req, res) => {
     FROM agent_environments ae
     JOIN environments e ON e.id = ae.environment_id
     WHERE ae.workspace_path = ?
-  `).all(coderPath) as any[]
+  `).all(teamPath) as any[]
 
   // Fetch role from team_roles table
   const roleRow = db.prepare(
     'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
-  ).get(coderPath) as any
+  ).get(teamPath) as any
 
   // Read model from settings.local.json
   const settings = readJsonSafe(settingsPath)
@@ -455,8 +456,8 @@ router.get('/:id', authenticateToken, (req, res) => {
     data: {
       id: id,
       name: workspace.name,
-      path: coderPath,
-      exists: fs.existsSync(coderPath),
+      path: teamPath,
+      exists: fs.existsSync(teamPath),
       claudeMd: readFileSafe(claudeMdPath),
       settings: settings,
       skills,
@@ -502,18 +503,18 @@ router.post('/', authenticateToken, (req, res) => {
   }
 
   // Gerar o path usando a nova estrutura
-  const coderPath = agentWorkspacePath(AGENTS_BASE_PATH, project.name, name)
+  const teamPath = agentWorkspacePath(AGENTS_BASE_PATH, project.name, name)
 
-  if (fs.existsSync(coderPath)) {
+  if (fs.existsSync(teamPath)) {
     return res.status(409).json({ data: null, error: 'Workspace already exists' })
   }
 
-  const claudeDir = path.join(coderPath, '.claude')
+  const claudeDir = path.join(teamPath, '.claude')
   fs.mkdirSync(path.join(claudeDir, 'skills'), { recursive: true })
   fs.mkdirSync(path.join(claudeDir, 'agents'), { recursive: true })
 
   // Create .gitignore in the workspace to exclude agent docs
-  const wsGitignore = path.join(coderPath, '.gitignore')
+  const wsGitignore = path.join(teamPath, '.gitignore')
   if (!fs.existsSync(wsGitignore)) {
     fs.writeFileSync(wsGitignore, '.agent-docs/\n')
   }
@@ -569,9 +570,9 @@ router.post('/', authenticateToken, (req, res) => {
   if (teamTemplate) {
     // Use team template CLAUDE.md (highest priority)
     claudeMdContent = renderTeamClaudeMd(teamTemplate, {
-      agentName: name,
+      teamName: name,
       projectName: project?.name ?? 'Unknown Project',
-      workspacePath: coderPath,
+      workspacePath: teamPath,
     })
   } else if (template_id) {
     const template = AGENT_TEMPLATES.find(t => t.id === template_id)
@@ -581,7 +582,7 @@ router.post('/', authenticateToken, (req, res) => {
         projectName: project?.name ?? 'Unknown Project',
       })
     } else {
-      claudeMdContent = `# ${name}\n\nAgent for project: ${project?.name ?? ''}\n`
+      claudeMdContent = `# ${name}\n\nTeam workspace for project: ${project?.name ?? ''}\n`
     }
   } else {
     // Template genérico se nenhum selecionado
@@ -592,18 +593,18 @@ router.post('/', authenticateToken, (req, res) => {
     })
   }
 
-  fs.writeFileSync(path.join(coderPath, 'CLAUDE.md'), claudeMdContent)
+  fs.writeFileSync(path.join(teamPath, 'CLAUDE.md'), claudeMdContent)
 
   // Criar vínculo com o projeto
   db.prepare(
     'INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
-  ).run(project_id, coderPath)
+  ).run(project_id, teamPath)
 
   // Save role if provided
   if (role && role !== 'generic') {
     db.prepare(
       'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
-    ).run(coderPath, role)
+    ).run(teamPath, role)
   }
 
   // Seed native agents when a team template is used
@@ -617,7 +618,7 @@ router.post('/', authenticateToken, (req, res) => {
       }
       const teamType = teamTypeMap[team_id]
       if (teamType) {
-        seedNativeAgentsForTeam(coderPath, teamType)
+        seedNativeAgentsForTeam(teamPath, teamType)
       }
     } catch (err) {
       console.error('[workspaces] Failed to seed native agents:', err)
@@ -626,8 +627,8 @@ router.post('/', authenticateToken, (req, res) => {
 
   return res.status(201).json({
     data: {
-      id: Buffer.from(coderPath).toString('base64url'),
-      path: coderPath,
+      id: Buffer.from(teamPath).toString('base64url'),
+      path: teamPath,
       name: name,
       project_id: project_id,
       role: role
@@ -645,18 +646,18 @@ router.put('/:id/claude-md', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
+  const teamPath = workspace.path
 
-  // Create agent-coder directory if it doesn't exist
-  if (!fs.existsSync(coderPath)) {
-    fs.mkdirSync(coderPath, { recursive: true })
+  // Create team workspace directory if it doesn't exist
+  if (!fs.existsSync(teamPath)) {
+    fs.mkdirSync(teamPath, { recursive: true })
   }
 
   const { content } = req.body
   if (typeof content !== 'string') {
     return res.status(400).json({ data: null, error: 'content must be a string' })
   }
-  fs.writeFileSync(path.join(coderPath, 'CLAUDE.md'), content)
+  fs.writeFileSync(path.join(teamPath, 'CLAUDE.md'), content)
   return res.json({ data: { saved: true }, error: null })
 })
 
@@ -669,18 +670,18 @@ router.put('/:id/settings', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
+  const teamPath = workspace.path
 
-  // Create agent-coder directory if it doesn't exist
-  if (!fs.existsSync(coderPath)) {
-    fs.mkdirSync(coderPath, { recursive: true })
+  // Create team workspace directory if it doesn't exist
+  if (!fs.existsSync(teamPath)) {
+    fs.mkdirSync(teamPath, { recursive: true })
   }
 
   const { settings } = req.body
   if (!settings || typeof settings !== 'object') {
     return res.status(400).json({ data: null, error: 'settings must be an object' })
   }
-  const claudeDir = path.join(coderPath, '.claude')
+  const claudeDir = path.join(teamPath, '.claude')
   if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true })
   fs.writeFileSync(
     path.join(claudeDir, 'settings.local.json'),
@@ -727,8 +728,8 @@ router.put('/:id', authenticateToken, (req, res) => {
     }
 
     // Update settings.local.json
-    const coderPath = workspace.path
-    const claudeDir = path.join(coderPath, '.claude')
+    const teamPath = workspace.path
+    const claudeDir = path.join(teamPath, '.claude')
     const settingsPath = path.join(claudeDir, 'settings.local.json')
 
     let settings: any = {}
@@ -834,19 +835,19 @@ router.put('/:id/project', authenticateToken, (req, res) => {
     return res.status(400).json({ data: null, error: 'project_id must be a string' })
   }
 
-  const coderPath = workspace.path
+  const teamPath = workspace.path
 
   // Update project_agents table
   // First remove any existing link
   db.prepare(
     'DELETE FROM project_agents WHERE workspace_path = ?'
-  ).run(coderPath)
+  ).run(teamPath)
 
   // If project_id is not empty string, create new link
   if (project_id !== '') {
     db.prepare(
       'INSERT OR REPLACE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
-    ).run(project_id, coderPath)
+    ).run(project_id, teamPath)
   }
 
   return res.json({ data: { project_id }, error: null })
@@ -872,8 +873,8 @@ router.put('/:id/model', authenticateToken, (req, res) => {
   }
 
   // Update settings.local.json
-  const coderPath = workspace.path
-  const claudeDir = path.join(coderPath, '.claude')
+  const teamPath = workspace.path
+  const claudeDir = path.join(teamPath, '.claude')
   const settingsPath = path.join(claudeDir, 'settings.local.json')
 
   let settings: any = {}
@@ -922,36 +923,36 @@ router.delete('/:id', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
+  const teamPath = workspace.path
 
   // Remove from project_agents table to clean up the link
   db.prepare(
     'DELETE FROM project_agents WHERE workspace_path = ?'
-  ).run(coderPath)
+  ).run(teamPath)
 
   // Also remove from team_roles table if it exists
   try {
     db.prepare(
       'DELETE FROM team_roles WHERE workspace_path = ?'
-    ).run(coderPath)
+    ).run(teamPath)
   } catch {}
 
   // Also remove from team_models table if it exists
   try {
     db.prepare(
       'DELETE FROM team_models WHERE workspace_path = ?'
-    ).run(coderPath)
+    ).run(teamPath)
   } catch {}
 
   // Also remove from agent_environments table if any links exist
   db.prepare(
     'DELETE FROM agent_environments WHERE workspace_path = ?'
-  ).run(coderPath)
+  ).run(teamPath)
 
   // Delete ONLY the specific workspace directory, not the entire project
-  fs.rmSync(coderPath, { recursive: true, force: true })
+  fs.rmSync(teamPath, { recursive: true, force: true })
 
-  return res.json({ data: { deleted: true, workspace_path: coderPath }, error: null })
+  return res.json({ data: { deleted: true, workspace_path: teamPath }, error: null })
 })
 
 // PUT /api/workspaces/:id/rename — renomear workspace (equipe)
@@ -1027,13 +1028,13 @@ router.post('/:id/skills', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
-  // Create agent-coder directory if it doesn't exist
-  if (!fs.existsSync(coderPath)) {
-    fs.mkdirSync(coderPath, { recursive: true })
+  const teamPath = workspace.path
+  // Create team workspace directory if it doesn't exist
+  if (!fs.existsSync(teamPath)) {
+    fs.mkdirSync(teamPath, { recursive: true })
   }
 
-  const skillDir = path.join(coderPath, '.claude', 'skills', name)
+  const skillDir = path.join(teamPath, '.claude', 'skills', name)
   fs.mkdirSync(skillDir, { recursive: true })
   fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content)
   return res.status(201).json({ data: { name, installed: true }, error: null })
@@ -1085,17 +1086,17 @@ router.put('/:id/agents/:agent', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const coderPath = workspace.path
-  // Create agent-coder directory if it doesn't exist
-  if (!fs.existsSync(coderPath)) {
-    fs.mkdirSync(coderPath, { recursive: true })
+  const teamPath = workspace.path
+  // Create team workspace directory if it doesn't exist
+  if (!fs.existsSync(teamPath)) {
+    fs.mkdirSync(teamPath, { recursive: true })
   }
 
   const { content } = req.body
   if (typeof content !== 'string') {
     return res.status(400).json({ data: null, error: 'content must be a string' })
   }
-  const agentsDir = path.join(coderPath, '.claude', 'agents')
+  const agentsDir = path.join(teamPath, '.claude', 'agents')
   if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true })
 
   // If an existing file matches this agent name (by frontmatter), update it in place;
@@ -1187,10 +1188,10 @@ router.post('/:id/environments', authenticateToken, (req, res) => {
   // If set_as_default is true, also set this workspace as the environment's default team
   if (set_as_default) {
     db.prepare('UPDATE environments SET default_team = ? WHERE id = ?').run(ws.path, environment_id)
-    // Also update agent_workspace for backwards compatibility if role is coder
+    // Also update team_workspace for backwards compatibility if role is coder
     const roleRow = db.prepare('SELECT role FROM team_roles WHERE workspace_path = ?').get(ws.path) as any
     if (roleRow?.role === 'coder') {
-      db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ?').run(ws.path, environment_id)
+      db.prepare('UPDATE environments SET team_workspace = ? WHERE id = ?').run(ws.path, environment_id)
     }
   }
 
@@ -1214,8 +1215,8 @@ router.delete('/:id/environments', authenticateToken, (req, res) => {
   const env = db.prepare('SELECT default_team FROM environments WHERE id = ?').get(environment_id) as any
   if (env && env.default_team === ws.path) {
     db.prepare('UPDATE environments SET default_team = NULL WHERE id = ?').run(environment_id)
-    // Also clear agent_workspace if it matches
-    db.prepare('UPDATE environments SET agent_workspace = ? WHERE id = ? AND agent_workspace = ?').run('', environment_id, ws.path)
+    // Also clear team_workspace if it matches
+    db.prepare('UPDATE environments SET team_workspace = ? WHERE id = ? AND team_workspace = ?').run('', environment_id, ws.path)
   }
 
   db.prepare(
@@ -1576,11 +1577,20 @@ Guidelines for improvement:
 
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
+    // Resolve the actual project source directory (not the API server cwd)
+    const projectEnvRow = db.prepare(`
+      SELECT e.project_path FROM agent_environments ae
+      JOIN environments e ON e.id = ae.environment_id
+      WHERE ae.workspace_path = ?
+      LIMIT 1
+    `).get(workspace.path) as any
+    const projectCwd = projectEnvRow?.project_path || process.cwd()
+
     const tasks = [{
       id: taskId,
       name: 'Improve CLAUDE.md with AI',
       prompt,
-      cwd: process.cwd(),
+      cwd: projectCwd,
       workspace: plannerWorkspace,
       tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',
@@ -1724,11 +1734,20 @@ Guidelines for improvement:
 
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
+    // Resolve the actual project source directory (not the API server cwd)
+    const agentProjectEnvRow = db.prepare(`
+      SELECT e.project_path FROM agent_environments ae
+      JOIN environments e ON e.id = ae.environment_id
+      WHERE ae.workspace_path = ?
+      LIMIT 1
+    `).get(workspace.path) as any
+    const agentProjectCwd = agentProjectEnvRow?.project_path || process.cwd()
+
     const tasks = [{
       id: taskId,
       name: `Improve agent "${agentName}" with AI`,
       prompt,
-      cwd: process.cwd(),
+      cwd: agentProjectCwd,
       workspace: plannerWorkspace,
       tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',

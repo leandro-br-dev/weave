@@ -510,9 +510,9 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     so env vars declared in settings.local.json arrive too late to affect auth.
     We apply them here, before the SDK is even instantiated.
 
-    workspace (agent-coder dir) has precedence over cwd (agent working dir):
+    workspace (team workspace dir) has precedence over cwd (agent working dir):
     - workspace = where CLAUDE.md and .claude/settings.local.json live
-                 (e.g., /root/projects/agent-client-working/projects/weave/agent-coder)
+                 (e.g., /root/projects/agent-client-working/projects/weave/team-coder)
     - cwd = where the agent works (e.g., /tmp, /root/projects/test_web)
 
     Shell environment always wins: we only set a var if it is not already set.
