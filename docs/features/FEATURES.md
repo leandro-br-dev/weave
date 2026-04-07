@@ -370,7 +370,7 @@ if agent_context:
 
 #### 5. Planner Documentation
 
-**File**: `projects/weave/agents/planner/.claude/skills/planning/SKILL.md` (lines 48-108)
+**File**: `native-skills/planning/SKILL.md`
 
 Comprehensive documentation covering:
 - How to use the "Available Agents" context
@@ -378,6 +378,8 @@ Comprehensive documentation covering:
 - Best practices for agent assignment
 - Examples of properly formatted tasks
 - Dependency sequencing guidance
+
+> **Note**: The planning skill is loaded directly from `native-skills/planning/SKILL.md` by the kanban pipeline and injected into the planning prompt. It is NOT installed into planner workspaces as a `.claude/skills/` dependency. It is also excluded from the `/api/native-skills` listing and install endpoints to prevent users from manually installing it as a false dependency.
 
 ### Example Usage
 

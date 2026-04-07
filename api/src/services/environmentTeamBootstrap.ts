@@ -116,7 +116,7 @@ export function bootstrapTeamForEnvironment(
     // the partial directory tree if needed.
 
     const claudeDir = path.join(workspacePath, '.claude')
-    fs.mkdirSync(path.join(claudeDir, 'skills'), { recursive: true })
+    fs.mkdirSync(claudeDir, { recursive: true })
 
     // .gitignore
     const gitignorePath = path.join(workspacePath, '.gitignore')
@@ -163,22 +163,7 @@ export function bootstrapTeamForEnvironment(
       }
       fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
     }
-
-    // Install planning skill for planner agents
-    if (role === 'planner') {
-      const nativeSkillsPath = path.join(
-        path.dirname(path.dirname(path.dirname(new URL(import.meta.url).pathname))),
-        'native-skills',
-      )
-      const planningSkillSrc = path.join(nativeSkillsPath, 'planning', 'SKILL.md')
-      const planningSkillDest = path.join(claudeDir, 'skills', 'planning')
-
-      if (fs.existsSync(planningSkillSrc)) {
-        fs.mkdirSync(planningSkillDest, { recursive: true })
-        fs.copyFileSync(planningSkillSrc, path.join(planningSkillDest, 'SKILL.md'))
-      }
-    }
-  }
+}
 
   // --- Database operations (wrapped in a transaction) ---
   const insertEnvTeam = db.transaction(() => {

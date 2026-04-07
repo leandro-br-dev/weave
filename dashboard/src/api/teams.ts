@@ -15,6 +15,7 @@ export type Team = {
   project_id: string | null
   role: TeamRole
   model?: string
+  environment_id?: string | null
 }
 
 export type TeamDetail = {

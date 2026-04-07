@@ -34,6 +34,7 @@ interface WorkspaceInfo {
   project_id: string | null
   role: string
   model: string
+  environment_id: string | null
 }
 
 function readJsonSafe(filePath: string): any {
@@ -95,7 +96,8 @@ function listAllWorkspaces(): WorkspaceInfo[] {
             type: 'agent',
             project_id: projectLink?.project_id ?? null,
             role: roleRow?.role ?? 'coder',
-            model: model
+            model: model,
+            environment_id: null,
           })
         }
       } catch (err) {
@@ -131,6 +133,11 @@ function listAllWorkspaces(): WorkspaceInfo[] {
               'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
             ).get(agentPath) as any
 
+            // Fetch linked environment_id from agent_environments table
+            const envLink = db.prepare(
+              'SELECT environment_id FROM agent_environments WHERE workspace_path = ? LIMIT 1'
+            ).get(agentPath) as any
+
             // Derive role from directory name as fallback
             const dirRole = agentSubDir.name.replace('agent-', '') // 'coder' or 'planner'
 
@@ -148,7 +155,8 @@ function listAllWorkspaces(): WorkspaceInfo[] {
               type: 'env-agent',
               project_id: projectLink?.project_id ?? null,
               role: roleRow?.role ?? dirRole,
-              model: model
+              model: model,
+              environment_id: envLink?.environment_id ?? null,
             })
           }
         } catch (err) {
@@ -190,7 +198,8 @@ function listAllWorkspaces(): WorkspaceInfo[] {
         type: 'legacy',
         project_id: projectLink?.project_id ?? null,
         role: roleRow?.role ?? 'coder',
-        model: model
+        model: model,
+        environment_id: null,
       })
     }
   }
@@ -1229,6 +1238,16 @@ router.delete('/:id/environments', authenticateToken, (req, res) => {
 router.post('/:id/native-skills/:skillId', authenticateToken, (req, res) => {
   const id = getIdParam(req.params)
   const skillId = Array.isArray(req.params.skillId) ? req.params.skillId[0] : req.params.skillId
+
+  // Pipeline-only skills are injected by the orchestrator, not manually installed.
+  const PIPELINE_ONLY = new Set(['planning', 'workflow_handoff'])
+  if (PIPELINE_ONLY.has(skillId)) {
+    return res.status(400).json({
+      data: null,
+      error: `"${skillId}" is a pipeline-injected skill and cannot be manually installed. It is automatically loaded by the orchestrator when needed.`
+    })
+  }
+
   const ws = listAllWorkspaces().find(w => w.id === id)
   if (!ws) return res.status(404).json({ data: null, error: 'Not found' })
 

@@ -9,13 +9,17 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const NATIVE_SKILLS_PATH = path.join(__dirname, '../../../native-skills')
 
+// Skills injected directly by the pipeline/runner — NOT user-installable.
+// Exposing them in the UI causes false dependencies.
+const PIPELINE_ONLY_SKILLS = new Set(['planning', 'workflow_handoff'])
+
 // GET /api/native-skills — listar skills nativas disponíveis
 router.get('/', authenticateToken, (_req, res) => {
   if (!fs.existsSync(NATIVE_SKILLS_PATH)) {
     return res.json({ data: [], error: null })
   }
   const skills = fs.readdirSync(NATIVE_SKILLS_PATH, { withFileTypes: true })
-    .filter(d => d.isDirectory())
+    .filter(d => d.isDirectory() && !PIPELINE_ONLY_SKILLS.has(d.name))
     .map(d => {
       const skillMd = path.join(NATIVE_SKILLS_PATH, d.name, 'SKILL.md')
       const content = fs.existsSync(skillMd) ? fs.readFileSync(skillMd, 'utf-8') : ''

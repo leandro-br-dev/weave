@@ -137,7 +137,7 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
     Build the workflow handoff section for multi-agent communication.
 
     Loads the SKILL.md from native-skills/workflow_handoff/ and substitutes
-    the {WORKFLOW_DIR} placeholder with the actual workflow directory path.
+    the [WORKFLOW_DIR] placeholder with the actual workflow directory path.
 
     Args:
         workflow_path: Absolute path to the workflow directory
@@ -161,7 +161,7 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
         return None
 
     # Substitute the placeholder with the actual path
-    content = content.replace('{WORKFLOW_DIR}', workflow_path)
+    content = content.replace('[WORKFLOW_DIR]', workflow_path)
 
     logger.info(f"[Handoff] Skill loaded, placeholder replaced with: {workflow_path}")
 

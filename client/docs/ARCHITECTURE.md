@@ -280,7 +280,7 @@ Mark task as 'planning'
 Find planner workspace
     │
     ▼
-Build planning prompt with context
+Build planning prompt with context (skill loaded from native-skills)
     │
     ▼
 Pre-create workflow directory (Blackboard)

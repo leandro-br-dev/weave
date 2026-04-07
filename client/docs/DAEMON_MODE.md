@@ -201,15 +201,17 @@ idle → planning → awaiting_approval → running → completed
 
 `build_planning_prompt(task, planning_context, skill_content, workflow_context, workflow_dir)`
 - Builds comprehensive prompt for planning agent
+- `skill_content` is loaded from `native-skills/planning/SKILL.md` (not from workspace)
 - Includes project context, environments, and agents
 - Provides clear instructions on cwd vs workspace usage
-- Injects Blackboard path for plan.json output
+- SKILL.md contains Blackboard instructions with `[WORKFLOW_DIR]` placeholder substituted at load time
 
 `process_kanban_task(task, client)`
 - Main processing logic for a single kanban task
 - Marks task as 'planning'
 - Pre-creates workflow directory via API (Blackboard pattern)
 - Finds project's planner agent workspace
+- Loads planning skill directly from `native-skills/planning/SKILL.md`
 - Builds prompt with task details, agents context, and workflow dir
 - Executes planning agent via Claude Agent SDK
 - Agent saves plan.json directly to workflow directory

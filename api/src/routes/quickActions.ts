@@ -128,19 +128,38 @@ router.post('/', authenticateToken, (req, res) => {
     }
   }
 
+  const planId = uuidv4()
+  const taskId = uuidv4()
+
+  // Resolve project name for workflow directory
+  let projectName = 'unknown'
+  if (project_id) {
+    const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(project_id) as any
+    if (project) projectName = project.name
+  }
+
+  // Create per-workflow directory with standard files (Blackboard)
+  let workflowPath: string | null = null
+  try {
+    workflowPath = ensureWorkflowDir(projectName, planId)
+  } catch (dirError) {
+    console.error(`[quick-actions] Failed to create workflow directory for plan ${planId}:`, dirError)
+  }
+
   // Montar prompt com skill nativa se selecionada
   let prompt = message
   if (native_skill) {
     const nativeSkillsPath = path.join(__dirname, '../../../native-skills')
     const skillPath = path.join(nativeSkillsPath, native_skill, 'SKILL.md')
     if (fs.existsSync(skillPath)) {
-      const skillContent = fs.readFileSync(skillPath, 'utf-8')
+      let skillContent = fs.readFileSync(skillPath, 'utf-8')
+      // Substitute [WORKFLOW_DIR] placeholder with the actual workflow directory
+      if (workflowPath) {
+        skillContent = skillContent.replace(/\[WORKFLOW_DIR\]/g, workflowPath)
+      }
       prompt = `${skillContent}\n\n---\n\nUser request:\n${message}`
     }
   }
-
-  const planId = uuidv4()
-  const taskId = uuidv4()
 
   const task = {
     id: taskId,
@@ -156,21 +175,6 @@ router.post('/', authenticateToken, (req, res) => {
 
   // Build attachments JSON if attachment_ids were provided
   const attachmentsJson = JSON.stringify(attachment_ids ?? [])
-
-  // Resolve project name for workflow directory
-  let projectName = 'unknown'
-  if (project_id) {
-    const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(project_id) as any
-    if (project) projectName = project.name
-  }
-
-  // Create per-workflow directory with standard files
-  let workflowPath: string | null = null
-  try {
-    workflowPath = ensureWorkflowDir(projectName, planId)
-  } catch (dirError) {
-    console.error(`[quick-actions] Failed to create workflow directory for plan ${planId}:`, dirError)
-  }
 
   db.prepare(`
     INSERT INTO plans (id, name, tasks, status, project_id, type, attachments, workflow_path)

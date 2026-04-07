@@ -9,7 +9,7 @@ Voce esta operando em uma arquitetura de multiplos agentes. Voce nao sabe o que 
 SEMPRE INICIE sua tarefa lendo o arquivo `state.md` localizado em:
 
 ```
-{WORKFLOW_DIR}/state.md
+[WORKFLOW_DIR]/state.md
 ```
 
 La esta o contexto deixado pelo agente anterior. Se o arquivo estiver vazio, voce e o primeiro agente neste workflow — anote isso.
@@ -19,7 +19,7 @@ La esta o contexto deixado pelo agente anterior. Se o arquivo estiver vazio, voc
 Se a sua tarefa envolver codigo, leia tambem o arquivo `plan.json` para entender as dependencias:
 
 ```
-{WORKFLOW_DIR}/plan.json
+[WORKFLOW_DIR]/plan.json
 ```
 
 ### 3. ATUALIZE o state.md antes de encerrar
@@ -53,7 +53,7 @@ Se algo quebrou gravemente (ex: erro de compilacao TS, testes falhando, build qu
 2. Atualize o `state.md` pedindo correcao
 
 ```
-{WORKFLOW_DIR}/errors.log
+[WORKFLOW_DIR]/errors.log
 ```
 
 ### 5. Nunca pule esta rotina

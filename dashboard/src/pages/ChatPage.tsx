@@ -571,7 +571,15 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
           placeholder={t('pages.chat.selectProject')}
         />
 
-        <Select label={t('pages.chat.agent')} value={workspaceId} onChange={e => setWorkspaceId(e.target.value)} required>
+        <Select label={t('pages.chat.agent')} value={workspaceId} onChange={e => {
+          const newWorkspaceId = e.target.value
+          setWorkspaceId(newWorkspaceId)
+          // Auto-select the linked environment when an env-agent is picked
+          const ws = allWorkspaces.find(w => w.id === newWorkspaceId)
+          if (ws?.environment_id) {
+            setEnvironmentId(ws.environment_id)
+          }
+        }} required>
           <option value="" disabled>{t('pages.chat.selectAgent')}</option>
           {filteredWorkspaces.length === 0 && projectId ? (
             <option value="" disabled>{t('pages.chat.noAgentsForProject')}</option>

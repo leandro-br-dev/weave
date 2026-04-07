@@ -1198,7 +1198,6 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
       agentName: string,
       role: string,
       projectPath: string,
-      installPlanningSkill: boolean = false
     ) => {
       if (fs.existsSync(workspacePath)) {
         // Already exists, just link it
@@ -1286,18 +1285,6 @@ You are an agent for the **${project.name}** project.
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
       }
 
-      // Install planning skill for planner agents
-      if (installPlanningSkill) {
-        const nativeSkillsPath = path.join(__dirname, '../../../native-skills')
-        const planningSkillSrc = path.join(nativeSkillsPath, 'planning', 'SKILL.md')
-        const planningSkillDest = path.join(claudeDir, 'skills', 'planning')
-
-        if (fs.existsSync(planningSkillSrc)) {
-          fs.mkdirSync(planningSkillDest, { recursive: true })
-          fs.copyFileSync(planningSkillSrc, path.join(planningSkillDest, 'SKILL.md'))
-        }
-      }
-
       // Link to project
       db.prepare(
         'INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
@@ -1312,7 +1299,7 @@ You are an agent for the **${project.name}** project.
     // Create Coder agent
     if (create_coder) {
       const coderPath = envAgentPath(AGENTS_BASE_PATH, project.name, env.name)
-      createAgentWorkspace(coderPath, 'agent-coder', 'coder', env.project_path, false)
+      createAgentWorkspace(coderPath, 'agent-coder', 'coder', env.project_path)
       // Update the environment's agent_workspace and default_team now that the user has confirmed creation
       db.prepare('UPDATE environments SET agent_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
       // Also link this workspace to the specific environment in agent_environments table
@@ -1329,7 +1316,7 @@ You are an agent for the **${project.name}** project.
     // Create Planner agent
     if (create_planner) {
       const plannerPath = envAgentPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
-      createAgentWorkspace(plannerPath, 'agent-planner', 'planner', env.project_path, true)
+      createAgentWorkspace(plannerPath, 'agent-planner', 'planner', env.project_path)
       // Also link this workspace to the specific environment in agent_environments table
       db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(plannerPath, environment_id)
       // Seed native agents for this team type

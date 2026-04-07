@@ -162,13 +162,38 @@ async def run_chat_turn(
     final_result = None
     new_sdk_session_id = None
 
-    # Inject agents context for planner agents
+    # Build the prompt with project context, environment info, and working directory
     full_prompt = message
+    prompt_prefix_parts: list[str] = []
+
+    logger.info(f"[ChatTurn] Injecting context: cwd={cwd}, workspace_path={workspace_path}")
+
+    # 1. Inject project context (directory tree + git info) from cwd
+    # This mirrors what runner.py does for plan tasks, so chat agents also
+    # know the project structure they should be working on.
+    if cwd and cwd != workspace_path:
+        try:
+            from orchestrator.project_context import generate_workflow_context
+            project_ctx = generate_workflow_context(cwd)
+            if project_ctx:
+                prompt_prefix_parts.append(project_ctx)
+        except Exception as e:
+            logger.warning(f"[ChatTurn] Failed to generate project context from cwd={cwd}: {e}")
+
+    # 2. Inject explicit working directory so the agent knows where to operate
+    if cwd and cwd != workspace_path:
+        prompt_prefix_parts.append(f"Working directory: {cwd}")
+        prompt_prefix_parts.append(f"All files must be created inside {cwd}. Do not use /tmp or any other path.")
+
+    if prompt_prefix_parts:
+        full_prompt = "\n\n".join(prompt_prefix_parts) + "\n\n---\n\n" + message
+
+    # Inject agents context for planner agents
     if client and project_id and 'planner' in workspace_path.lower():
         try:
             agents_context = await client.get_project_agents_context(project_id)
             if agents_context:
-                full_prompt = f"{agents_context}\n\n---\n\n{message}"
+                full_prompt = f"{agents_context}\n\n---\n\n{full_prompt}"
                 logger.info(f"[ChatTurn] Injected agents context for planner agent")
         except Exception as e:
             logger.warning(f"[ChatTurn] Failed to fetch agents context: {e}")

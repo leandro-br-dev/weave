@@ -298,27 +298,6 @@ For reviewer/tester agents: same pattern
 
 '''
 
-    # Blackboard instruction: tell the agent WHERE to save the plan
-    blackboard_section = ''
-    if workflow_dir:
-        blackboard_section = f'''
-## Blackboard: Save Your Plan
-
-You MUST save your final plan as a JSON file to this exact path:
-
-```
-{workflow_dir}/plan.json
-```
-
-After saving, you MUST validate it by running this command in the terminal:
-
-```bash
-weave-validate plan {workflow_dir}/plan.json
-```
-
-If the validation returns an error (exit code 1), fix the JSON and run the validation again until it succeeds before finishing.
-'''
-
     return f'''{skill_content}
 
 ---
@@ -329,7 +308,6 @@ If the validation returns an error (exit code 1), fix the JSON and run the valid
 {agents_section}
 {task_section}
 {cwd_instruction}
-{blackboard_section}
 Analyze the task, read the relevant codebase using the project_path above, and generate a precise execution plan.
 Save the plan to `{workflow_dir}/plan.json` and validate it with `weave-validate plan {workflow_dir}/plan.json`.'''
 
@@ -431,17 +409,18 @@ async def process_kanban_task(task: dict, client) -> None:
 
         logger.info(f'[KanbanPipeline] Workflow directory ready: {workflow_dir} (id={workflow_id})')
 
-        # Lê SKILL.md (sempre, independente de setting_sources)
-        logger.info('[KanbanPipeline] Step 3: loading planning skill...')
-        skill_path = os.path.join(planner_workspace, '.claude', 'skills', 'planning', 'SKILL.md')
+        # Load planning instructions from native-skills (injected directly into prompt).
+        # The planning skill is a centralized file, NOT a per-workspace skill.
+        skill_path = os.path.join(os.path.dirname(__file__), '..', 'native-skills', 'planning', 'SKILL.md')
         skill_content = ''
         if os.path.exists(skill_path):
             with open(skill_path) as f:
                 skill_content = f.read()
-            logger.info(f'[KanbanPipeline] Loaded planning skill ({len(skill_content)} chars)')
+            # Substitute the [WORKFLOW_DIR] placeholder with the actual workflow directory
+            skill_content = skill_content.replace('[WORKFLOW_DIR]', workflow_dir)
+            logger.info(f'[KanbanPipeline] Loaded planning instructions from native-skills ({len(skill_content)} chars)')
         else:
-            logger.warning(f'[KanbanPipeline] Planning skill not found at {skill_path}')
-            skill_content = 'Generate a precise execution plan and save it as plan.json to the workflow directory.'
+            raise FileNotFoundError(f'[KanbanPipeline] Native planning skill not found at {skill_path}. Ensure native-skills/planning/SKILL.md exists in the client directory.')
 
         logger.info('[KanbanPipeline] Step 4: building planning prompt...')
         prompt = await build_planning_prompt({
