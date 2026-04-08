@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { authenticateToken } from '../middleware/auth.js'
 import { db } from '../db/index.js'
-import { agentWorkspacePath, envAgentPath, slugify, AGENTS_BASE_PATH } from '../utils/paths.js'
+import { agentWorkspacePath, slugify, AGENTS_BASE_PATH } from '../utils/paths.js'
 import { updateAgentSettings, rebuildAgentSettings } from '../utils/agentSettings.js'
 import { AGENT_TEMPLATES, renderTemplate } from '../utils/claudeMdTemplates.js'
 /** @deprecated AGENT_TEMPLATES is deprecated — use TEAM_TEMPLATES from teamTemplates.ts */
@@ -513,10 +513,10 @@ router.post('/', authenticateToken, (req, res) => {
   fs.mkdirSync(path.join(claudeDir, 'skills'), { recursive: true })
   fs.mkdirSync(path.join(claudeDir, 'agents'), { recursive: true })
 
-  // Create .gitignore in the workspace to exclude agent docs
+  // Create .gitignore in the workspace
   const wsGitignore = path.join(teamPath, '.gitignore')
   if (!fs.existsSync(wsGitignore)) {
-    fs.writeFileSync(wsGitignore, '.agent-docs/\n')
+    fs.writeFileSync(wsGitignore, '')
   }
 
   const projectTarget = project_path || `/root/projects/${project.name}`
@@ -1578,13 +1578,36 @@ Guidelines for improvement:
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
     // Resolve the actual project source directory (not the API server cwd)
+    // First try: find environment linked to the specific workspace
+    let projectCwd: string | undefined
     const projectEnvRow = db.prepare(`
       SELECT e.project_path FROM agent_environments ae
       JOIN environments e ON e.id = ae.environment_id
       WHERE ae.workspace_path = ?
+      AND e.project_path IS NOT NULL AND e.project_path != ''
       LIMIT 1
     `).get(workspace.path) as any
-    const projectCwd = projectEnvRow?.project_path || process.cwd()
+    if (projectEnvRow?.project_path) {
+      projectCwd = projectEnvRow.project_path
+    }
+
+    // Second try: find ANY environment for this project with a valid project_path
+    if (!projectCwd && workspace.project_id) {
+      const anyEnvRow = db.prepare(`
+        SELECT e.project_path FROM environments e
+        WHERE e.project_id = ?
+        AND e.project_path IS NOT NULL AND e.project_path != ''
+        LIMIT 1
+      `).get(workspace.project_id) as any
+      if (anyEnvRow?.project_path) {
+        projectCwd = anyEnvRow.project_path
+      }
+    }
+
+    if (!projectCwd) {
+      console.warn(`[teams] No project_path found for workspace ${workspace.path} (project ${workspace.project_id}). Using fallback.`)
+      projectCwd = process.cwd()
+    }
 
     const tasks = [{
       id: taskId,
@@ -1735,13 +1758,36 @@ Guidelines for improvement:
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
     // Resolve the actual project source directory (not the API server cwd)
+    // First try: find environment linked to the specific workspace
+    let agentProjectCwd: string | undefined
     const agentProjectEnvRow = db.prepare(`
       SELECT e.project_path FROM agent_environments ae
       JOIN environments e ON e.id = ae.environment_id
       WHERE ae.workspace_path = ?
+      AND e.project_path IS NOT NULL AND e.project_path != ''
       LIMIT 1
     `).get(workspace.path) as any
-    const agentProjectCwd = agentProjectEnvRow?.project_path || process.cwd()
+    if (agentProjectEnvRow?.project_path) {
+      agentProjectCwd = agentProjectEnvRow.project_path
+    }
+
+    // Second try: find ANY environment for this project with a valid project_path
+    if (!agentProjectCwd && workspace.project_id) {
+      const anyAgentEnvRow = db.prepare(`
+        SELECT e.project_path FROM environments e
+        WHERE e.project_id = ?
+        AND e.project_path IS NOT NULL AND e.project_path != ''
+        LIMIT 1
+      `).get(workspace.project_id) as any
+      if (anyAgentEnvRow?.project_path) {
+        agentProjectCwd = anyAgentEnvRow.project_path
+      }
+    }
+
+    if (!agentProjectCwd) {
+      console.warn(`[teams] No project_path found for workspace ${workspace.path} (project ${workspace.project_id}). Using fallback.`)
+      agentProjectCwd = process.cwd()
+    }
 
     const tasks = [{
       id: taskId,

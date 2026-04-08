@@ -253,7 +253,7 @@ describe('CreatePlanForm', () => {
 
     await waitFor(() => {
       // Should use parent directory of workspace path (project root)
-      // Workspace path is /root/workspace1/agent-coder, so project root is /root/workspace1
+      // Workspace path is /root/workspace1/team-coder, so project root is /root/workspace1
       expect(cwdInput.value).toBe('/root/workspace1');
     });
   });

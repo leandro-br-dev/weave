@@ -264,10 +264,10 @@ Description: {project.get('description', 'No description')}
             f"  workspace: `{agent.get('workspace_path')}`"
         )
     agents_section = (
-        "## Available Agents\n\n"
-        + ("\n".join(agent_lines) if agent_lines else "No agents configured.")
+        "## Available Teams\n\n"
+        + ("\n".join(agent_lines) if agent_lines else "No teams configured.")
         + "\n\nWhen creating tasks, use the exact `workspace` paths listed above."
-        + "\nMatch task type to agent role: planner for planning, coder for implementation, reviewer for validation."
+        + "\nMatch task type to team role: planner for planning, coder for implementation, reviewer for validation."
     )
 
     # Tarefa do kanban

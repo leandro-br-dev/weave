@@ -52,7 +52,7 @@ export interface SeedResult {
  * into `team_native_agents`, linked to the specified team workspace.
  *
  * @param teamWorkspacePath  The absolute path of the team workspace that
- *                           was just created (e.g. `~/.local/.../myproject/dev/agent-coder`).
+ *                           was just created (e.g. `~/.local/.../myproject/dev/team-coder`).
  * @param envName            The environment name used to resolve the team type
  *                           (`plan` → plan, `staging` → staging, anything else → dev).
  * @returns                  Summary of how many agents were seeded and their identifiers.

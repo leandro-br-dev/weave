@@ -168,25 +168,37 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
     return content
 
 
-def prepare_agent_docs_dir(workspace: str, plan_id: str, task_id: str) -> str:
+def prepare_agent_docs_dir(workspace: str | None, plan_id: str, task_id: str) -> str:
     """
-    Create and return the directory path for agent documentation.
+    Return the documentation directory path for agent documentation.
 
-    This directory is used for agents to write process documentation, context,
-    handoffs, and notes that should NOT pollute the target project directory.
+    Documentation is now stored in the workflow directory (alongside plan.json,
+    state.md, errors.log) rather than in a legacy .agent-docs subdirectory
+    inside the workspace.  The caller should pass workflow_path directly when
+    available.
+
+    This function is kept for backward compatibility.  When *workspace* is
+    provided and contains 'workflows' in the path, it is assumed to already be
+    the workflow directory and is returned as-is.  Otherwise an empty string is
+    returned — callers should prefer passing ``docs_dir=workflow_path`` to
+    :func:`build_prompt` instead.
 
     Args:
-        workspace: Path to the agent's workspace
+        workspace: Path to the agent's workspace (or workflow directory)
         plan_id: ID of the plan being executed
         task_id: ID of the task being executed
 
     Returns:
-        Path to the documentation directory, or empty string if workspace/plan_id not provided
+        Path to the documentation directory, or empty string if unavailable
     """
-    if not workspace or not plan_id:
+    if not workspace:
         return ''
 
-    docs_dir = os.path.join(workspace, '.agent-docs', plan_id)
+    # If the path already looks like a workflow directory, return it directly
+    if 'workflows' in workspace:
+        return workspace
+
+    return ''
     os.makedirs(docs_dir, exist_ok=True)
     return docs_dir
 
@@ -204,10 +216,10 @@ def _natural_sort_key(s: str) -> list[int | str]:
 
 def list_agent_docs(docs_dir: str) -> str:
     """
-    Scan and list .agent-docs files with their paths.
+    Scan and list workflow documentation files with their paths.
 
     Args:
-        docs_dir: Path to the .agent-docs/{plan_id}/ directory
+        docs_dir: Path to the workflow directory (plan.json, state.md, errors.log, etc.)
 
     Returns:
         Formatted string listing all files sorted by name (natural sort for
@@ -224,7 +236,7 @@ def list_agent_docs(docs_dir: str) -> str:
     files.sort(key=_natural_sort_key)
 
     lines = [
-        '## Workflow Documentation Directory',
+        '## Workflow Directory',
         '',
         f'Path: {docs_dir}/',
         '',
@@ -585,7 +597,7 @@ def generate_and_cache_context(project_path: str) -> str:
     return _workflow_context_cache[project_path]
 
 
-def build_system_prompt(task: Task, plan_id: str | None = None) -> str | None:
+def build_system_prompt(task: Task, plan_id: str | None = None, workflow_path: str | None = None) -> str | None:
     """
     Build the system prompt for a task.
     Priority: agent_file > system_prompt field.
@@ -594,6 +606,7 @@ def build_system_prompt(task: Task, plan_id: str | None = None) -> str | None:
     Args:
         task: Task to build system prompt for
         plan_id: Optional plan ID for documentation directory injection
+        workflow_path: Optional path to workflow directory (preferred over .agent-docs)
 
     Returns:
         System prompt string, or None if no prompt is configured
@@ -611,9 +624,16 @@ def build_system_prompt(task: Task, plan_id: str | None = None) -> str | None:
     if not base_prompt:
         return None
 
-    # If workspace and plan_id are available, inject documentation guidelines
-    if task.workspace and plan_id:
+    # If a workflow_path is available, inject documentation guidelines there
+    # (preferred over legacy .agent-docs)
+    docs_dir = workflow_path or ''
+    if task.workspace and plan_id and not docs_dir:
+        # Legacy fallback — should no longer be reached
         docs_dir = os.path.join(task.workspace, '.agent-docs', plan_id)
+
+    if docs_dir:
+        # Ensure directory exists
+        os.makedirs(docs_dir, exist_ok=True)
         # Count existing files to determine next numeric prefix
         existing_files = []
         docs_path = Path(docs_dir)
@@ -673,7 +693,7 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
         context: Results from previous tasks (used as fallback if no ctx_dir)
         ctx_dir: Context directory with saved dependency notes (takes precedence)
         workflow_context: Optional pre-generated project context string (directory tree + git info)
-        docs_dir: Optional path to .agent-docs/{plan_id}/ directory for docs inventory
+        docs_dir: Optional path to workflow directory for docs inventory
         attachment_ids: Optional list of attachment UUIDs to include in the prompt
         api_base_url: Optional API base URL for fetching attachment content
         token: Optional auth token for fetching attachment content
@@ -918,11 +938,17 @@ async def run_task(
     logger.info(f'[{task.id}] Agent: {agent_name} | cwd: {task.cwd}')
 
     # Prepare agent documentation directory
+    # Use workflow_path when available (preferred over legacy .agent-docs)
     docs_dir = ''
-    if plan_id and task.workspace:
-        docs_dir = prepare_agent_docs_dir(task.workspace, plan_id, task.id)
+    if workflow_path:
+        docs_dir = workflow_path
         if docs_dir:
-            logger.info(f'[{task.id}] Agent docs dir: {docs_dir}')
+            logger.info(f'[{task.id}] Workflow docs dir: {docs_dir}')
+    elif plan_id and task.workspace:
+        legacy_dir = prepare_agent_docs_dir(task.workspace, plan_id, task.id)
+        if legacy_dir:
+            docs_dir = legacy_dir
+            logger.info(f'[{task.id}] Agent docs dir (legacy): {docs_dir}')
 
     # Send initial log message
     if log_callback:
@@ -957,7 +983,7 @@ async def run_task(
         allowed_tools=tools,
         permission_mode=task.permission_mode,
         max_turns=task.max_turns,
-        system_prompt=build_system_prompt(task, plan_id),
+        system_prompt=build_system_prompt(task, plan_id, workflow_path=workflow_path),
         # "project" loads CLAUDE.md, .claude/skills/, .claude/agents/, .claude/settings*.json
         # from the cwd. Without this, all project-level features are silently ignored.
         setting_sources=["project"],
@@ -967,7 +993,7 @@ async def run_task(
     # Generate or retrieve cached workflow context
     workflow_context = generate_and_cache_context(project_path or task.cwd)
 
-    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path)
+    prompt = build_prompt(task, context, ctx_dir, workflow_context, docs_dir=docs_dir or workflow_path or None, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path)
 
     # Inject agents context for planner agents
     agent_context = await build_agent_context(task, client, plan_id)

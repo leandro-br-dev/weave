@@ -121,7 +121,7 @@ export function bootstrapTeamForEnvironment(
     // .gitignore
     const gitignorePath = path.join(workspacePath, '.gitignore')
     if (!fs.existsSync(gitignorePath)) {
-      fs.writeFileSync(gitignorePath, '.agent-docs/\n')
+      fs.writeFileSync(gitignorePath, '')
     }
 
     // CLAUDE.md

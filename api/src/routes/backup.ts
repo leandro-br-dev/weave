@@ -170,8 +170,8 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       }
     }
 
-    // Also check for legacy agent-coder structure
-    const legacyAgentPath = path.join(projectPath, 'agent-coder')
+    // Also check for legacy team-coder structure (previously named agent-coder)
+    const legacyAgentPath = path.join(projectPath, 'team-coder')
     if (fs.existsSync(legacyAgentPath) && !fs.existsSync(legacyPath)) {
       const ws = readWorkspace(legacyAgentPath)
       if (ws) {
@@ -185,7 +185,7 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       .filter(d => d.isDirectory() && d.name !== 'agents')
 
     for (const envDir of envDirs) {
-      for (const teamType of ['team-coder', 'team-planner', 'agent-coder', 'agent-planner']) {
+      for (const teamType of ['team-coder', 'team-planner', 'team-reviewer']) {
         const teamPath = path.join(projectPath, envDir.name, teamType)
         if (fs.existsSync(teamPath) && fs.statSync(teamPath).isDirectory()) {
           const ws = readWorkspace(teamPath)
@@ -239,7 +239,7 @@ function restoreWorkspace(ws: BackupData['agent_workspaces'][number]): void {
   // .gitignore
   const gitignorePath = path.join(fullPath, '.gitignore')
   if (!fs.existsSync(gitignorePath)) {
-    fs.writeFileSync(gitignorePath, '.claude/\n.agent-docs/\n', 'utf-8')
+    fs.writeFileSync(gitignorePath, '.claude/\n', 'utf-8')
   }
 }
 

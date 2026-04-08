@@ -800,10 +800,10 @@ class DaemonClient:
 
     async def get_project_agents_context(self, project_id: str) -> str:
         """
-        Return a formatted string with available agents for a project.
+        Return a formatted string with available teams for a project.
 
         This context is injected into planner agents so they can reference
-        the correct agents when creating task assignments.
+        the correct teams when creating task assignments.
 
         GET /api/projects/:id/agents-context
 
@@ -811,7 +811,7 @@ class DaemonClient:
             project_id: ID of the project
 
         Returns:
-            Formatted string with agent information, or empty string on error
+            Formatted string with team information, or empty string on error
         """
         import asyncio
 
@@ -823,7 +823,7 @@ class DaemonClient:
             handled = self._handle_response(response)
 
             if handled.error:
-                logger.warning(f"Failed to fetch agents context: {handled.error}")
+                logger.warning(f"Failed to fetch teams context: {handled.error}")
                 return ""
 
             # A API pode retornar {"data": [...]} ou diretamente [...]
@@ -838,7 +838,7 @@ class DaemonClient:
             if not agents:
                 return ""
 
-            lines = ["## Available Agents for this Project\n"]
+            lines = ["## Available Teams for this Project\n"]
             for agent in agents:
                 role = agent.get("role", "generic")
                 name = agent.get("name", "unknown")
@@ -849,7 +849,7 @@ class DaemonClient:
             lines.append("")
             lines.append(
                 "When creating task assignments, use the workspace paths above. "
-                "Match task type to agent role: coders for implementation, "
+                "Match task type to team role: coders for implementation, "
                 "reviewers for validation, testers for test suites, etc."
             )
 

@@ -443,7 +443,7 @@ export function CreatePlanForm() {
                             if (ws && !task.selectedEnvId) {
                               // Workspace path is /root/projects/weave/projects/{name}/team-coder
                               // We want the parent: /root/projects/weave/projects/{name}
-                              const projectRoot = ws.path.split(/\/team-coder|\/agent-coder/)[0]
+                              const projectRoot = ws.path.split(/\/team-coder|\/team-planner|\/team-reviewer/)[0]
                               updateTask(index, 'cwd', projectRoot)
                             }
                           }}

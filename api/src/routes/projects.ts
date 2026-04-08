@@ -605,13 +605,19 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
       const role = agent.role || 'generic'
 
       // Extract name from workspace path
-      // Expected format: /root/projects/weave/projects/{project}/agents/{agent-name}/
+      // Current format: {basePath}/{projectSlug}/{envSlug}/team-{role}/
+      // Legacy format:  {basePath}/{projectSlug}/agents/{agent-name}/
       const pathParts = workspacePath.split(path.sep).filter(Boolean)
       let name = 'unknown'
 
-      // Try to extract agent name from path structure
-      if (pathParts.length >= 5 && pathParts[3] === 'agents') {
-        // Structure: .../projects/{project}/agents/{agent-name}
+      // Try current environment-team format: .../{project}/{env}/team-{role}
+      if (pathParts.length >= 5 && pathParts[pathParts.length - 1].startsWith('team-')) {
+        name = pathParts[pathParts.length - 1]
+        // Also extract the environment name for context
+        const envName = pathParts[pathParts.length - 2]
+        name = `${name} (${envName})`
+      } else if (pathParts.length >= 5 && pathParts[3] === 'agents') {
+        // Legacy structure: .../projects/{project}/agents/{agent-name}
         name = pathParts[4]
       } else if (pathParts.length >= 4) {
         // Fallback: use last directory component
@@ -725,13 +731,22 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
       const role = a.role
 
       // Extract name from workspace path
-      // Expected format: /root/projects/weave/projects/{project}/agents/{agent-name}/
+      // Current format: {basePath}/{projectSlug}/{envSlug}/team-{role}/
+      // Legacy format:  {basePath}/{projectSlug}/agents/{agent-name}/
       const pathParts = workspacePath.split(path.sep).filter(Boolean)
       let name = 'unknown'
 
-      if (pathParts.length >= 5 && pathParts[3] === 'agents') {
+      // Try current environment-team format: .../{project}/{env}/team-{role}
+      if (pathParts.length >= 5 && pathParts[pathParts.length - 1].startsWith('team-')) {
+        name = pathParts[pathParts.length - 1]
+        // Also extract the environment name for context
+        const envName = pathParts[pathParts.length - 2]
+        name = `${name} (${envName})`
+      } else if (pathParts.length >= 5 && pathParts[3] === 'agents') {
+        // Legacy structure: .../projects/{project}/agents/{agent-name}
         name = pathParts[4]
       } else if (pathParts.length >= 4) {
+        // Fallback: use last directory component
         name = pathParts[pathParts.length - 1]
       }
 
@@ -1217,7 +1232,7 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
       // Create .gitignore
       const gitignorePath = path.join(workspacePath, '.gitignore')
       if (!fs.existsSync(gitignorePath)) {
-        fs.writeFileSync(gitignorePath, '.agent-docs/\n')
+        fs.writeFileSync(gitignorePath, '')
       }
 
       // Resolve team template by role for CLAUDE.md and permissions

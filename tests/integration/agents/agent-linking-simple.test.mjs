@@ -135,14 +135,14 @@ try {
     testFail(`Found ${orphanCount} orphaned database records`);
   }
 
-  // Verify agent names in paths - agent-coder, planner, etc. are all valid
-  console.log('   Agent names found:');
+  // Verify team names in paths - team-coder, team-planner, etc. are all valid
+  console.log('   Team names found:');
   agents.forEach(agent => {
     const pathParts = agent.workspace_path.split('/');
     const name = pathParts[pathParts.length - 1];
     console.log(`   - ${name}`);
   });
-  testPass('Agent name paths reviewed (agent-coder, planner, etc. are valid)');
+  testPass('Team name paths reviewed (team-coder, team-planner, etc. are valid)');
 
 } catch (error) {
   testFail('Database integrity check', error.message);
@@ -154,13 +154,13 @@ testSection('Test 3: Agent Name Display Logic');
 try {
   // Simulate the fix logic
   const testPaths = [
-    '/root/projects/weave/projects/test/agent-coder',
+    '/root/projects/weave/projects/test/team-coder',
     '/root/projects/weave/projects/test/agents/planner',
     '/root/projects/weave/projects/my-project/frontend-dev',
     '/root/projects/weave/projects/simple/coder'
   ];
 
-  const expectedNames = ['agent-coder', 'planner', 'frontend-dev', 'coder'];
+  const expectedNames = ['team-coder', 'planner', 'frontend-dev', 'coder'];
 
   let allCorrect = true;
   testPaths.forEach((path, i) => {

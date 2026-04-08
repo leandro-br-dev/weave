@@ -170,13 +170,13 @@ testSection('Test 3: Agent Name Display Logic');
 try {
   // Simulate the fix logic
   const testPaths = [
-    '/root/projects/weave/projects/test/agent-coder',
+    '/root/projects/weave/projects/test/team-coder',
     '/root/projects/weave/projects/test/agents/planner',
     '/root/projects/weave/projects/my-project/frontend-dev',
     '/root/projects/weave/projects/simple/coder'
   ];
 
-  const expectedNames = ['agent-coder', 'planner', 'frontend-dev', 'coder'];
+  const expectedNames = ['team-coder', 'planner', 'frontend-dev', 'coder'];
 
   let allCorrect = true;
   testPaths.forEach((path, i) => {
