@@ -943,6 +943,11 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
   )
 
   // Show toast when improvement starts
+  // Note: We guard against a duplicate toast caused by the brief gap between mutation
+  // completion (isPending → false) and polling start (isImproving → true). When that
+  // gap occurs, the else-branch would reset showedStartToast, allowing a second toast
+  // to fire once isImproving flips to true. We prevent this by only resetting when
+  // there is no active improvementPlanId — meaning the full lifecycle has ended.
   useEffect(() => {
     if ((improveClaudeMd.isPending || isImproving) && !showedStartToast) {
       console.log(`[${new Date().toISOString()}] [ClaudeMdTab] 🎯 Showing improvement start toast`, {
@@ -953,7 +958,7 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
       })
       showToast('info', 'AI Improvement Started', 'Your CLAUDE.md is being analyzed and improved...')
       setShowedStartToast(true)
-    } else if (!improveClaudeMd.isPending && !isImproving) {
+    } else if (!improveClaudeMd.isPending && !isImproving && improvementPlanId === null) {
       setShowedStartToast(false)
     }
   }, [improveClaudeMd.isPending, isImproving, showedStartToast, showToast, improvementPlanId, teamId])
@@ -993,8 +998,15 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
         teamId
       })
       setImprovementError(pollingError)
-      // Don't clear planId on error - keep it so user can check the plan
       setShowedStartToast(false)
+
+      // Clear planId so the component doesn't re-poll a failed plan on reload
+      setImprovementPlanId(null)
+      try {
+        localStorage.removeItem(improvementStorageKey)
+      } catch (e) {
+        console.error('Error clearing improvement state from localStorage:', e)
+      }
 
       // Show error with plan ID reference
       const planId = improvementPlanId
@@ -1003,7 +1015,7 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
         : pollingError
       showToast('error', 'Improvement Incomplete', errorMessage)
     }
-  }, [pollingError, showToast, improvementPlanId, teamId])
+  }, [pollingError, showToast, improvementPlanId, teamId, improvementStorageKey])
 
   const handleImproveWithAI = () => {
     // Open the instructions dialog instead of triggering immediately
@@ -1887,6 +1899,9 @@ function AgentsTab({ teamId, agents }: { teamId: string; agents: Array<{ name: s
     if (agentPollingError) {
       setAgentImprovementError(agentPollingError)
       setShowedAgentStartToast(false)
+      // Clear planId and agent name so the component doesn't re-poll a failed plan on reload
+      setImprovementPlanId(null)
+      setImprovingAgentName(null)
       showToast('error', t('pages.agents.agentsTab.improvementError'), agentPollingError)
     }
   }, [agentPollingError, showToast, improvingAgentName, t])

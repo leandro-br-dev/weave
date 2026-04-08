@@ -600,7 +600,7 @@ export default function KanbanPage() {
         title={t('pages.kanban.title')}
         description={
           projectFilter && projectFilter !== 'all'
-            ? `Tasks for ${projects.find((p) => p.id === projectFilter)?.name || 'selected project'}`
+            ? t('pages.kanban.tasksForProject', { name: projects.find((p) => p.id === projectFilter)?.name || t('pages.kanban.selectedProject') })
             : t('pages.kanban.filters.allProjects')
         }
         actions={
@@ -1373,8 +1373,8 @@ export default function KanbanPage() {
       {/* Delete Confirmation */}
       <ConfirmDialog
         open={!!deleteConfirm}
-        title={t('kanban.task.deleteConfirmTitle')}
-        description={t('kanban.task.deleteConfirmDescription')}
+        title={t('pages.kanban.task.deleteConfirmTitle')}
+        description={t('pages.kanban.task.deleteConfirmDescription')}
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setDeleteConfirm(null)}

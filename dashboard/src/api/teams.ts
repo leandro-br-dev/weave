@@ -425,7 +425,7 @@ export function useImproveAgent() {
   })
 }
 
-export type PlanStatus = 'pending' | 'running' | 'success' | 'error' | 'cancelled'
+export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'error' | 'cancelled'
 
 export type Plan = {
   id: string
@@ -439,6 +439,7 @@ export type Plan = {
     }
   }
   error?: string
+  result?: string
 }
 
 interface UseImprovementStatusResult {
@@ -508,6 +509,40 @@ export function useImprovementStatus(
     const MAX_POLL_ATTEMPTS = 300 // Maximum 10 minutes (300 * 2 seconds) — improvement plans can take 3-5+ minutes
     const SUCCESS_STATUS_POLL_TIMEOUT = 30 // Additional 60 seconds (30 * 2 seconds) after status='success' to wait for structured_output
 
+    // Helper to handle terminal states (reused in initial check and polling)
+    const handleTerminalState = (plan: Plan, count: number) => {
+      logError(`❌ Plan reached terminal state: ${plan.status}`, {
+        planId,
+        error: plan.error || plan.result,
+        totalPollAttempts: count,
+        elapsedTime: `${count * 2}s`
+      })
+      setIsImproving(false)
+      setError(plan.error || plan.result || `Plan ${plan.status}`)
+    }
+
+    // Immediate check: if plan is already in a terminal state (e.g. page reload after failure),
+    // don't show "Melhorando..." — resolve immediately.
+    apiClient.get<Plan>(`/api/plans/${planId}`).then((initialPlan) => {
+      if (cancelled) return
+      if (initialPlan.status === 'error' || initialPlan.status === 'cancelled' || initialPlan.status === 'failed') {
+        handleTerminalState(initialPlan, 0)
+        return
+      }
+      // If plan already succeeded with content, resolve immediately
+      if (initialPlan.status === 'success') {
+        const content = extractImprovedContent(initialPlan.structured_output)
+        if (content) {
+          log(`✅ Plan already completed with content`)
+          setIsImproving(false)
+          setImprovedContent(content)
+          return
+        }
+      }
+    }).catch(() => {
+      // Ignore initial check errors, polling will handle retries
+    })
+
     const intervalId = setInterval(async () => {
       try {
         pollingCount++
@@ -530,16 +565,9 @@ export function useImprovementStatus(
         })
 
         // Handle terminal states
-        if (plan.status === 'error' || plan.status === 'cancelled') {
-          logError(`❌ Plan reached terminal state: ${plan.status}`, {
-            planId,
-            error: plan.error,
-            totalPollAttempts: pollingCount,
-            elapsedTime: `${pollingCount * 2}s`
-          })
+        if (plan.status === 'error' || plan.status === 'cancelled' || plan.status === 'failed') {
           clearInterval(intervalId)
-          setIsImproving(false)
-          setError(plan.error || `Plan ${plan.status}`)
+          handleTerminalState(plan, pollingCount)
           return
         }
 

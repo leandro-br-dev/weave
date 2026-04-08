@@ -267,9 +267,9 @@ export default function WorkflowsPage() {
       {/* Metrics */}
       {metrics && (
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-8">
-          <MetricCard label="Total" value={metrics.total} />
+          <MetricCard label={t('pages.workflows.list.metrics.total')} value={metrics.total} />
           <MetricCard
-            label="Success rate"
+            label={t('pages.workflows.list.metrics.successRate')}
             value={`${metrics.success_rate}%`}
             color={
               metrics.success_rate >= 70
@@ -280,11 +280,11 @@ export default function WorkflowsPage() {
             }
           />
           <MetricCard
-            label="Avg duration"
+            label={t('pages.workflows.list.metrics.avgDuration')}
             value={formatDuration(metrics.avg_duration_seconds)}
           />
           <MetricCard
-            label="Last 7 days"
+            label={t('pages.workflows.list.metrics.last7Days')}
             value={`${metrics.last_7_days.success}✓ ${metrics.last_7_days.failed}✗`}
           />
         </div>

@@ -52,6 +52,8 @@
       "autoMovedTasks_other": "Movidas {{count}} tarefas automaticamente",
       "autoMovedTasksDescription": "As tarefas foram movidas com base em seu status",
       "allProjectsPlaceholder": "Todos os projetos",
+      "tasksForProject": "Tarefas para {{name}}",
+      "selectedProject": "projeto selecionado",
       "actions": {
         "save": "Salvar",
         "cancel": "Cancelar",

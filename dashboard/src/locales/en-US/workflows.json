@@ -24,6 +24,12 @@
           "status": "Filter by Status",
           "type": "Filter by Type"
         },
+        "metrics": {
+          "total": "Total",
+          "successRate": "Success rate",
+          "avgDuration": "Avg duration",
+          "last7Days": "Last 7 days"
+        },
         "table": {
           "name": "Workflow Name",
           "status": "Status",

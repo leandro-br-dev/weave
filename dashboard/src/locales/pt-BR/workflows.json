@@ -24,6 +24,12 @@
           "status": "Filtrar por Status",
           "type": "Filtrar por Tipo"
         },
+        "metrics": {
+          "total": "Total",
+          "successRate": "Taxa de sucesso",
+          "avgDuration": "Duração média",
+          "last7Days": "Últimos 7 dias"
+        },
         "table": {
           "name": "Nome do Fluxo",
           "status": "Status",
