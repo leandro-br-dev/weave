@@ -24,7 +24,7 @@ import {
   TEAM_TEMPLATES,
   type TeamTemplate,
 } from '../utils/teamTemplates.js'
-import { AGENTS_BASE_PATH, slugify } from '../utils/paths.js'
+import { AGENTS_BASE_PATH, slugify, teamWorkspacePath } from '../utils/paths.js'
 import { seedNativeAgentsForTeam, type SeedResult } from './nativeAgentsBootstrap.js'
 
 // ---------------------------------------------------------------------------
@@ -103,9 +103,8 @@ export function bootstrapTeamForEnvironment(
 
   const role = teamTemplate.role
   const teamName = `team-${role === 'planner' ? 'planner' : role === 'reviewer' ? 'reviewer' : 'coder'}`
-  const envSlug = slugify(envName)
   const projectSlug = slugify(projectName)
-  const workspacePath = path.resolve(path.join(AGENTS_BASE_PATH, projectSlug, envSlug, teamName))
+  const workspacePath = teamWorkspacePath(AGENTS_BASE_PATH, projectSlug, teamName)
 
   // If the workspace directory already exists, just link it (idempotent).
   const alreadyExists = fs.existsSync(workspacePath)

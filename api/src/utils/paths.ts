@@ -79,59 +79,151 @@ export function slugify(name: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+// ---------------------------------------------------------------------------
+// NEW directory structure (v2)
+// ---------------------------------------------------------------------------
+//
+// Each project is now organised as:
+//
+//   {base}/{projectSlug}/
+//   ├── env/                  ← environment source-code directories
+//   │   ├── dev/
+//   │   ├── plan/
+//   │   └── staging/
+//   ├── teams/                ← all team workspaces for this project
+//   │   ├── team-coder/
+//   │   ├── team-planner/
+//   │   ├── team-reviewer/
+//   │   └── {custom-team}/
+//   └── workflows/            ← per-plan workflow directories
+//       └── {uuid}/
+//
+// Teams belong to the project, not to a specific environment. They are
+// peers with env/ and workflows/, which prevents naming collisions (e.g.
+// an environment named "teams") and makes the hierarchy explicit.
+// ---------------------------------------------------------------------------
+
 /**
- * Path for an agent workspace.
- * Structure: {basePath}/{projectSlug}/agents/{agentName}/
+ * Path for an environment's source-code directory.
+ * Structure: {basePath}/{projectSlug}/env/{envSlug}/
+ */
+export function envDirPath(
+  basePath: string,
+  projectSlug: string,
+  envSlug: string,
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), 'env', slugify(envSlug)))
+}
+
+/**
+ * Path for a team workspace.
+ * Structure: {basePath}/{projectSlug}/teams/{teamName}/
+ *
+ * Teams are project-level entities — they sit alongside env/ and workflows/
+ * rather than inside a specific environment directory.
+ */
+export function teamWorkspacePath(
+  basePath: string,
+  projectSlug: string,
+  teamName: string,
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), 'teams', slugify(teamName)))
+}
+
+/**
+ * @deprecated Use teamWorkspacePath instead.
+ * Kept for backward compatibility — resolves to the NEW teams/ structure.
  */
 export function agentWorkspacePath(
   basePath: string,
   projectSlug: string,
-  agentName: string
+  agentName: string,
 ): string {
-  return path.resolve(path.join(basePath, slugify(projectSlug), 'agents', slugify(agentName)))
+  return teamWorkspacePath(basePath, projectSlug, agentName)
 }
 
 /**
- * Path for an environment's auto-generated team workspace.
- * Structure: {basePath}/{projectSlug}/{envSlug}/team-coder/
- * (environments keep the current structure — they are tied to a specific env)
+ * Path for an environment's auto-generated default team workspace.
+ * Structure: {basePath}/{projectSlug}/teams/team-coder/
+ *
+ * The team name is derived from the environment type:
+ *   - plan    → team-planner
+ *   - dev     → team-coder
+ *   - staging → team-reviewer
+ *
+ * @deprecated Use teamWorkspacePath with the appropriate team name.
  */
 export function envTeamPath(
   basePath: string,
   projectSlug: string,
-  envSlug: string
+  _envSlug: string,
 ): string {
-  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'team-coder'))
+  return teamWorkspacePath(basePath, projectSlug, 'team-coder')
 }
 
-/** @deprecated Use envTeamPath instead */
+/** @deprecated Use teamWorkspacePath instead */
 export function envAgentPath(
   basePath: string,
   projectSlug: string,
-  envSlug: string
+  envSlug: string,
 ): string {
   return envTeamPath(basePath, projectSlug, envSlug)
 }
 
 /**
  * Path for an environment's auto-generated planner team workspace.
- * Structure: {basePath}/{projectSlug}/{envSlug}/team-planner/
+ * Structure: {basePath}/{projectSlug}/teams/team-planner/
+ *
+ * @deprecated Use teamWorkspacePath(basePath, projectSlug, 'team-planner') instead.
  */
 export function envTeamPlannerPath(
   basePath: string,
   projectSlug: string,
-  envSlug: string
+  _envSlug: string,
 ): string {
-  return path.resolve(path.join(basePath, slugify(projectSlug), slugify(envSlug), 'team-planner'))
+  return teamWorkspacePath(basePath, projectSlug, 'team-planner')
 }
 
-/** @deprecated Use envTeamPlannerPath instead */
+/** @deprecated Use teamWorkspacePath instead */
 export function envAgentPlannerPath(
   basePath: string,
   projectSlug: string,
-  envSlug: string
+  envSlug: string,
 ): string {
   return envTeamPlannerPath(basePath, projectSlug, envSlug)
+}
+
+/**
+ * Base directory for all teams within a project.
+ * Structure: {basePath}/{projectSlug}/teams/
+ */
+export function teamsBaseDir(
+  basePath: string,
+  projectSlug: string,
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), 'teams'))
+}
+
+/**
+ * Base directory for all environments within a project.
+ * Structure: {basePath}/{projectSlug}/env/
+ */
+export function envsBaseDir(
+  basePath: string,
+  projectSlug: string,
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug), 'env'))
+}
+
+/**
+ * Resolve a project's base directory.
+ * Structure: {basePath}/{projectSlug}/
+ */
+export function projectBaseDir(
+  basePath: string,
+  projectSlug: string,
+): string {
+  return path.resolve(path.join(basePath, slugify(projectSlug)))
 }
 
 /**

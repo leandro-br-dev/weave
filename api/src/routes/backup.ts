@@ -135,6 +135,7 @@ function readWorkspace(workspacePath: string): BackupData['agent_workspaces'][nu
 /** Collect all agent workspace directories under the AGENTS_BASE_PATH */
 function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
   const workspaces: BackupData['agent_workspaces'] = []
+  const seen = new Set<string>()
 
   if (!fs.existsSync(getAgentsBasePath())) return workspaces
 
@@ -145,13 +146,15 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
   for (const projectDir of projectDirs) {
     const projectPath = path.join(basePath, projectDir.name)
 
-    // New structure: {project}/agents/{agent-name}/
-    const agentsDir = path.join(projectPath, 'agents')
-    if (fs.existsSync(agentsDir)) {
-      const agentDirs = fs.readdirSync(agentsDir, { withFileTypes: true })
+    // NEW structure: {project}/teams/{team-name}/
+    const teamsDir = path.join(projectPath, 'teams')
+    if (fs.existsSync(teamsDir)) {
+      const teamDirs = fs.readdirSync(teamsDir, { withFileTypes: true })
         .filter(d => d.isDirectory())
-      for (const agentDir of agentDirs) {
-        const fullPath = path.join(agentsDir, agentDir.name)
+      for (const teamDir of teamDirs) {
+        const fullPath = path.join(teamsDir, teamDir.name)
+        if (seen.has(fullPath)) continue
+        seen.add(fullPath)
         const ws = readWorkspace(fullPath)
         if (ws) {
           ws.relative_path = path.relative(basePath, fullPath)
@@ -160,9 +163,27 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       }
     }
 
-    // Legacy structure: {project}/team-coder/
+    // LEGACY structure: {project}/agents/{agent-name}/
+    const agentsDir = path.join(projectPath, 'agents')
+    if (fs.existsSync(agentsDir)) {
+      const agentDirs = fs.readdirSync(agentsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+      for (const agentDir of agentDirs) {
+        const fullPath = path.join(agentsDir, agentDir.name)
+        if (seen.has(fullPath)) continue
+        seen.add(fullPath)
+        const ws = readWorkspace(fullPath)
+        if (ws) {
+          ws.relative_path = path.relative(basePath, fullPath)
+          workspaces.push(ws)
+        }
+      }
+    }
+
+    // LEGACY structure: {project}/team-coder/
     const legacyPath = path.join(projectPath, 'team-coder')
-    if (fs.existsSync(legacyPath)) {
+    if (fs.existsSync(legacyPath) && !seen.has(legacyPath)) {
+      seen.add(legacyPath)
       const ws = readWorkspace(legacyPath)
       if (ws) {
         ws.relative_path = path.relative(basePath, legacyPath)
@@ -170,24 +191,15 @@ function collectAgentWorkspaces(): BackupData['agent_workspaces'] {
       }
     }
 
-    // Also check for legacy team-coder structure (previously named agent-coder)
-    const legacyAgentPath = path.join(projectPath, 'team-coder')
-    if (fs.existsSync(legacyAgentPath) && !fs.existsSync(legacyPath)) {
-      const ws = readWorkspace(legacyAgentPath)
-      if (ws) {
-        ws.relative_path = path.relative(basePath, legacyAgentPath)
-        workspaces.push(ws)
-      }
-    }
-
-    // Environment-based teams: {project}/{env-slug}/team-coder|team-planner/
+    // LEGACY structure: {project}/{env-slug}/team-coder|team-planner|team-reviewer/
     const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'agents')
+      .filter(d => d.isDirectory() && !['agents', 'teams', 'env', 'workflows', 'uploads', 'logs'].includes(d.name))
 
     for (const envDir of envDirs) {
       for (const teamType of ['team-coder', 'team-planner', 'team-reviewer']) {
         const teamPath = path.join(projectPath, envDir.name, teamType)
-        if (fs.existsSync(teamPath) && fs.statSync(teamPath).isDirectory()) {
+        if (fs.existsSync(teamPath) && fs.statSync(teamPath).isDirectory() && !seen.has(teamPath)) {
+          seen.add(teamPath)
           const ws = readWorkspace(teamPath)
           if (ws) {
             ws.relative_path = path.relative(basePath, teamPath)

@@ -5,7 +5,7 @@ import path from 'path'
 import fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { fileURLToPath } from 'url'
-import { AGENTS_BASE_PATH } from '../utils/paths.js'
+import { AGENTS_BASE_PATH, teamsBaseDir } from '../utils/paths.js'
 import { ensureWorkflowDir } from '../services/workflowDir.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -28,60 +28,82 @@ function listAllWorkspaces(): any[] {
   for (const projectDir of projectDirs) {
     const projectPath = path.join(AGENTS_BASE_PATH, projectDir.name)
 
-    // New structure: {project}/agents/{agent-name}/
-    const agentsDirPath = path.join(projectPath, 'agents')
-    if (fs.existsSync(agentsDirPath)) {
+    // NEW structure: {project}/teams/{team-name}/
+    const teamsDirPath = path.join(projectPath, 'teams')
+    if (fs.existsSync(teamsDirPath)) {
       try {
-        const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
+        const teamDirs = fs.readdirSync(teamsDirPath, { withFileTypes: true })
+          .filter(d => d.isDirectory())
+
+        for (const teamDir of teamDirs) {
+          const fullPath = path.resolve(path.join(teamsDirPath, teamDir.name))
+          results.push({
+            id: Buffer.from(fullPath).toString('base64url'),
+            name: teamDir.name,
+            path: fullPath,
+            type: teamDir.name.startsWith('team-') ? 'env-agent' : 'agent'
+          })
+        }
+      } catch (err) {
+        console.error(`[quick-actions] Error scanning teams dir ${teamsDirPath}:`, err)
+      }
+    }
+
+    // LEGACY structure: {project}/agents/{agent-name}/
+    const legacyAgentsDir = path.join(projectPath, 'agents')
+    if (fs.existsSync(legacyAgentsDir)) {
+      try {
+        const agentDirs = fs.readdirSync(legacyAgentsDir, { withFileTypes: true })
           .filter(d => d.isDirectory())
 
         for (const agentDir of agentDirs) {
-          const fullPath = path.resolve(path.join(agentsDirPath, agentDir.name))
+          const fullPath = path.resolve(path.join(legacyAgentsDir, agentDir.name))
+          if (results.some(r => r.path === fullPath)) continue
           results.push({
             id: Buffer.from(fullPath).toString('base64url'),
             name: agentDir.name,
             path: fullPath,
-            type: 'agent'
+            type: 'legacy'
           })
         }
       } catch (err) {
-        console.error(`[quick-actions] Error scanning agents dir ${agentsDirPath}:`, err)
+        console.error(`[quick-actions] Error scanning legacy agents dir ${legacyAgentsDir}:`, err)
       }
     }
 
-    // Environment teams: {project}/{env}/team-coder/, team-planner/, etc.
+    // LEGACY structure: {project}/{env}/team-{role}/ (env-nested teams)
     try {
-      const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name !== 'agents')
+      const subDirs = fs.readdirSync(projectPath, { withFileTypes: true })
+        .filter(d => d.isDirectory() && !['agents', 'teams', 'env', 'workflows'].includes(d.name))
 
-      for (const envDir of envDirs) {
-        const envDirPath = path.join(projectPath, envDir.name)
+      for (const subDir of subDirs) {
+        const subDirPath = path.join(projectPath, subDir.name)
         try {
-          // Scan for all team subdirectories (team-coder, team-planner, etc.)
-          const teamSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+          const teamSubDirs = fs.readdirSync(subDirPath, { withFileTypes: true })
             .filter(d => d.isDirectory() && (d.name.startsWith('team-') || d.name.startsWith('agent-')))
 
           for (const teamSubDir of teamSubDirs) {
-            const teamPath = path.resolve(path.join(envDirPath, teamSubDir.name))
+            const teamPath = path.resolve(path.join(subDirPath, teamSubDir.name))
+            if (results.some(r => r.path === teamPath)) continue
             const dirRole = teamSubDir.name.replace(/^team-|^agent-/, '')
             results.push({
               id: Buffer.from(teamPath).toString('base64url'),
-              name: `${projectDir.name}/${envDir.name}/${dirRole}`,
+              name: teamSubDir.name,
               path: teamPath,
-              type: 'env-agent'
+              type: 'legacy'
             })
           }
-        } catch (err) {
-          console.error(`[quick-actions] Error scanning env dir ${envDirPath}:`, err)
+        } catch {
+          // Not an env dir, skip
         }
       }
-    } catch (err) {
-      console.error(`[quick-actions] Error scanning project dir ${projectPath}:`, err)
+    } catch {
+      // Ignore scan errors
     }
 
-    // Legacy structure: {project}/team-coder/
+    // LEGACY structure: {project}/team-coder/ (direct child)
     const legacyTeamCoderPath = path.resolve(path.join(projectPath, 'team-coder'))
-    if (fs.existsSync(legacyTeamCoderPath)) {
+    if (fs.existsSync(legacyTeamCoderPath) && !results.some(r => r.path === legacyTeamCoderPath)) {
       results.push({
         id: Buffer.from(legacyTeamCoderPath).toString('base64url'),
         name: projectDir.name,

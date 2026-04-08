@@ -22,8 +22,7 @@
 import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
-import { getProjectsDir } from '../utils/paths.js'
-import { slugify } from '../utils/paths.js'
+import { getProjectsDir, envDirPath, slugify } from '../utils/paths.js'
 
 export interface DefaultEnvironment {
   name: string
@@ -189,20 +188,22 @@ function sanitiseRemote(targetDir: string, originalUrl: string): void {
 
 /**
  * Resolve the target directory for a project's environments.
- * Structure: {baseDir}/{projectSlug}/
+ * Structure: {baseDir}/{projectSlug}/env/
  *
- * Each environment gets a subdirectory: {projectSlug}/plan, {projectSlug}/dev, etc.
+ * Each environment gets a subdirectory under env/: env/plan, env/dev, etc.
  */
 export function getProjectEnvsBaseDir(projectName: string, baseDir?: string): string {
   const root = baseDir || getProjectsDir()
-  return path.join(root, slugify(projectName))
+  return path.join(root, slugify(projectName), 'env')
 }
 
 /**
  * Get the path for a specific environment within a project.
+ * Structure: {baseDir}/{projectSlug}/env/{envSlug}/
  */
 export function getEnvProjectPath(projectName: string, envName: string, baseDir?: string): string {
-  return path.join(getProjectEnvsBaseDir(projectName, baseDir), slugify(envName))
+  const root = baseDir || getProjectsDir()
+  return envDirPath(root, projectName, envName)
 }
 
 /**

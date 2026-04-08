@@ -100,6 +100,16 @@ ensure_deps "$ROOT/api" "API"
 ensure_deps "$ROOT/dashboard" "Dashboard"
 
 # ─── Check Claude CLI ────────────────────────────────────────────
+# Run project directory migrations before starting services
+echo '→ Checking for directory migrations...'
+MIGRATION_SCRIPT="$ROOT/scripts/migrations/005-migrate-env-teams-structure.sh"
+if [ -f "$MIGRATION_SCRIPT" ]; then
+  bash "$MIGRATION_SCRIPT" || echo '  ⚠ Migration script had errors — check above'
+else
+  echo '  → No migrations pending'
+fi
+echo ""
+
 echo '→ Checking Claude CLI authentication...'
 if command -v claude >/dev/null 2>&1; then
   CLAUDE_AUTH=$(claude --version 2>&1)

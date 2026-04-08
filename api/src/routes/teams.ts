@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { authenticateToken } from '../middleware/auth.js'
 import { db } from '../db/index.js'
-import { agentWorkspacePath, slugify, AGENTS_BASE_PATH } from '../utils/paths.js'
+import { agentWorkspacePath, slugify, AGENTS_BASE_PATH, teamWorkspacePath, teamsBaseDir } from '../utils/paths.js'
 import { updateAgentSettings, rebuildAgentSettings } from '../utils/agentSettings.js'
 import { AGENT_TEMPLATES, renderTemplate } from '../utils/claudeMdTemplates.js'
 /** @deprecated AGENT_TEMPLATES is deprecated — use TEAM_TEMPLATES from teamTemplates.ts */
@@ -20,7 +20,7 @@ const __dirname = path.dirname(__filename)
 const router = Router()
 
 function getWorkspacePath(project: string): string {
-  return path.resolve(path.join(AGENTS_BASE_PATH, project, 'team-coder'))
+  return teamWorkspacePath(AGENTS_BASE_PATH, project, 'team-coder')
 }
 
 interface WorkspaceInfo {
@@ -59,16 +59,16 @@ function listAllWorkspaces(): WorkspaceInfo[] {
 
   for (const projectDir of projectDirs) {
     const projectPath = path.join(AGENTS_BASE_PATH, projectDir.name)
-    const agentsDirPath = path.join(projectPath, 'agents')
 
-    // New structure: {project}/agents/{agent-name}/
-    if (fs.existsSync(agentsDirPath)) {
+    // NEW structure: {project}/teams/{team-name}/
+    const teamsDirPath = path.join(projectPath, 'teams')
+    if (fs.existsSync(teamsDirPath)) {
       try {
-        const agentDirs = fs.readdirSync(agentsDirPath, { withFileTypes: true })
+        const teamDirs = fs.readdirSync(teamsDirPath, { withFileTypes: true })
           .filter(d => d.isDirectory())
 
-        for (const agentDir of agentDirs) {
-          const fullPath = path.resolve(path.join(agentsDirPath, agentDir.name))
+        for (const teamDir of teamDirs) {
+          const fullPath = path.resolve(path.join(teamsDirPath, teamDir.name))
           const settingsPath = path.join(fullPath, '.claude', 'settings.local.json')
           const claudeMdPath = path.join(fullPath, 'CLAUDE.md')
           const settings = readJsonSafe(settingsPath)
@@ -83,7 +83,63 @@ function listAllWorkspaces(): WorkspaceInfo[] {
             'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
           ).get(fullPath) as any
 
+          // Fetch linked environment_id from agent_environments table
+          const envLink = db.prepare(
+            'SELECT environment_id FROM agent_environments WHERE workspace_path = ? LIMIT 1'
+          ).get(fullPath) as any
+
           // Read model from settings.local.json (ANTHROPIC_MODEL env var)
+          const model = settings?.env?.ANTHROPIC_MODEL || ''
+
+          // Determine workspace type
+          const teamName = teamDir.name
+          const isEnvTeam = teamName.startsWith('team-')
+          const dirRole = teamName.replace(/^team-|^agent-/, '')
+
+          results.push({
+            id: Buffer.from(fullPath).toString('base64url'),
+            name: teamName,
+            path: fullPath,
+            exists: true,
+            hasSettings: fs.existsSync(settingsPath),
+            hasClaude: fs.existsSync(claudeMdPath),
+            baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
+            type: isEnvTeam ? 'env-agent' : 'agent',
+            project_id: projectLink?.project_id ?? null,
+            role: roleRow?.role ?? dirRole,
+            model: model,
+            environment_id: envLink?.environment_id ?? null,
+          })
+        }
+      } catch (err) {
+        console.error(`[teams] Error scanning teams dir ${teamsDirPath}:`, err)
+      }
+    }
+
+    // LEGACY structure: {project}/agents/{agent-name}/ (old custom agents)
+    const legacyAgentsDir = path.join(projectPath, 'agents')
+    if (fs.existsSync(legacyAgentsDir)) {
+      try {
+        const agentDirs = fs.readdirSync(legacyAgentsDir, { withFileTypes: true })
+          .filter(d => d.isDirectory())
+
+        for (const agentDir of agentDirs) {
+          const fullPath = path.resolve(path.join(legacyAgentsDir, agentDir.name))
+          // Skip if already found via teams/ (after migration)
+          if (results.some(r => r.path === fullPath)) continue
+
+          const settingsPath = path.join(fullPath, '.claude', 'settings.local.json')
+          const claudeMdPath = path.join(fullPath, 'CLAUDE.md')
+          const settings = readJsonSafe(settingsPath)
+
+          const projectLink = db.prepare(
+            'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
+          ).get(fullPath) as any
+
+          const roleRow = db.prepare(
+            'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
+          ).get(fullPath) as any
+
           const model = settings?.env?.ANTHROPIC_MODEL || ''
 
           results.push({
@@ -94,7 +150,7 @@ function listAllWorkspaces(): WorkspaceInfo[] {
             hasSettings: fs.existsSync(settingsPath),
             hasClaude: fs.existsSync(claudeMdPath),
             baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
-            type: 'agent',
+            type: 'legacy',
             project_id: projectLink?.project_id ?? null,
             role: roleRow?.role ?? 'coder',
             model: model,
@@ -102,90 +158,83 @@ function listAllWorkspaces(): WorkspaceInfo[] {
           })
         }
       } catch (err) {
-        console.error(`[teams] Error scanning agents dir ${agentsDirPath}:`, err)
+        console.error(`[teams] Error scanning legacy agents dir ${legacyAgentsDir}:`, err)
       }
     }
 
-    // Environment teams: {project}/{env}/team-coder/ and {project}/{env}/team-planner/
+    // LEGACY structure: {project}/{env}/team-{role}/ (env-nested teams)
     try {
-      const envDirs = fs.readdirSync(projectPath, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name !== 'agents')
+      const subDirs = fs.readdirSync(projectPath, { withFileTypes: true })
+        .filter(d => d.isDirectory() && !['agents', 'teams', 'env', 'workflows'].includes(d.name))
 
-      for (const envDir of envDirs) {
-        const envDirPath = path.join(projectPath, envDir.name)
+      for (const subDir of subDirs) {
+        const subDirPath = path.join(projectPath, subDir.name)
         try {
-          // Scan for all team subdirectories (team-coder, team-planner, etc.)
-          const teamSubDirs = fs.readdirSync(envDirPath, { withFileTypes: true })
+          const teamSubDirs = fs.readdirSync(subDirPath, { withFileTypes: true })
             .filter(d => d.isDirectory() && (d.name.startsWith('team-') || d.name.startsWith('agent-')))
 
           for (const teamSubDir of teamSubDirs) {
-            const teamPath = path.resolve(path.join(envDirPath, teamSubDir.name))
+            const teamPath = path.resolve(path.join(subDirPath, teamSubDir.name))
+            // Skip if already found via teams/
+            if (results.some(r => r.path === teamPath)) continue
+
             const settingsPath = path.join(teamPath, '.claude', 'settings.local.json')
             const claudeMdPath = path.join(teamPath, 'CLAUDE.md')
             const settings = readJsonSafe(settingsPath)
 
-            // Fetch project_id from project_agents table
             const projectLink = db.prepare(
               'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
             ).get(teamPath) as any
 
-            // Fetch role from team_roles table
             const roleRow = db.prepare(
               'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
             ).get(teamPath) as any
 
-            // Fetch linked environment_id from agent_environments table
             const envLink = db.prepare(
               'SELECT environment_id FROM agent_environments WHERE workspace_path = ? LIMIT 1'
             ).get(teamPath) as any
 
-            // Derive role from directory name as fallback
-            const dirRole = teamSubDir.name.replace(/^team-|^agent-/, '') // 'coder' or 'planner'
-
-            // Read model from settings.local.json (ANTHROPIC_MODEL env var)
+            const dirRole = teamSubDir.name.replace(/^team-|^agent-/, '')
             const model = settings?.env?.ANTHROPIC_MODEL || ''
 
             results.push({
               id: Buffer.from(teamPath).toString('base64url'),
-              name: `${projectDir.name}/${envDir.name}/${dirRole}`,
+              name: teamSubDir.name,
               path: teamPath,
               exists: true,
               hasSettings: fs.existsSync(settingsPath),
               hasClaude: fs.existsSync(claudeMdPath),
               baseUrl: settings?.env?.ANTHROPIC_BASE_URL ?? null,
-              type: 'env-agent',
+              type: 'legacy',
               project_id: projectLink?.project_id ?? null,
               role: roleRow?.role ?? dirRole,
               model: model,
               environment_id: envLink?.environment_id ?? null,
             })
           }
-        } catch (err) {
-          console.error(`[teams] Error scanning env dir ${envDirPath}:`, err)
+        } catch {
+          // Not an env dir or no team subdirs, skip silently
         }
       }
-    } catch (err) {
-      console.error(`[teams] Error scanning project dir ${projectPath}:`, err)
+    } catch {
+      // Ignore scan errors
     }
 
-    // Legacy structure: {project}/team-coder/ (for backward compatibility)
+    // LEGACY structure: {project}/team-coder/ (direct child)
     const legacyTeamCoderPath = path.resolve(path.join(projectPath, 'team-coder'))
-    if (fs.existsSync(legacyTeamCoderPath)) {
+    if (fs.existsSync(legacyTeamCoderPath) && !results.some(r => r.path === legacyTeamCoderPath)) {
       const settingsPath = path.join(legacyTeamCoderPath, '.claude', 'settings.local.json')
       const claudeMdPath = path.join(legacyTeamCoderPath, 'CLAUDE.md')
       const settings = readJsonSafe(settingsPath)
 
-      // Fetch project_id from project_agents table
       const projectLink = db.prepare(
         'SELECT project_id FROM project_agents WHERE workspace_path = ? LIMIT 1'
       ).get(legacyTeamCoderPath) as any
 
-      // Fetch role from team_roles table
       const roleRow = db.prepare(
         'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
       ).get(legacyTeamCoderPath) as any
 
-      // Read model from settings.local.json (ANTHROPIC_MODEL env var)
       const model = settings?.env?.ANTHROPIC_MODEL || ''
 
       results.push({
@@ -502,8 +551,8 @@ router.post('/', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Project not found' })
   }
 
-  // Gerar o path usando a nova estrutura
-  const teamPath = agentWorkspacePath(AGENTS_BASE_PATH, project.name, name)
+  // Gerar o path usando a nova estrutura — teams/ subfolder
+  const teamPath = teamWorkspacePath(AGENTS_BASE_PATH, project.name, name)
 
   if (fs.existsSync(teamPath)) {
     return res.status(409).json({ data: null, error: 'Workspace already exists' })
@@ -977,7 +1026,7 @@ router.put('/:id/rename', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Workspace not found' })
   }
 
-  const oldProjectPath = path.dirname(workspace.path) // The actual project root
+  const oldProjectPath = path.dirname(path.dirname(workspace.path)) // Navigate up from teams/{team-name} to project root
   const newProjectPath = path.join(AGENTS_BASE_PATH, name)
 
   if (fs.existsSync(newProjectPath)) {
@@ -1499,7 +1548,7 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get planner workspace for this project
+    // Get planner workspace for this project — MUST be from the same project
     const plannerRow = db.prepare(`
       SELECT pa.workspace_path FROM project_agents pa
       LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
@@ -1507,8 +1556,22 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
       LIMIT 1
     `).get(workspace.project_id) as any
 
-    const plannerWorkspace = plannerRow?.workspace_path ||
-      path.join(AGENTS_BASE_PATH, 'weave', 'agents', 'planner')
+    if (!plannerRow?.workspace_path) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
+      })
+    }
+
+    const plannerWorkspace = plannerRow.workspace_path
+
+    // Verify the planner workspace exists on disk
+    if (!fs.existsSync(plannerWorkspace)) {
+      return res.status(400).json({
+        data: null,
+        error: `Planner workspace not found at ${plannerWorkspace}. Please repair the team or recreate it.`
+      })
+    }
 
     // Read current CLAUDE.md if it exists to provide additional context
     let currentClaudeMdContent = ''
@@ -1545,9 +1608,9 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
     const prompt = `You are an expert at writing clear, concise, and effective CLAUDE.md files for AI coding agents. Your task is to improve the following CLAUDE.md content while maintaining its core purpose and structure.
 
 Context:
-- This CLAUDE.md is for the "${workspace.name}" agent
-- The agent workspace is located at: ${workspace.path}
-- The agent role is: ${workspace.role || 'generic'}
+- This CLAUDE.md is for the "${workspace.name}" team
+- The team workspace is located at: ${workspace.path}
+- The team role is: ${workspace.role || 'generic'}
 
 Current CLAUDE.md file content (use as base reference):
 ${currentClaudeMdContent || '(No existing CLAUDE.md file)'}
@@ -1578,35 +1641,45 @@ Guidelines for improvement:
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
     // Resolve the actual project source directory (not the API server cwd)
-    // First try: find environment linked to the specific workspace
+    // The team being improved MUST have a default environment to read project files from
     let projectCwd: string | undefined
-    const projectEnvRow = db.prepare(`
-      SELECT e.project_path FROM agent_environments ae
-      JOIN environments e ON e.id = ae.environment_id
-      WHERE ae.workspace_path = ?
+
+    // First try: find the default environment for this project
+    const defaultEnvRow = db.prepare(`
+      SELECT e.project_path FROM environments e
+      WHERE e.project_id = ?
       AND e.project_path IS NOT NULL AND e.project_path != ''
+      ORDER BY
+        CASE WHEN e.env_type = 'dev' THEN 0
+             WHEN e.env_type = 'plan' THEN 1
+             WHEN e.env_type = 'staging' THEN 2
+             ELSE 3 END
       LIMIT 1
-    `).get(workspace.path) as any
-    if (projectEnvRow?.project_path) {
-      projectCwd = projectEnvRow.project_path
+    `).get(workspace.project_id) as any
+
+    if (defaultEnvRow?.project_path) {
+      projectCwd = defaultEnvRow.project_path
     }
 
-    // Second try: find ANY environment for this project with a valid project_path
-    if (!projectCwd && workspace.project_id) {
-      const anyEnvRow = db.prepare(`
-        SELECT e.project_path FROM environments e
-        WHERE e.project_id = ?
+    // Second try: find environment linked to the specific workspace
+    if (!projectCwd) {
+      const projectEnvRow = db.prepare(`
+        SELECT e.project_path FROM agent_environments ae
+        JOIN environments e ON e.id = ae.environment_id
+        WHERE ae.workspace_path = ?
         AND e.project_path IS NOT NULL AND e.project_path != ''
         LIMIT 1
-      `).get(workspace.project_id) as any
-      if (anyEnvRow?.project_path) {
-        projectCwd = anyEnvRow.project_path
+      `).get(workspace.path) as any
+      if (projectEnvRow?.project_path) {
+        projectCwd = projectEnvRow.project_path
       }
     }
 
     if (!projectCwd) {
-      console.warn(`[teams] No project_path found for workspace ${workspace.path} (project ${workspace.project_id}). Using fallback.`)
-      projectCwd = process.cwd()
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have any environment with a valid project path. AI improvements require access to the project source code. Please set up at least one environment (dev, plan, or staging) with a project path.'
+      })
     }
 
     const tasks = [{
@@ -1662,7 +1735,7 @@ router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get planner workspace for this project
+    // Get planner workspace for this project — MUST be from the same project
     const plannerRow = db.prepare(`
       SELECT pa.workspace_path FROM project_agents pa
       LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
@@ -1670,8 +1743,22 @@ router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
       LIMIT 1
     `).get(workspace.project_id) as any
 
-    const plannerWorkspace = plannerRow?.workspace_path ||
-      path.join(AGENTS_BASE_PATH, 'weave', 'agents', 'planner')
+    if (!plannerRow?.workspace_path) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
+      })
+    }
+
+    const plannerWorkspace = plannerRow.workspace_path
+
+    // Verify the planner workspace exists on disk
+    if (!fs.existsSync(plannerWorkspace)) {
+      return res.status(400).json({
+        data: null,
+        error: `Planner workspace not found at ${plannerWorkspace}. Please repair the team or recreate it.`
+      })
+    }
 
     // Read current CLAUDE.md if it exists to provide project context
     let claudeMdContent = ''
@@ -1758,35 +1845,44 @@ Guidelines for improvement:
 3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
 
     // Resolve the actual project source directory (not the API server cwd)
-    // First try: find environment linked to the specific workspace
     let agentProjectCwd: string | undefined
-    const agentProjectEnvRow = db.prepare(`
-      SELECT e.project_path FROM agent_environments ae
-      JOIN environments e ON e.id = ae.environment_id
-      WHERE ae.workspace_path = ?
+
+    // First try: find the default environment for this project
+    const agentDefaultEnvRow = db.prepare(`
+      SELECT e.project_path FROM environments e
+      WHERE e.project_id = ?
       AND e.project_path IS NOT NULL AND e.project_path != ''
+      ORDER BY
+        CASE WHEN e.env_type = 'dev' THEN 0
+             WHEN e.env_type = 'plan' THEN 1
+             WHEN e.env_type = 'staging' THEN 2
+             ELSE 3 END
       LIMIT 1
-    `).get(workspace.path) as any
-    if (agentProjectEnvRow?.project_path) {
-      agentProjectCwd = agentProjectEnvRow.project_path
+    `).get(workspace.project_id) as any
+
+    if (agentDefaultEnvRow?.project_path) {
+      agentProjectCwd = agentDefaultEnvRow.project_path
     }
 
-    // Second try: find ANY environment for this project with a valid project_path
-    if (!agentProjectCwd && workspace.project_id) {
-      const anyAgentEnvRow = db.prepare(`
-        SELECT e.project_path FROM environments e
-        WHERE e.project_id = ?
+    // Second try: find environment linked to the specific workspace
+    if (!agentProjectCwd) {
+      const agentProjectEnvRow = db.prepare(`
+        SELECT e.project_path FROM agent_environments ae
+        JOIN environments e ON e.id = ae.environment_id
+        WHERE ae.workspace_path = ?
         AND e.project_path IS NOT NULL AND e.project_path != ''
         LIMIT 1
-      `).get(workspace.project_id) as any
-      if (anyAgentEnvRow?.project_path) {
-        agentProjectCwd = anyAgentEnvRow.project_path
+      `).get(workspace.path) as any
+      if (agentProjectEnvRow?.project_path) {
+        agentProjectCwd = agentProjectEnvRow.project_path
       }
     }
 
     if (!agentProjectCwd) {
-      console.warn(`[teams] No project_path found for workspace ${workspace.path} (project ${workspace.project_id}). Using fallback.`)
-      agentProjectCwd = process.cwd()
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have any environment with a valid project path. AI improvements require access to the project source code. Please set up at least one environment (dev, plan, or staging) with a project path.'
+      })
     }
 
     const tasks = [{

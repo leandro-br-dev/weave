@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.js'
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
-import { envTeamPath, envTeamPlannerPath, AGENTS_BASE_PATH } from '../utils/paths.js'
+import { envTeamPath, envTeamPlannerPath, AGENTS_BASE_PATH, teamWorkspacePath, envDirPath } from '../utils/paths.js'
 import { getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
 import { createDefaultEnvironments, isValidGitUrl, ENV_TYPE_NAMES } from '../services/gitClone.js'
 import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv } from '../services/environmentTeamBootstrap.js'
@@ -1003,12 +1003,10 @@ router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
     const agentSlug = slugify(name)
     const projectSlug = slugify(project.name)
 
-    // Paths
-    const workspacePath = env
-      ? path.join(env.team_workspace, 'agents', agentSlug)
-      : path.join(AGENTS_BASE_PATH, projectSlug, 'agents', agentSlug)
+    // Paths — all teams go under {project}/teams/
+    const workspacePath = teamWorkspacePath(AGENTS_BASE_PATH, projectSlug, agentSlug)
 
-    // Planner workspace — usa o planner do projeto ou o padrão
+    // Planner workspace — use the project's own planner team
     const plannerRow = db.prepare(`
       SELECT pa.workspace_path FROM project_agents pa
       LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
@@ -1016,8 +1014,14 @@ router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
       LIMIT 1
     `).get(req.params.id) as any
 
-    const plannerWorkspace = plannerRow?.workspace_path ||
-      path.join(AGENTS_BASE_PATH, 'weave', 'agents', 'planner')
+    if (!plannerRow?.workspace_path) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have a planner team. Please create a planner team for this project before generating agents with AI.'
+      })
+    }
+
+    const plannerWorkspace = plannerRow.workspace_path
 
     // Project path from environment or default
     const projectPath = env?.project_path || ''
@@ -1313,7 +1317,7 @@ You are a team workspace for the **${project.name}** project.
 
     // Create Coder team
     if (create_coder) {
-      const coderPath = envTeamPath(AGENTS_BASE_PATH, project.name, env.name)
+      const coderPath = teamWorkspacePath(AGENTS_BASE_PATH, project.name, 'team-coder')
       createAgentWorkspace(coderPath, 'team-coder', 'coder', env.project_path)
       // Update the environment's team_workspace and default_team now that the user has confirmed creation
       db.prepare('UPDATE environments SET team_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
@@ -1330,7 +1334,7 @@ You are a team workspace for the **${project.name}** project.
 
     // Create Planner team
     if (create_planner) {
-      const plannerPath = envTeamPlannerPath(AGENTS_BASE_PATH, project.name, env.name)
+      const plannerPath = teamWorkspacePath(AGENTS_BASE_PATH, project.name, 'team-planner')
       createAgentWorkspace(plannerPath, 'team-planner', 'planner', env.project_path)
       // Also link this workspace to the specific environment in agent_environments table
       db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(plannerPath, environment_id)
