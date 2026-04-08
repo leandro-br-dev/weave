@@ -113,7 +113,7 @@ update_db_path() {
 }
 
 # ─── Process each project directory ───────────────────────────────────
-for project_dir in "$PROJECTS_DIR"/*/; do
+for project_dir in "$PROJECTS_DIR/"*/; do
   [ -d "$project_dir" ] || continue
 
   project_name="$(basename "$project_dir")"
@@ -125,7 +125,7 @@ for project_dir in "$PROJECTS_DIR"/*/; do
   teams_dir_created=false
 
   # ── Step 1: Identify and move team-* subdirectories into teams/ ──
-  for subdir in "$project_dir"*/; do
+  for subdir in "$project_dir/"*/; do
     [ -d "$subdir" ] || continue
     sub_name="$(basename "$subdir")"
     sub_name="${sub_name%/}"
@@ -136,7 +136,7 @@ for project_dir in "$PROJECTS_DIR"/*/; do
     esac
 
     # Check if this subdirectory contains team-* or agent-* directories
-    for team_dir in "$subdir"*/; do
+    for team_dir in "$subdir/"*/; do
       [ -d "$team_dir" ] || continue
       team_name="$(basename "$team_dir")"
       team_name="${team_name%/}"
@@ -221,7 +221,21 @@ for project_dir in "$PROJECTS_DIR"/*/; do
     # Check if this dir has been fully migrated (only meta files remain)
     # A source-code env will have .git, src/, or other project files
     has_source=false
-    for item in "$old_env_path"*/ "$old_env_path".git "$old_env_path".gitignore 2>/dev/null; do
+    # Enable nullglob so non-matching globs expand to nothing instead of literals
+    local_nullglob_was_set=false
+    if shopt -q nullglob; then
+      local_nullglob_was_set=true
+    fi
+    shopt -s nullglob
+
+    source_items=("$old_env_path/"*/ "$old_env_path"/.git "$old_env_path"/.gitignore)
+
+    # Restore nullglob setting
+    if [ "$local_nullglob_was_set" = false ]; then
+      shopt -u nullglob
+    fi
+
+    for item in "${source_items[@]}"; do
       item_name="$(basename "$item")"
       case "$item_name" in
         .git|.gitignore|src|lib|api|client|dashboard|docs|public|assets|components|pages|config|test|tests|spec|specs|*.json|*.md|*.yml|*.yaml|*.toml|*.lock|node_modules|venv|.env|*.py|*.ts|*.js)
@@ -264,7 +278,7 @@ for project_dir in "$PROJECTS_DIR"/*/; do
   done
 
   # ── Step 3: Move any remaining non-meta subdirectories into env/ ──
-  for subdir in "$project_dir"*/; do
+  for subdir in "$project_dir/"*/; do
     [ -d "$subdir" ] || continue
     sub_name="$(basename "$subdir")"
     sub_name="${sub_name%/}"
@@ -292,7 +306,7 @@ for project_dir in "$PROJECTS_DIR"/*/; do
 
     # Check for team subdirs
     has_team=false
-    for item in "$subdir"*/; do
+    for item in "$subdir/"*/; do
       item_name="$(basename "$item")"
       for prefix in $KNOWN_TEAM_PREFIXES; do
         if [[ "$item_name" == "$prefix"* ]]; then
@@ -334,7 +348,7 @@ for project_dir in "$PROJECTS_DIR"/*/; do
       teams_dir_created=true
     fi
 
-    for agent_dir in "$old_agents_dir"*/; do
+    for agent_dir in "$old_agents_dir/"*/; do
       [ -d "$agent_dir" ] || continue
       agent_name="$(basename "$agent_dir")"
       agent_name="${agent_name%/}"
