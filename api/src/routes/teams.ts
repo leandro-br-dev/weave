@@ -1656,14 +1656,53 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
       ? `\n## User Instructions\n\nThe user has provided specific instructions for this improvement. Follow these directions carefully:\n\n${userInstructions.trim()}\n`
       : ''
 
+    // Read agent definitions from the team's .claude/agents/ directory
+    const agentsDir = path.join(workspace.path, '.claude', 'agents')
+    let agentsContext = ''
+    if (fs.existsSync(agentsDir)) {
+      const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+      if (agentFiles.length > 0) {
+        agentsContext = `\n## Agents Available in This Team\n\nThe following agents are defined in ${agentsDir}/ and can be orchestrated by this team:\n\n`
+        for (const af of agentFiles) {
+          try {
+            const agentContent = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+            // Extract frontmatter name or use filename
+            const nameMatch = agentContent.match(/^---\s*\n[\s\S]*?name:\s*["']?([^"'\n]+)/)
+            const agentName = nameMatch ? nameMatch[1] : af.replace('.md', '')
+            // Extract description from frontmatter if present
+            const descMatch = agentContent.match(/^---\s*\n[\s\S]*?description:\s*["']([^"']+)["']/)
+            const agentDesc = descMatch ? descMatch[1] : ''
+            agentsContext += `- **${agentName}** (${af})${agentDesc ? ': ' + agentDesc : ''}\n`
+          } catch (readErr) {
+            agentsContext += `- **${af.replace('.md', '')}** (${af}): (could not read file)\n`
+          }
+        }
+        agentsContext += `\nThese are the REAL agents belonging to this team. Reference ONLY these agents in the CLAUDE.md. Do NOT invent agents that don't exist. Do NOT reference other teams or workspaces.\n`
+      }
+    } else {
+      agentsContext = `\n## Agents Available in This Team\n\nNo agents directory found at ${agentsDir}/. This team has no agent definitions yet.\n`
+    }
+
     // Create improvement prompt
     const prompt = `You are an expert at writing clear, concise, and effective CLAUDE.md files for AI coding agents. Your task is to improve the following CLAUDE.md content while maintaining its core purpose and structure.
+
+## CRITICAL CONCEPTS — READ FIRST
+
+**Team (Equipe):** A workspace where agents operate. This CLAUDE.md belongs to the team "${workspace.name}" at path: ${workspace.path}
+
+**Agent (Agente):** A specialist that can be invoked within a team to execute specific tasks. Agents are defined as .md files in the team's .claude/agents/ directory.
+
+**NEVER confuse teams with agents:**
+- Do NOT list other teams as "available agents"
+- Do NOT reference paths like "dev/agent-coder" or "staging/agent-reviewer" — these are deprecated
+- Do NOT invent agent names or roles that don't exist in the .claude/agents/ directory
+- ONLY list the agents that actually exist in this team's .claude/agents/ folder
 
 Context:
 - This CLAUDE.md is for the "${workspace.name}" team
 - The team workspace is located at: ${workspace.path}
 - The team role is: ${workspace.role || 'generic'}
-
+${agentsContext}
 Current CLAUDE.md file content (use as base reference):
 ${currentClaudeMdContent || '(No existing CLAUDE.md file)'}
 
@@ -1680,6 +1719,7 @@ Guidelines for improvement:
 7. Keep any project-specific information intact
 8. Consider both the existing file (if any) and the user-provided content
 9. Preserve valuable information from the existing file while incorporating improvements from the user content
+10. If the existing or user content references non-existent agents, deprecated paths, or confuses teams with agents — CORRECT these errors
 
 ## IMPORTANT: Output format — READ CAREFULLY
 

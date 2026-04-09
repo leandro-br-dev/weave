@@ -580,15 +580,17 @@ router.put('/:id', authenticateToken, (req, res) => {
   }
 })
 
-// GET /api/projects/:id/agents-context — retorna agentes disponíveis para injeção no contexto do planejador (agentes dentro de equipes)
+// GET /api/projects/:id/agents-context — returns teams available for planner context injection
+// NOTE: The project_agents table stores TEAM workspace paths, not individual agents.
+// Each team has its own agents defined in .claude/agents/ within the team workspace.
 router.get('/:id/agents-context', authenticateToken, (req, res) => {
   try {
     // Verify project exists
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id)
     if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
 
-    // Fetch agents linked to the project with their roles
-    const agents = db.prepare(`
+    // Fetch teams linked to the project with their roles
+    const teams = db.prepare(`
       SELECT
         pa.workspace_path,
         wr.role,
@@ -599,23 +601,22 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
       ORDER BY pa.created_at ASC
     `).all(req.params.id) as any[]
 
-    // Format each agent for the planner context
-    const formattedAgents = agents.map((agent) => {
-      const workspacePath = agent.workspace_path
-      const role = agent.role || 'generic'
+    // Format each team for the planner context
+    const formattedTeams = teams.map((team) => {
+      const workspacePath = team.workspace_path
+      const role = team.role || 'generic'
 
       // Extract name from workspace path
-      // Current format: {basePath}/{projectSlug}/{envSlug}/team-{role}/
-      // Legacy format:  {basePath}/{projectSlug}/agents/{agent-name}/
+      // Current format: {basePath}/{projectSlug}/teams/team-{role}/
       const pathParts = workspacePath.split(path.sep).filter(Boolean)
       let name = 'unknown'
 
-      // Try current environment-team format: .../{project}/{env}/team-{role}
+      // Try current environment-team format: .../{project}/teams/team-{role}
       if (pathParts.length >= 5 && pathParts[pathParts.length - 1].startsWith('team-')) {
         name = pathParts[pathParts.length - 1]
-        // Also extract the environment name for context
-        const envName = pathParts[pathParts.length - 2]
-        name = `${name} (${envName})`
+        // Also extract the parent directory for context
+        const parentName = pathParts[pathParts.length - 2]
+        name = `${name} (${parentName})`
       } else if (pathParts.length >= 5 && pathParts[3] === 'agents') {
         // Legacy structure: .../projects/{project}/agents/{agent-name}
         name = pathParts[4]
@@ -624,17 +625,35 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
         name = pathParts[pathParts.length - 1]
       }
 
+      // Discover actual agents inside the team's .claude/agents/ directory
+      const agentsDir = path.join(workspacePath, '.claude', 'agents')
+      const teamAgents: string[] = []
+      if (fs.existsSync(agentsDir)) {
+        const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+        for (const af of agentFiles) {
+          try {
+            const content = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+            const nameMatch = content.match(/^---\s*\n[\s\S]*?name:\s*["']?([^"'\n]+)/)
+            teamAgents.push(nameMatch ? nameMatch[1].trim() : af.replace('.md', ''))
+          } catch {
+            teamAgents.push(af.replace('.md', ''))
+          }
+        }
+      }
+
       return {
         name,
+        type: 'team', // These are teams, not individual agents
         role,
         workspace_path: workspacePath,
+        agents: teamAgents, // Actual agents within this team
         cwd: null, // CWD will be set by the task/environment configuration
       }
     })
 
-    return res.json({ data: formattedAgents, error: null })
+    return res.json({ data: formattedTeams, error: null })
   } catch (e: any) {
-    console.error('Error fetching agents context:', e)
+    console.error('Error fetching teams context:', e)
     return res.status(500).json({ data: null, error: e.message })
   }
 })
@@ -715,8 +734,8 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
       })
     )
 
-    // Fetch agents with roles
-    const agents = db.prepare(`
+    // Fetch teams with roles (project_agents stores team workspace paths)
+    const teams = db.prepare(`
       SELECT
         pa.workspace_path,
         COALESCE(wr.role, 'generic') as role
@@ -725,35 +744,47 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
       WHERE pa.project_id = ?
     `).all(req.params.id) as any[]
 
-    // Format agents with names
-    const agentsWithNames = agents.map((a: any) => {
-      const workspacePath = a.workspace_path
-      const role = a.role
+    // Format teams with names and discover their agents
+    const teamsWithAgents = teams.map((t: any) => {
+      const workspacePath = t.workspace_path
+      const role = t.role
 
       // Extract name from workspace path
-      // Current format: {basePath}/{projectSlug}/{envSlug}/team-{role}/
-      // Legacy format:  {basePath}/{projectSlug}/agents/{agent-name}/
       const pathParts = workspacePath.split(path.sep).filter(Boolean)
       let name = 'unknown'
 
-      // Try current environment-team format: .../{project}/{env}/team-{role}
       if (pathParts.length >= 5 && pathParts[pathParts.length - 1].startsWith('team-')) {
         name = pathParts[pathParts.length - 1]
-        // Also extract the environment name for context
-        const envName = pathParts[pathParts.length - 2]
-        name = `${name} (${envName})`
+        const parentName = pathParts[pathParts.length - 2]
+        name = `${name} (${parentName})`
       } else if (pathParts.length >= 5 && pathParts[3] === 'agents') {
-        // Legacy structure: .../projects/{project}/agents/{agent-name}
         name = pathParts[4]
       } else if (pathParts.length >= 4) {
-        // Fallback: use last directory component
         name = pathParts[pathParts.length - 1]
+      }
+
+      // Discover actual agents inside the team's .claude/agents/ directory
+      const agentsDir = path.join(workspacePath, '.claude', 'agents')
+      const teamAgents: string[] = []
+      if (fs.existsSync(agentsDir)) {
+        const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+        for (const af of agentFiles) {
+          try {
+            const content = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+            const nameMatch = content.match(/^---\s*\n[\s\S]*?name:\s*["']?([^"'\n]+)/)
+            teamAgents.push(nameMatch ? nameMatch[1].trim() : af.replace('.md', ''))
+          } catch {
+            teamAgents.push(af.replace('.md', ''))
+          }
+        }
       }
 
       return {
         name,
+        type: 'team',
         role,
         workspace_path: workspacePath,
+        agents: teamAgents,
       }
     })
 
@@ -774,7 +805,7 @@ router.get('/:id/planning-context', authenticateToken, async (req, res) => {
           color: project.color || '',
         },
         environments: environmentsWithContext,
-        agents: agentsWithNames,
+        teams: teamsWithAgents,
         workflow_context,
       },
       error: null,

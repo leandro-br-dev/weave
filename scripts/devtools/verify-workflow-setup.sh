@@ -49,11 +49,8 @@ echo "Checking files..."
 echo ""
 
 # Core files
-check_file "/root/projects/weave/projects/weave/agents/planner/CLAUDE.md" \
-    "Planner agent CLAUDE.md"
-
-check_file "/root/projects/weave/api/src/routes/workspaces.ts" \
-    "Workspaces routes"
+check_file "/root/projects/weave/api/src/routes/teams.ts" \
+    "Teams routes"
 
 check_file "/root/projects/weave/api/src/routes/plans.ts" \
     "Plans routes"

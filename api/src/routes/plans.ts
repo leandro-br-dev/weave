@@ -1235,7 +1235,7 @@ ${rework_prompt}`
         })
       }
 
-      // Fetch all project agents with their roles for the planner prompt
+      // Fetch all project teams with their roles for the planner prompt
       const projectAgents = db.prepare(`
         SELECT
           pa.workspace_path,
@@ -1250,9 +1250,9 @@ ${rework_prompt}`
         SELECT slug, name, project_path FROM environments WHERE project_id = ?
       `).all(sourcePlan.project_id) as any[]
 
-      const agentsList = projectAgents.length > 0
+      const teamsList = projectAgents.length > 0
         ? projectAgents.map(a => `- ${a.role}: ${a.workspace_path}`).join('\n')
-        : 'No agents configured.'
+        : 'No teams configured.'
 
       const envsList = environments.length > 0
         ? environments.map(e => `- ${e.name} (${e.slug}): ${e.project_path || 'N/A'}`).join('\n')
@@ -1264,8 +1264,10 @@ ${rework_prompt}`
 
 IMPORTANT: You are acting as a **planner** for a rework. Your job is to analyze the context above and generate a **new execution plan** that addresses the modification request.
 
-## Available Agents
-${agentsList}
+## Available Teams
+${teamsList}
+
+> **Note:** These are TEAMS (workspaces), not individual agents. Each team has its own agents defined in its .claude/agents/ directory. When assigning tasks, specify the team workspace path. The agents within each team are orchestrated by the team itself.
 
 ## Project Environments
 ${envsList}
@@ -1274,7 +1276,7 @@ ${envsList}
 1. Analyze what was previously attempted and why it needs modification
 2. Design a new plan that addresses the "New Modification Request"
 3. Generate the plan using the <plan>...</plan> format
-4. Assign each task to the appropriate agent based on their role
+4. Assign each task to the appropriate team based on its role
 5. Keep the plan focused on only what needs to change — avoid duplicating work that succeeded previously
 
 Output your plan enclosed in <plan>...</plan> tags.`

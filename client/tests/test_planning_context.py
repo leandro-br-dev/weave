@@ -8,9 +8,9 @@ import asyncio
 import pytest
 
 # Add the client to the path
-sys.path.insert(0, '/root/projects/weave')
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
 
-from client.orchestrator.daemon_client import DaemonClient
+from orchestrator.daemon_client import DaemonClient
 
 @pytest.mark.asyncio
 async def test_planning_context():

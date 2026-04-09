@@ -238,7 +238,8 @@ async def build_planning_prompt(
     """Monta o prompt completo para o agente planejador."""
     project = planning_context.get('project', {})
     environments = planning_context.get('environments', [])
-    agents = planning_context.get('agents', [])
+    # Support both 'teams' (new) and 'agents' (legacy) key for backward compatibility
+    teams = planning_context.get('teams', planning_context.get('agents', []))
 
     # Seção de contexto do projeto
     project_section = f"""## Project Context
@@ -256,18 +257,23 @@ Description: {project.get('description', 'No description')}
         )
     env_section = "## Environments\n\n" + ("\n".join(env_lines) if env_lines else "No environments configured.")
 
-    # Seção de agentes disponíveis
-    agent_lines = []
-    for agent in agents:
-        agent_lines.append(
-            f"- **{agent.get('name')}** (role: `{agent.get('role')}`)\n"
-            f"  workspace: `{agent.get('workspace_path')}`"
+    # Seção de equipes disponíveis (teams, não agents individuais)
+    team_lines = []
+    for team in teams:
+        agents_info = ""
+        if team.get('agents'):
+            agents_info = f"\n  agents: {', '.join(team['agents'])}"
+        team_lines.append(
+            f"- **{team.get('name')}** (role: `{team.get('role')}`)\n"
+            f"  workspace: `{team.get('workspace_path')}`{agents_info}"
         )
     agents_section = (
         "## Available Teams\n\n"
-        + ("\n".join(agent_lines) if agent_lines else "No teams configured.")
+        + ("\n".join(team_lines) if team_lines else "No teams configured.")
         + "\n\nWhen creating tasks, use the exact `workspace` paths listed above."
         + "\nMatch task type to team role: planner for planning, coder for implementation, reviewer for validation."
+        + "\n\nNOTE: Each team has its own agents defined in its .claude/agents/ directory."
+        + " Do NOT confuse teams with agents."
     )
 
     # Tarefa do kanban
@@ -282,11 +288,11 @@ Description:
     cwd_instruction = """
 ## Important: cwd vs workspace
 
-- `workspace`: path to the agent's workspace folder (where .claude/settings.local.json lives)
+- `workspace`: path to the team's workspace folder (where .claude/settings.local.json lives)
 - `cwd`: the project directory where the code lives (use environment project_path above)
 
-For coder agents: set cwd = the environment project_path, workspace = agent workspace_path
-For reviewer/tester agents: same pattern
+For coder teams: set cwd = the environment project_path, workspace = team workspace_path
+For reviewer/tester teams: same pattern
 """
 
     # Inject workflow context if available

@@ -44,21 +44,27 @@ async def test_build_planning_prompt():
                 'project_path': '/var/www/weave'
             }
         ],
-        'agents': [
+        'teams': [
             {
-                'name': 'planner',
+                'name': 'team-planner',
                 'role': 'planner',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/planner'
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-planner',
+                'agents': ['analyst', 'planner'],
+                'type': 'team'
             },
             {
-                'name': 'coder-backend',
+                'name': 'team-coder',
                 'role': 'coder',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/coder-backend'
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-coder',
+                'agents': ['coder', 'frontend', 'tester'],
+                'type': 'team'
             },
             {
-                'name': 'reviewer',
+                'name': 'team-reviewer',
                 'role': 'reviewer',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/reviewer'
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-reviewer',
+                'agents': ['build-validator', 'pr-handler'],
+                'type': 'team'
             }
         ]
     }
@@ -98,7 +104,7 @@ Output your plan in the following format:
     print(f"  • Prompt length: {len(prompt)} chars")
     print(f"  • Has project context: {'## Project Context' in prompt}")
     print(f"  • Has environments: {'## Environments' in prompt}")
-    print(f"  • Has agents: {'## Available Agents' in prompt}")
+    print(f"  • Has teams: {'## Available Teams' in prompt}")
     print(f"  • Has task: {'## Task to Plan' in prompt}")
     print(f"  • Has cwd instruction: {'cwd vs workspace' in prompt}")
     print(f"  • Has skill content: {'planning agent' in prompt}")
@@ -107,9 +113,9 @@ Output your plan in the following format:
     assert 'weave' in prompt, "Project name missing"
     assert 'dev' in prompt, "Environment 'dev' missing"
     assert 'production' in prompt, "Environment 'production' missing"
-    assert 'planner' in prompt, "Agent 'planner' missing"
-    assert 'coder-backend' in prompt, "Agent 'coder-backend' missing"
-    assert 'reviewer' in prompt, "Agent 'reviewer' missing"
+    assert 'team-planner' in prompt, "Team 'team-planner' missing"
+    assert 'team-coder' in prompt, "Team 'team-coder' missing"
+    assert 'team-reviewer' in prompt, "Team 'team-reviewer' missing"
     assert 'Add authentication middleware' in prompt, "Task title missing"
     assert '/root/projects/weave' in prompt, "Project path missing"
 
@@ -171,7 +177,7 @@ async def test_with_real_api():
         print(f"  • Has all required sections: {all([
             '## Project Context' in prompt,
             '## Environments' in prompt,
-            '## Available Agents' in prompt,
+            '## Available Teams' in prompt,
             '## Task to Plan' in prompt
         ])}")
 

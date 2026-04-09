@@ -318,14 +318,17 @@ async def get_project_agents_context(self, project_id: str) -> str:
 
 **Formatted Output**:
 ```markdown
-## Available Agents for this Project
+## Available Teams for this Project
 
 - **frontend-dev** (role: `coder`)
   workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
+  agents: dev-frontend, dev-tester
 - **api-tester** (role: `tester`)
   workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
+  agents: dev-backend
 
-When creating task assignments, use the workspace paths above. Match task type to agent role: coders for implementation, reviewers for validation, testers for test suites, etc.
+When creating task assignments, use the workspace paths above. Match task type to team role: coders for implementation, reviewers for validation, testers for test suites, etc.
+NOTE: Each team has its own agents defined in its .claude/agents/ directory.
 ```
 
 #### 3. Chat Runner Integration
@@ -373,9 +376,9 @@ if agent_context:
 **File**: `native-skills/planning/SKILL.md`
 
 Comprehensive documentation covering:
-- How to use the "Available Agents" context
-- Agent roles and their purposes
-- Best practices for agent assignment
+- How to use the "Available Teams" context
+- Team roles and their purposes
+- Best practices for team task assignment
 - Examples of properly formatted tasks
 - Dependency sequencing guidance
 
@@ -390,16 +393,14 @@ Create a plan to add user authentication to the application
 
 #### Injected Context (Automatic)
 ```markdown
-## Available Agents for this Project
+## Available Teams for this Project
 
-- **backend-coder** (role: `coder`)
+- **team-coder** (role: `coder`)
   workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
-- **frontend-coder** (role: `coder`)
-  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
-- **code-reviewer** (role: `reviewer`)
+  agents: dev-backend, dev-frontend, dev-tester
+- **team-reviewer** (role: `reviewer`)
   workspace: `/root/projects/weave/projects/myapp/teams/team-reviewer`
-- **test-automation** (role: `tester`)
-  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
+  agents: build-validator, pr-handler
 
 ---
 
@@ -1273,11 +1274,11 @@ A: The context injection only happens for agents with "planner" in their workspa
 
 **Q: What's the difference between agents-context and planning-context endpoints?**
 
-A: The `agents-context` endpoint returns only the list of agents with their roles, while `planning-context` returns complete project information including project details, environments, and agents.
+A: The `agents-context` endpoint returns the list of teams with their roles and the agents within each team, while `planning-context` returns complete project information including project details, environments, and teams.
 
 **Q: Do I need to call both endpoints?**
 
-A: It depends on your use case. For basic agent assignment, `agents-context` is sufficient. For comprehensive planning that needs to understand project structure and environments, use `planning-context`.
+A: It depends on your use case. For basic team assignment, `agents-context` is sufficient. For comprehensive planning that needs to understand project structure and environments, use `planning-context`.
 
 ### Auto-Move Feature
 

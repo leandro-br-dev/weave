@@ -893,6 +893,13 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
   const improveClaudeMd = useImproveClaudeMd()
   const { showToast } = useToast()
 
+  // Sync local value when content prop changes (e.g. after query invalidation, approve flow)
+  useEffect(() => {
+    if (content !== undefined && content !== null) {
+      setValue(content)
+    }
+  }, [content])
+
   // LocalStorage key for persisting improvement plan ID
   const improvementStorageKey = `claude-md-improvement-${teamId}`
 
@@ -1172,7 +1179,12 @@ function ClaudeMdTab({ teamId, content }: { teamId: string; content: string | nu
 
       <div className="flex gap-2">
         <button
-          onClick={() => saveClaudeMd.mutate(value)}
+          onClick={() => {
+            saveClaudeMd.mutate(value, {
+              onSuccess: () => showToast('success', 'Saved!', 'CLAUDE.md updated successfully.'),
+              onError: (err: any) => showToast('error', 'Save Failed', err?.message || 'Failed to save CLAUDE.md.'),
+            })
+          }}
           disabled={saveClaudeMd.isPending}
           className={`px-6 py-2 ${accentColors.bg} text-white rounded-lg ${accentColors.hoverBg} disabled:opacity-50`}
         >

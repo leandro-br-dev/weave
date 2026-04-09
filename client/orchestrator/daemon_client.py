@@ -839,18 +839,22 @@ class DaemonClient:
                 return ""
 
             lines = ["## Available Teams for this Project\n"]
-            for agent in agents:
-                role = agent.get("role", "generic")
-                name = agent.get("name", "unknown")
-                workspace = agent.get("workspace_path", "")
+            for team in agents:
+                role = team.get("role", "generic")
+                name = team.get("name", "unknown")
+                workspace = team.get("workspace_path", "")
+                team_agents = team.get("agents", [])
+                agents_info = f"\n  agents: {', '.join(team_agents)}" if team_agents else ""
                 lines.append(f"- **{name}** (role: `{role}`)")
-                lines.append(f"  workspace: `{workspace}`")
+                lines.append(f"  workspace: `{workspace}`{agents_info}")
 
             lines.append("")
             lines.append(
                 "When creating task assignments, use the workspace paths above. "
                 "Match task type to team role: coders for implementation, "
-                "reviewers for validation, testers for test suites, etc."
+                "reviewers for validation, testers for test suites, etc.\n"
+                "NOTE: Each team has its own agents defined in its .claude/agents/ directory. "
+                "Do NOT confuse teams with individual agents."
             )
 
             return "\n".join(lines)

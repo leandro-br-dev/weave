@@ -68,21 +68,24 @@ def sample_planning_context_data():
                 'project_path': '/var/www/weave',
             },
         ],
-        'agents': [
+        'teams': [
             {
-                'name': 'planner',
+                'name': 'team-planner',
                 'role': 'planner',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/planner',
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-planner',
+                'agents': ['analyst', 'planner'],
             },
             {
-                'name': 'coder-backend',
+                'name': 'team-coder',
                 'role': 'coder',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/coder-backend',
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-coder',
+                'agents': ['coder', 'frontend', 'tester'],
             },
             {
-                'name': 'reviewer',
+                'name': 'team-reviewer',
                 'role': 'reviewer',
-                'workspace_path': '/root/projects/weave/projects/weave/agents/reviewer',
+                'workspace_path': '/root/projects/weave/projects/weave/teams/team-reviewer',
+                'agents': ['build-validator', 'pr-handler'],
             },
         ],
     }

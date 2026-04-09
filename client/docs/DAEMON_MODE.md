@@ -422,8 +422,8 @@ The kanban pipeline integrates with the full planning context endpoint, providin
 ## Environments
 - All available environments with their project paths
 
-## Available Agents
-- All agents with their roles and workspace paths
+## Available Teams
+- All teams with their roles, workspace paths, and agents within each team
 
 ## Task to Plan
 - Title and description from the kanban task
