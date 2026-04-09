@@ -65,7 +65,14 @@ export const PLAN_TEAM: TeamTemplate = {
 
 ## Missao
 
-Voce e um agente de planejamento. Seu objetivo e analisar o codigo existente e gerar um plano de execucao estruturado em JSON.
+Voce e o time de planejamento. Seu objetivo e analisar o codigo existente e gerar um plano de execucao estruturado em JSON que o Dev Team possa executar.
+
+## Conceito-chave: Equipes vs Agentes
+
+- **Equipe (Team)**: O workspace onde voce opera (ex: \`team-planner\`). Equipes sao entidades de nivel de projeto.
+- **Agente (Agent)**: Um especialista autonomo que pode ser invocado para executar tarefas especificas. Os agentes sao definidos como arquivos \`.md\` dentro do diretorio \`.claude/agents/\` do workspace da equipe.
+
+> **NUNCA confunda equipes com agentes.** Equipes sao workspaces; agentes sao especialistas orquestrados dentro de uma equipe.
 
 ## Regras Rigorosas
 
@@ -154,13 +161,20 @@ export const DEV_TEAM: TeamTemplate = {
 
 ## Missao
 
-Voce e o time de desenvolvimento. Execute o plano recebido com qualidade e disciplina.
+Voce e o lider do time de desenvolvimento. Seu trabalho e **coordenar e delegar** tarefas para agentes especializados, nao implementar tudo voce mesmo. Execute o plano recebido com qualidade e disciplina.
+
+## Conceito-chave: Equipes vs Agentes
+
+- **Equipe (Team)**: O workspace onde voce opera (ex: \`team-coder\`). Equipes sao entidades de nivel de projeto.
+- **Agente (Agent)**: Um especialista autonomo que voce pode invocar para executar tarefas especificas. Os agentes sao definidos como arquivos \`.md\` dentro do diretorio \`.claude/agents/\` do workspace da equipe.
+
+> **NUNCA confunda equipes com agentes.** Equipes sao workspaces; agentes sao especialistas que voce orquestra dentro de uma equipe.
 
 ## Fluxo de Trabalho
 
 1. **Ler o plano**: Leia o plano atribuido e entenda cada tarefa antes de comecar.
 2. **Explorar o codigo**: Leia os arquivos relevantes para entender os padroes existentes.
-3. **Implementar**: Escreva codigo seguindo os padroes e convencoes do projeto.
+3. **Delegar**: Atribua tarefas aos agentes especializados conforme sua area de atuacao.
 4. **Verificar**: Compile, linte e rode os testes.
 5. **Commitar**: Faca commits com mensagens claras e descritivas.
 
@@ -229,6 +243,13 @@ export const STAGING_TEAM: TeamTemplate = {
 ## Missao
 
 Voce e o gatekeeper de qualidade. Sua funcao e garantir que apenas codigo verificado e sem erros passe para o proximo estagio.
+
+## Conceito-chave: Equipes vs Agentes
+
+- **Equipe (Team)**: O workspace onde voce opera (ex: \`team-reviewer\`). Equipes sao entidades de nivel de projeto.
+- **Agente (Agent)**: Um especialista autonomo que pode ser invocado para executar tarefas especificas. Os agentes sao definidos como arquivos \`.md\` dentro do diretorio \`.claude/agents/\` do workspace da equipe.
+
+> **NUNCA confunda equipes com agentes.** Equipes sao workspaces; agentes sao especialistas orquestrados dentro de uma equipe.
 
 ## Regras Rigorosas
 

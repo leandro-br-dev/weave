@@ -134,8 +134,8 @@ WEAVE_TOKEN=your-secret-token-here
 PORT=3000
 DASHBOARD_PORT=5173
 
-# Agent workspace location (default: ~/.local/share/weave/projects)
-AGENTS_BASE_PATH=~/.local/share/weave/projects
+# Team workspace location (default: ~/.local/share/weave/projects)
+TEAMS_BASE_PATH=~/.local/share/weave/projects
 
 # Timeouts
 PLAN_TIMEOUT_SECONDS=7200

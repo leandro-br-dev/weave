@@ -106,64 +106,64 @@ curl -X POST -H "Authorization: Bearer $TOKEN" \
   http://localhost:3000/api/projects | jq .
 ```
 
-#### 2. Create Agents (via dashboard or manually)
+#### 2. Create Teams (via dashboard or manually)
 
-For each agent, create a workspace with the appropriate role:
+For each team, create a workspace with the appropriate role:
 
 ```bash
 TEAMS_BASE_PATH="/root/projects/weave/projects"
 PROJECT_NAME="myapp"
 
-# Create agents directory
-mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents"
+# Create teams directory
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/teams"
 
-# Create planner agent
-mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/planner/.claude"
+# Create planner team
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-planner/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
-# Create coder agent
-mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/coder/.claude"
+# Create coder team
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-coder/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 
-# Create reviewer agent
-mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/agents/reviewer/.claude"
+# Create reviewer team
+mkdir -p "$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-reviewer/.claude"
 # (Add CLAUDE.md, settings.local.json, skills/)
 ```
 
-#### 3. Link Agents to Project
+#### 3. Link Teams to Project
 
 ```bash
 PROJECT_ID="<from step 1>"
 
-# Link planner agent
+# Link planner team
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/planner\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-planner\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
-# Link coder agent
+# Link coder team
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/coder\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-coder\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 
-# Link reviewer agent
+# Link reviewer team
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/agents/reviewer\"}" \
+  -d "{\"workspace_path\":\"$TEAMS_BASE_PATH/$PROJECT_NAME/teams/team-reviewer\"}" \
   http://localhost:3000/api/projects/$PROJECT_ID/agents
 ```
 
-#### 4. Set Agent Roles (via dashboard or SQL)
+#### 4. Set Team Roles (via dashboard or SQL)
 
 ```bash
-# Via dashboard: Go to /agents, click on agent, edit role
+# Via dashboard: Go to /agents, click on team, edit role
 # Or via SQL:
 sqlite3 /root/projects/weave/api/data/database.db \
   "INSERT OR REPLACE INTO workspace_roles (workspace_path, role) VALUES
-  ('/root/projects/weave/projects/myapp/agents/planner', 'planner'),
-  ('/root/projects/weave/projects/myapp/agents/coder', 'coder'),
-  ('/root/projects/weave/projects/myapp/agents/reviewer', 'reviewer');"
+  ('/root/projects/weave/projects/myapp/teams/team-planner', 'planner'),
+  ('/root/projects/weave/projects/myapp/teams/team-coder', 'coder'),
+  ('/root/projects/weave/projects/myapp/teams/team-reviewer', 'reviewer');"
 ```
 
 #### 5. Verify Agents Context
@@ -178,21 +178,21 @@ Expected output:
 {
   "data": [
     {
-      "name": "planner",
+      "name": "team-planner",
       "role": "planner",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/planner",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-planner",
       "cwd": null
     },
     {
-      "name": "coder",
+      "name": "team-coder",
       "role": "coder",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/coder",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": null
     },
     {
-      "name": "reviewer",
+      "name": "team-reviewer",
       "role": "reviewer",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/reviewer",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-reviewer",
       "cwd": null
     }
   ],
@@ -286,13 +286,13 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
     {
       "name": "frontend-dev",
       "role": "coder",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/frontend-dev",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": null
     },
     {
       "name": "api-tester",
       "role": "tester",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/api-tester",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": null
     }
   ],
@@ -321,9 +321,9 @@ async def get_project_agents_context(self, project_id: str) -> str:
 ## Available Agents for this Project
 
 - **frontend-dev** (role: `coder`)
-  workspace: `/root/projects/weave/projects/myapp/agents/frontend-dev`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
 - **api-tester** (role: `tester`)
-  workspace: `/root/projects/weave/projects/myapp/agents/api-tester`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
 
 When creating task assignments, use the workspace paths above. Match task type to agent role: coders for implementation, reviewers for validation, testers for test suites, etc.
 ```
@@ -393,13 +393,13 @@ Create a plan to add user authentication to the application
 ## Available Agents for this Project
 
 - **backend-coder** (role: `coder`)
-  workspace: `/root/projects/weave/projects/myapp/agents/backend-coder`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
 - **frontend-coder** (role: `coder`)
-  workspace: `/root/projects/weave/projects/myapp/agents/frontend-coder`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
 - **code-reviewer** (role: `reviewer`)
-  workspace: `/root/projects/weave/projects/myapp/agents/code-reviewer`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-reviewer`
 - **test-automation** (role: `tester`)
-  workspace: `/root/projects/weave/projects/myapp/agents/test-automation`
+  workspace: `/root/projects/weave/projects/myapp/teams/team-coder`
 
 ---
 
@@ -418,26 +418,26 @@ Create a plan to add user authentication to the application
     {
       "id": "backend-auth",
       "name": "Implement backend authentication",
-      "workspace": "/root/projects/weave/projects/myapp/agents/backend-coder",
+      "workspace": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": "/path/to/project/backend"
     },
     {
       "id": "frontend-auth",
       "name": "Implement frontend authentication",
-      "workspace": "/root/projects/weave/projects/myapp/agents/frontend-coder",
+      "workspace": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": "/path/to/project/frontend",
       "depends_on": ["backend-auth"]
     },
     {
       "id": "review-auth",
       "name": "Review authentication implementation",
-      "workspace": "/root/projects/weave/projects/myapp/agents/code-reviewer",
+      "workspace": "/root/projects/weave/projects/myapp/teams/team-reviewer",
       "depends_on": ["frontend-auth"]
     },
     {
       "id": "test-auth",
       "name": "Test authentication flow",
-      "workspace": "/root/projects/weave/projects/myapp/agents/test-automation",
+      "workspace": "/root/projects/weave/projects/myapp/teams/team-coder",
       "depends_on": ["review-auth"]
     }
   ]
@@ -482,13 +482,13 @@ Authorization: Bearer <your-token>
     {
       "name": "frontend-dev",
       "role": "coder",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/frontend-dev",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": null
     },
     {
       "name": "api-tester",
       "role": "tester",
-      "workspace_path": "/root/projects/weave/projects/myapp/agents/api-tester",
+      "workspace_path": "/root/projects/weave/projects/myapp/teams/team-coder",
       "cwd": null
     }
   ],
@@ -646,11 +646,9 @@ async def get_project_planning_context(self, project_id: str) -> dict:
 
 🤖 AGENTS:
   - coder-backend (role: coder)
-    Workspace: /root/projects/weave/projects/weave/agents/coder-backend
-  - coder-frontent (role: coder)
-    Workspace: /root/projects/weave/projects/weave/agents/coder-frontent
-  - planner (role: planner)
-    Workspace: /root/projects/weave/projects/weave/agents/planner
+    Workspace: /root/projects/weave/projects/weave/teams/team-coder
+  - team-planner (role: planner)
+    Workspace: /root/projects/weave/projects/weave/teams/team-planner
 ```
 
 ---
