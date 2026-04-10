@@ -260,7 +260,8 @@ router.get('/pending', authenticateToken, (req: Request, res: Response) => {
           completed_at,
           created_at,
           attachments,
-          workflow_path
+          workflow_path,
+          sdk_session_id
         FROM plans
         WHERE status = 'pending'
         ORDER BY created_at DESC
@@ -768,6 +769,37 @@ router.post('/:id/heartbeat', authenticateToken, (req: Request, res: Response) =
   }
 })
 
+// POST /api/plans/:id/sdk-session - Save SDK session ID for a plan (enables resume with context)
+router.post('/:id/sdk-session', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { sdk_session_id }: { sdk_session_id: string } = req.body
+
+    if (!sdk_session_id) {
+      return res.status(400).json({ data: null, error: 'sdk_session_id is required' })
+    }
+
+    const plan = db
+      .prepare('SELECT * FROM plans WHERE id = ?')
+      .get(id) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    db.prepare(
+      "UPDATE plans SET sdk_session_id = ? WHERE id = ?"
+    ).run(sdk_session_id, id)
+
+    console.log(`[plans] SDK session ID saved for plan ${id}: ${sdk_session_id.substring(0, 12)}...`)
+
+    res.json({ data: { saved: true }, error: null })
+  } catch (error) {
+    console.error('Error saving SDK session ID:', error)
+    res.status(500).json({ data: null, error: 'Failed to save SDK session ID' })
+  }
+})
+
 // POST /api/plans/:id/complete - Complete a plan
 router.post('/:id/complete', authenticateToken, (req: Request, res: Response) => {
   try {
@@ -960,13 +992,15 @@ router.post('/:id/execute', authenticateToken, (req: Request, res: Response) => 
       WHERE plan_id = ?
     `).run(id)
 
+    // Clear sdk_session_id on full re-execute so a fresh Claude Code session is created
     db.prepare(`
       UPDATE plans
       SET status = 'pending',
           client_id = NULL,
           started_at = NULL,
           completed_at = NULL,
-          result = NULL
+          result = NULL,
+          sdk_session_id = NULL
       WHERE id = ?
     `).run(id)
 
@@ -1046,6 +1080,7 @@ router.post('/:id/resume', authenticateToken, (req: Request, res: Response) => {
     // Set status back to pending so daemon picks it up
     // Keep started_at to maintain execution history
     // Clear completed_at and result to allow re-execution
+    // Keep sdk_session_id to preserve Claude Code session context on resume
     const logMessage = plan.status === 'success'
       ? '↻ Plan resumed - re-executing successful plan'
       : '↻ Plan resumed - will skip completed tasks'

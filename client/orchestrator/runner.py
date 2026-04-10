@@ -32,6 +32,10 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     PermissionResultAllow,
     ResultMessage,
+    SystemMessage,
+    TaskNotificationMessage,
+    TaskProgressMessage,
+    TaskStartedMessage,
     TextBlock,
     ToolPermissionContext,
     ToolUseBlock,
@@ -445,6 +449,7 @@ class TaskResult:
     success: bool
     output: str = ""          # Captured ResultMessage.result — passed as context to dependents
     error: str | None = None
+    sdk_session_id: str | None = None  # Claude Code SDK session ID from this task
 
 
 def _init_context_dir(plan_name: str) -> Path:
@@ -887,6 +892,7 @@ async def run_task(
     api_base_url: str | None = None,  # API base URL for fetching attachments
     token: str | None = None,  # Auth token for fetching attachments
     workflow_path: str | None = None,  # Path to workflow directory (state.md, plan.json, errors.log)
+    sdk_session_id: str | None = None,  # Claude Code SDK session ID for resume
 ) -> TaskResult:
     """
     Run a single task and stream output to terminal.
@@ -978,17 +984,32 @@ async def run_task(
     # permission requests that would otherwise hang in daemon mode.
     can_use_tool = _make_can_use_tool_callback(task.permission_mode)
 
-    options = ClaudeAgentOptions(
-        cwd=task.cwd,
-        allowed_tools=tools,
-        permission_mode=task.permission_mode,
-        max_turns=task.max_turns,
-        system_prompt=build_system_prompt(task, plan_id, workflow_path=workflow_path),
+    # Build SDK options
+    options_kwargs: dict = {
+        "cwd": task.cwd,
+        "allowed_tools": tools,
+        "permission_mode": task.permission_mode,
+        "max_turns": task.max_turns,
+        "system_prompt": build_system_prompt(task, plan_id, workflow_path=workflow_path),
         # "project" loads CLAUDE.md, .claude/skills/, .claude/agents/, .claude/settings*.json
         # from the cwd. Without this, all project-level features are silently ignored.
-        setting_sources=["project"],
-        can_use_tool=can_use_tool,
-    )
+        "setting_sources": ["project"],
+        "can_use_tool": can_use_tool,
+    }
+
+    # Unset CLAUDECODE to prevent nested session detection
+    # This allows the daemon to run within Claude Code sessions
+    if "CLAUDECODE" in os.environ:
+        del os.environ["CLAUDECODE"]
+
+    # If we have a sdk_session_id, pass it to resume the Claude Code session.
+    # This preserves the full conversation context from the previous execution,
+    # allowing resume after failures or daemon restarts.
+    if sdk_session_id:
+        options_kwargs["resume"] = sdk_session_id
+        logger.info(f"[{task.id}] Resuming Claude Code session: {sdk_session_id[:12]}...")
+
+    options = ClaudeAgentOptions(**options_kwargs)
 
     # Generate or retrieve cached workflow context
     workflow_context = generate_and_cache_context(project_path or task.cwd)
@@ -1006,6 +1027,7 @@ async def run_task(
     logger.info(f"[{task.id}] Prompt built: {len(prompt)} chars, workflow_path={workflow_path}, starts_with={repr(prompt[:200])}")
 
     final_result: ResultMessage | None = None
+    task_sdk_session_id: str | None = None
     logs_buffer: list[dict] = []
     captured_texts: list[str] = []  # Capture all output text for structured output detection
 
@@ -1157,8 +1179,51 @@ async def run_task(
                                     add_log("error", error_msg)
                                     # Continue execution - fail-safe behavior
 
+            # Handle subagent lifecycle messages (Agent tool / Task tool spawning)
+            elif isinstance(message, TaskStartedMessage):
+                logger.subagent_start(
+                    task.id,
+                    message.task_id,
+                    message.description,
+                    task_type=getattr(message, 'task_type', None),
+                )
+                type_label = f" ({message.task_type})" if getattr(message, 'task_type', None) else ""
+                add_log("info", f"🔄 Subagent spawned: {message.task_id}{type_label} — {message.description[:120]}")
+                send_logs_if_needed()  # Flush immediately so the log is visible
+
+            elif isinstance(message, TaskProgressMessage):
+                usage = getattr(message, 'usage', None) or {}
+                tokens = usage.get('total_tokens', 0)
+                last_tool = getattr(message, 'last_tool_name', None)
+                logger.subagent_progress(
+                    task.id,
+                    message.task_id,
+                    message.description,
+                    tokens=tokens,
+                    last_tool=last_tool,
+                )
+                # Progress logs are verbose — only send to terminal, not to API
+                # (they would flood the plan log with noise)
+
+            elif isinstance(message, TaskNotificationMessage):
+                status = getattr(message, 'status', 'unknown')
+                summary = getattr(message, 'summary', '')
+                usage = getattr(message, 'usage', None) or {}
+                logger.subagent_done(task.id, message.task_id, status, summary)
+                summary_text = f" — {summary[:100]}" if summary else ""
+                level = "info" if status == "completed" else ("warning" if status == "stopped" else "error")
+                add_log(level, f"{'✔' if status == 'completed' else '⏹' if status == 'stopped' else '✘'} Subagent {message.task_id} {status}{summary_text}")
+                send_logs_if_needed()  # Flush immediately so the log is visible
+
             elif isinstance(message, ResultMessage):
                 final_result = message  # store — don't return yet
+                # Capture sdk_session_id from ResultMessage for session continuity
+                task_sdk_session_id = (
+                    getattr(message, 'session_id', None) or
+                    getattr(message, 'sessionId', None)
+                )
+                if task_sdk_session_id:
+                    logger.info(f"[{task.id}] SDK session ID captured: {task_sdk_session_id[:12]}...")
                 add_log("info", f"✔ finished — {message.stop_reason}")
                 send_logs_if_needed()  # Flush logs on completion
 
@@ -1213,7 +1278,7 @@ async def run_task(
                 # Log when no structured output found — helps diagnose improvement flow issues
                 logger.debug(f"[{task.id}] No structured output extracted from {len(captured_texts)} text blocks")
 
-        return TaskResult(task_id=task.id, success=success, output=output)
+        return TaskResult(task_id=task.id, success=success, output=output, sdk_session_id=task_sdk_session_id or sdk_session_id)
 
     logger.task_done(task.id, "success")
     send_logs_if_needed()  # Flush any remaining logs
@@ -1240,7 +1305,7 @@ async def run_task(
         else:
             logger.debug(f"[{task.id}] No structured output extracted from {len(captured_texts)} text blocks")
 
-    return TaskResult(task_id=task.id, success=True)
+    return TaskResult(task_id=task.id, success=True, sdk_session_id=task_sdk_session_id or sdk_session_id)
 
 
 async def run_wave(
@@ -1255,6 +1320,7 @@ async def run_wave(
     api_base_url: str | None = None,
     token: str | None = None,
     workflow_path: str | None = None,
+    sdk_session_id: str | None = None,
 ) -> list[TaskResult]:
     """
     Run all tasks in a wave.
@@ -1272,13 +1338,14 @@ async def run_wave(
         client: Optional DaemonClient instance for approval requests
         plan_id: Optional plan ID for approval requests
         project_path: Optional project path for generating workflow context
+        sdk_session_id: Optional Claude Code SDK session ID for resume
 
     Returns:
         List of TaskResult objects
     """
     results: list[TaskResult] = []
     for task in tasks:
-        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path)
+        result = await run_task(task, context, ctx_dir, log_callback, client, plan_id, project_path, attachment_ids=attachment_ids, api_base_url=api_base_url, token=token, workflow_path=workflow_path, sdk_session_id=sdk_session_id)
         results.append(result)
     return results
 
@@ -1287,7 +1354,8 @@ async def run_plan(
     plan: Plan,
     log_callback: callable[[str, str, str], None] | None = None,
     client: Any | None = None,
-) -> tuple[bool, dict | None]:
+    sdk_session_id: str | None = None,
+) -> tuple[bool, dict | None, str | None]:
     """
     Execute the full plan in dependency order.
 
@@ -1295,10 +1363,12 @@ async def run_plan(
         plan: Plan to execute
         log_callback: Optional callback(task_id, level, message) for log collection
         client: Optional DaemonClient for extracting reviews
+        sdk_session_id: Optional Claude Code SDK session ID for resume
 
     Returns:
-        Tuple of (success: bool, review: dict | None)
+        Tuple of (success: bool, review: dict | None, sdk_session_id: str | None)
         review is the extracted <review> JSON if present in task outputs
+        sdk_session_id is the captured session ID (new or existing) for persistence
     """
     logger.plan_start(plan.name)
 
@@ -1330,16 +1400,23 @@ async def run_plan(
         api_base_url = client.server_url
         attach_token = client.token
 
+    # Track the latest sdk_session_id across all tasks
+    latest_sdk_session_id = sdk_session_id
+
     for wave_index, wave in enumerate(waves):
         logger.wave_start(wave_index, [t.name for t in wave])
         results = await run_wave(
             wave, context, ctx_dir, log_callback, client, plan.id, project_path,
             attachment_ids=plan_attachment_ids, api_base_url=api_base_url, token=attach_token,
             workflow_path=plan.workflow_path,
+            sdk_session_id=latest_sdk_session_id,
         )
 
         for r in results:
             context[r.task_id] = r
+            # Track the latest session ID from each task result
+            if r.sdk_session_id:
+                latest_sdk_session_id = r.sdk_session_id
 
         failed = [r for r in results if not r.success]
         if failed:
@@ -1349,7 +1426,7 @@ async def run_plan(
             # Clear context cache for this project
             if project_path and project_path in _workflow_context_cache:
                 del _workflow_context_cache[project_path]
-            return False, None
+            return False, None, latest_sdk_session_id
 
     logger.plan_done(plan.name, success=True)
 
@@ -1368,4 +1445,4 @@ async def run_plan(
     if project_path and project_path in _workflow_context_cache:
         del _workflow_context_cache[project_path]
 
-    return True, review
+    return True, review, latest_sdk_session_id

@@ -579,4 +579,11 @@ export const migrations: Migration[] = [
       `ALTER TABLE environments DROP COLUMN agent_workspace`,
     ],
   },
+  {
+    version: 41,
+    description: 'Plans — add sdk_session_id column to persist Claude Code SDK session for resume',
+    up: [
+      `ALTER TABLE plans ADD COLUMN sdk_session_id TEXT`,
+    ],
+  },
 ];

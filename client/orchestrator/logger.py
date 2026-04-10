@@ -97,3 +97,31 @@ def warning(text: str) -> None:
 def success(text: str) -> None:
     """Success messages with green checkmark."""
     print(f"{GREEN}[{_ts()}] ✔ {text}{RESET}")
+
+
+# ── Subagent lifecycle logging ──────────────────────────────────────────────
+
+def subagent_start(task_id: str, agent_id: str, description: str, task_type: str | None = None) -> None:
+    """Log when a subagent (Agent tool / Task tool) is spawned."""
+    type_label = f" ({task_type})" if task_type else ""
+    print(f"{MAGENTA}┌─ Subagent spawned{RESET}  {BOLD}{agent_id}{RESET}{type_label}")
+    print(f"{MAGENTA}│  parent: {task_id}{RESET}  {DIM}{description[:120]}{RESET}")
+
+
+def subagent_progress(task_id: str, agent_id: str, description: str, tokens: int = 0, last_tool: str | None = None) -> None:
+    """Log subagent progress updates."""
+    parts = [f"{DIM}│ [{agent_id}]{RESET} {description[:100]}"]
+    if tokens:
+        parts.append(f"{DIM}(tokens: {tokens}){RESET}")
+    if last_tool:
+        parts.append(f"{YELLOW}⚙ {last_tool}{RESET}")
+    print(" ".join(parts))
+
+
+def subagent_done(task_id: str, agent_id: str, status: str, summary: str = "") -> None:
+    """Log when a subagent finishes."""
+    color = GREEN if status == "completed" else (YELLOW if status == "stopped" else RED)
+    symbol = "✔" if status == "completed" else ("⏹" if status == "stopped" else "✘")
+    print(f"{color}└─ {symbol} Subagent {agent_id} {status}{RESET}")
+    if summary:
+        print(f"{color}│  {DIM}{summary[:120]}{RESET}")

@@ -16,6 +16,9 @@ from claude_agent_sdk import (
     ClaudeAgentOptions,
     PermissionResultAllow,
     ResultMessage,
+    TaskNotificationMessage,
+    TaskProgressMessage,
+    TaskStartedMessage,
     TextBlock,
     ToolPermissionContext,
     query,
@@ -254,6 +257,32 @@ async def run_chat_turn(
                                     'role': 'assistant_chunk',
                                     'message': text
                                 }])
+
+            elif isinstance(message_obj, TaskStartedMessage):
+                type_label = f" ({message_obj.task_type})" if getattr(message_obj, 'task_type', None) else ""
+                logger.subagent_start("chat", message_obj.task_id, message_obj.description, task_type=getattr(message_obj, 'task_type', None))
+                if log_callback:
+                    await log_callback([{
+                        'session_id': session_id,
+                        'role': 'assistant_chunk',
+                        'message': f"🔄 Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}"
+                    }])
+
+            elif isinstance(message_obj, TaskProgressMessage):
+                usage = getattr(message_obj, 'usage', None) or {}
+                logger.subagent_progress("chat", message_obj.task_id, message_obj.description, tokens=usage.get('total_tokens', 0))
+
+            elif isinstance(message_obj, TaskNotificationMessage):
+                status = getattr(message_obj, 'status', 'unknown')
+                summary = getattr(message_obj, 'summary', '')
+                logger.subagent_done("chat", message_obj.task_id, status, summary)
+                if log_callback:
+                    symbol = '✔' if status == 'completed' else ('⏹' if status == 'stopped' else '✘')
+                    await log_callback([{
+                        'session_id': session_id,
+                        'role': 'assistant_chunk',
+                        'message': f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}"
+                    }])
 
             elif msg_type in ('result', 'ResultMessage') or isinstance(message_obj, ResultMessage):
                 final_result = message_obj

@@ -464,12 +464,32 @@ async def process_kanban_task(task: dict, client) -> None:
         async def _string_to_async_iterable(text):
             yield {"type": "user", "session_id": "", "message": {"role": "user", "content": text}, "parent_tool_use_id": None}
 
+        # Import subagent message types for lifecycle tracking
+        from claude_agent_sdk import (
+            AssistantMessage,
+            ResultMessage,
+            TaskStartedMessage,
+            TaskProgressMessage,
+            TaskNotificationMessage,
+        )
+
         async for event in query(prompt=_string_to_async_iterable(prompt), options=opts):
             event_type = type(event).__name__
             if event_type == "AssistantMessage":
                 for block in getattr(event, "content", []):
                     if hasattr(block, "text"):
                         full_response += block.text
+            elif event_type == "TaskStartedMessage":
+                type_label = f" ({event.task_type})" if getattr(event, 'task_type', None) else ""
+                logger.subagent_start("planner", event.task_id, event.description, task_type=getattr(event, 'task_type', None))
+                logger.info(f'[KanbanPipeline] Subagent spawned: {event.task_id}{type_label} — {event.description[:120]}')
+            elif event_type == "TaskProgressMessage":
+                logger.subagent_progress("planner", event.task_id, event.description, tokens=(getattr(event, 'usage', None) or {}).get('total_tokens', 0))
+            elif event_type == "TaskNotificationMessage":
+                status = getattr(event, 'status', 'unknown')
+                summary = getattr(event, 'summary', '')
+                logger.subagent_done("planner", event.task_id, status, summary)
+                logger.info(f'[KanbanPipeline] Subagent {event.task_id} {status} — {summary[:100] if summary else ""}')
             elif event_type == "ResultMessage":
                 result_text = getattr(event, "result", "") or ""
                 if result_text:

@@ -467,9 +467,12 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
     plan_id = plan_data.get("id")
     plan_name = plan_data.get("name")
     tasks_json = plan_data.get("tasks", "[]")
+    sdk_session_id = plan_data.get("sdk_session_id")  # Claude Code SDK session ID for resume
 
     # Log do plan_id para debug
     logger.info(f"Received plan: {plan_name} (ID: {plan_id})")
+    if sdk_session_id:
+        logger.info(f"Resuming plan {plan_id} with SDK session: {sdk_session_id[:12]}...")
 
     try:
         # Parse tasks from JSON string
@@ -513,7 +516,7 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
         # Execute the plan with log collection
         try:
             success, error_msg, review = await asyncio.wait_for(
-                run_plan_with_logging(client, plan_id, plan),
+                run_plan_with_logging(client, plan_id, plan, sdk_session_id=sdk_session_id),
                 timeout=PLAN_TIMEOUT_SECONDS
             )
         except asyncio.TimeoutError:
@@ -839,6 +842,7 @@ async def run_plan_with_logging(
     client: object,  # DaemonClient - avoid circular import
     plan_id: str,
     plan: Plan,
+    sdk_session_id: str | None = None,
 ) -> tuple[bool, str | None, dict | None]:
     """
     Execute a plan and stream logs to the API.
@@ -849,6 +853,7 @@ async def run_plan_with_logging(
         client: Daemon API client
         plan_id: Plan ID for log submission
         plan: Plan to execute
+        sdk_session_id: Optional Claude Code SDK session ID for resume
 
     Returns:
         Tuple of (success: bool, error_message: str | None, review: dict | None)
@@ -891,8 +896,22 @@ async def run_plan_with_logging(
                 logger.error(f"Failed to send logs: {log_response.error}")
 
     try:
-        # Execute plan with log callback
-        success, review = await run_plan(plan, log_callback, client)
+        # Execute plan with log callback and sdk_session_id for resume
+        success, review, new_sdk_session_id = await run_plan(
+            plan, log_callback, client, sdk_session_id=sdk_session_id,
+        )
+
+        # Persist the captured SDK session ID to the database
+        # This enables resume with context preservation if the plan fails later
+        if new_sdk_session_id:
+            try:
+                save_response = client.save_plan_sdk_session_id(plan_id, new_sdk_session_id)
+                if save_response.error:
+                    logger.warning(f"Failed to save SDK session ID for plan {plan_id}: {save_response.error}")
+                else:
+                    logger.info(f"SDK session ID saved for plan {plan_id}: {new_sdk_session_id[:12]}...")
+            except Exception as e:
+                logger.warning(f"Failed to save SDK session ID for plan {plan_id}: {e}")
 
         # Flush any remaining logs
         if logs_buffer:

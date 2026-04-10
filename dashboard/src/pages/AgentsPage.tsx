@@ -2019,6 +2019,14 @@ Descreva a especialidade e comportamento deste agente.
 `
 
   const handleImproveAgent = (agentNameToImprove: string) => {
+    // Clear any stale improvement state from a previous agent
+    setShowAgentImprovementModal(false)
+    setImprovedAgentContent('')
+    setImprovementPlanId(null)
+    hasShownAgentModalRef.current = false
+    setAgentImprovementError(null)
+    setShowedAgentStartToast(false)
+
     setImprovingAgentName(agentNameToImprove)
     setShowAgentInstructionsDialog(true)
   }
@@ -2064,16 +2072,19 @@ Descreva a especialidade e comportamento deste agente.
 
   const handleApproveAgentImprovement = (approvedContent: string) => {
     if (!improvingAgentName) return
+    const agentNameSnapshot = improvingAgentName
+    // Clear modal state immediately to prevent stale content from appearing
+    // when the user starts improving another agent before the save completes
+    setShowAgentImprovementModal(false)
+    setImprovedAgentContent('')
+    hasShownAgentModalRef.current = false
     saveAgent.mutate(
-      { name: improvingAgentName, content: approvedContent },
+      { name: agentNameSnapshot, content: approvedContent },
       {
         onSuccess: () => {
-          setShowAgentImprovementModal(false)
-          setImprovedAgentContent('')
           setImprovingAgentName(null)
           setImprovementPlanId(null)
-          hasShownAgentModalRef.current = false
-          showToast('success', t('pages.agents.agentsTab.agentSaved'), t('pages.agents.agentsTab.agentSavedDesc', { name: improvingAgentName }))
+          showToast('success', t('pages.agents.agentsTab.agentSaved'), t('pages.agents.agentsTab.agentSavedDesc', { name: agentNameSnapshot }))
         },
       }
     )

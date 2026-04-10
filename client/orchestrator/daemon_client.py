@@ -948,6 +948,31 @@ class DaemonClient:
         except Exception as e:
             return PlanResponse(data=None, error=f"Request failed: {e}")
 
+    def save_plan_sdk_session_id(self, plan_id: str, sdk_session_id: str) -> PlanResponse:
+        """
+        Save SDK session ID for a plan (enables resume with Claude Code session context).
+
+        POST /api/plans/:id/sdk-session
+        Body: {sdk_session_id: string}
+
+        Args:
+            plan_id: ID of the plan
+            sdk_session_id: SDK session ID to persist
+
+        Returns:
+            PlanResponse with data={saved: true} or error
+        """
+        try:
+            response = self._client.post(
+                f"/plans/{plan_id}/sdk-session",
+                json={"sdk_session_id": sdk_session_id},
+            )
+            return self._handle_response(response)
+        except httpx.HTTPError as e:
+            return PlanResponse(data=None, error=f"HTTP error: {e}")
+        except Exception as e:
+            return PlanResponse(data=None, error=f"Request failed: {e}")
+
     def save_assistant_message(
         self,
         session_id: str,
