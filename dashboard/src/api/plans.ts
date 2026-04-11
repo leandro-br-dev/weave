@@ -262,6 +262,27 @@ export const useReworkPlan = () => {
   });
 };
 
+// ── Convert Workflow to Chat ──────────────────────────────────────────────────
+
+export interface ConvertToChatResponse {
+  id: string;
+  name: string;
+  converted: boolean;
+}
+
+export const useConvertPlanToChat = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (planId: string) =>
+      apiClient.post<ConvertToChatResponse>(`/api/plans/${planId}/convert-to-chat`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+};
+
 // ── Workflow Files (blackboard) ──────────────────────────────────────────────
 
 export interface WorkflowFiles {

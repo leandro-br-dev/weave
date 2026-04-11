@@ -112,5 +112,10 @@
     "error": "Failed to load workflow files.",
     "refresh": "Refresh",
     "description": "Live audit trail showing communication between agents: what the Planner told the Coder, and what the Coder told the Tester."
-  }
+  },
+  "convertToChat": "Convert to Chat",
+  "convertToChatTitle": "Transform this workflow into a chat session, preserving the Claude Code session context",
+  "converting": "Converting...",
+  "convertedToChat": "Workflow converted to chat successfully",
+  "convertToChatError": "Failed to convert workflow to chat"
 }

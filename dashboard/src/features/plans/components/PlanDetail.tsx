@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePlan, useEditPlan, useCheckCompletion, useReworkPlan } from '@/api/plans';
+import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePlan, useEditPlan, useCheckCompletion, useReworkPlan, useConvertPlanToChat } from '@/api/plans';
 import { useSaveClaudeMd } from '@/api/teams';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
-import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn } from 'lucide-react';
+import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn, MessageSquare } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -237,6 +237,7 @@ export function PlanDetail() {
   const [improvedContent, setImprovedContent] = useState('');
   const [hasShownImprovement, setHasShownImprovement] = useState(false);
   const reworkPlan = useReworkPlan();
+  const convertPlanToChat = useConvertPlanToChat();
   const { data: planAttachments = [] } = usePlanAttachments(id, plan?.attachments);
   const [showReworkModal, setShowReworkModal] = useState(false);
   const [reworkPrompt, setReworkPrompt] = useState('');
@@ -263,6 +264,20 @@ export function PlanDetail() {
     a.download = `${plan.name.replace(/\s+/g, '-').toLowerCase()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleConvertToChat = async () => {
+    if (!id || !plan) return;
+    try {
+      const result = await convertPlanToChat.mutateAsync(id);
+      const chatId = (result as any)?.id;
+      if (chatId) {
+        showToast('success', t('planDetail.convertedToChat'));
+        navigate(`/chat`, { state: { openSessionId: chatId } });
+      }
+    } catch (err) {
+      showToast('error', t('planDetail.convertToChatError'));
+    }
   };
 
   // Use SSE streaming for logs
@@ -619,6 +634,18 @@ export function PlanDetail() {
                 >
                   <GitBranch className="h-4 w-4" />
                   {t('planDetail.rework')}
+                </button>
+                <button
+                  onClick={handleConvertToChat}
+                  disabled={convertPlanToChat.isPending}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 border border-blue-300 text-blue-600 text-sm rounded hover:bg-blue-50',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                  title={t('planDetail.convertToChatTitle')}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {convertPlanToChat.isPending ? t('planDetail.converting') : t('planDetail.convertToChat')}
                 </button>
                 <Button
                   variant="secondary"

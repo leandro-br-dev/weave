@@ -112,5 +112,10 @@
     "error": "Falha ao carregar arquivos do workflow.",
     "refresh": "Atualizar",
     "description": "Trilha de auditoria ao vivo mostrando a comunicação entre agentes: o que o Planner disse para o Coder, e o que o Coder disse para o Tester."
-  }
+  },
+  "convertToChat": "Converter em Chat",
+  "convertToChatTitle": "Transformar este workflow em uma sessão de chat, preservando o contexto da sessão do Claude Code",
+  "converting": "Convertendo...",
+  "convertedToChat": "Workflow convertido em chat com sucesso",
+  "convertToChatError": "Falha ao converter workflow em chat"
 }

@@ -1698,4 +1698,145 @@ router.post('/:id/check-completion', authenticateToken, (req: Request, res: Resp
   }
 })
 
+// POST /api/plans/:id/convert-to-chat — Convert a completed workflow into a chat session
+// The new chat session inherits the plan's sdk_session_id so the Claude Code session
+// continues with full context. Plan logs are seeded as the initial conversation history.
+router.post('/:id/convert-to-chat', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Fetch the plan
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(id) as any
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    // Only allow conversion for completed (success or failed) plans
+    if (!['success', 'failed'].includes(plan.status)) {
+      return res.status(400).json({
+        data: null,
+        error: 'Only completed workflows (success or failed) can be converted to chat',
+      })
+    }
+
+    // Check if a chat session already exists for this plan
+    const existing = db.prepare(
+      'SELECT id, name FROM chat_sessions WHERE plan_id = ? AND source_type = ?'
+    ).get(id, 'workflow') as any
+
+    if (existing) {
+      return res.json({
+        data: { id: existing.id, name: existing.name, converted: false },
+        error: null,
+      })
+    }
+
+    // Determine the workspace_path for the new chat session.
+    // Use the plan's team_id (which is a workspace path) if available,
+    // otherwise fall back to the first task's workspace.
+    let workspacePath = plan.team_id || ''
+    if (!workspacePath) {
+      try {
+        const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : plan.tasks
+        if (Array.isArray(tasks) && tasks.length > 0 && tasks[0].workspace) {
+          workspacePath = tasks[0].workspace
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    if (!workspacePath) {
+      return res.status(400).json({
+        data: null,
+        error: 'Cannot determine workspace for this workflow',
+      })
+    }
+
+    // Resolve environment_id from the plan's team workspace
+    let environmentId: string | null = null
+    if (plan.team_id) {
+      const env = db.prepare(
+        'SELECT e.id FROM environments e WHERE e.default_team = ? LIMIT 1'
+      ).get(plan.team_id) as any
+      if (env) environmentId = env.id
+    }
+
+    // Build a summary of the workflow to seed as the first assistant message
+    const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : (plan.tasks || [])
+    const taskNames = Array.isArray(tasks)
+      ? tasks.map((t: any, i: number) => `${i + 1}. ${t.name || t.prompt?.slice(0, 60) || 'Task'}`).join('\n')
+      : ''
+
+    const resultStatus = plan.result_status || plan.status
+    const resultNotes = plan.result_notes || ''
+
+    // Fetch key log entries (info level, one per task, to give context)
+    const logEntries = db.prepare(
+      `SELECT task_id, level, message FROM plan_logs WHERE plan_id = ? AND level != 'debug' ORDER BY id ASC`
+    ).all(id) as any[]
+
+    // Group logs by task and take the first meaningful message per task
+    const taskLogSummaries: string[] = []
+    const seenTasks = new Set<string>()
+    for (const log of logEntries) {
+      const taskId = log.task_id || 'unknown'
+      if (!seenTasks.has(taskId) && log.level !== 'debug') {
+        seenTasks.add(taskId)
+        const taskName = Array.isArray(tasks)
+          ? tasks.find((t: any) => t.id === taskId)?.name || taskId
+          : taskId
+        taskLogSummaries.push(`**${taskName}**: ${log.message}`)
+      }
+    }
+
+    // Create the chat session
+    const sessionId = randomUUID()
+    const sessionName = plan.name || 'Workflow Chat'
+
+    db.prepare(`
+      INSERT INTO chat_sessions (id, name, project_id, workspace_path, environment_id, sdk_session_id, status, source_type, plan_id)
+      VALUES (?, ?, ?, ?, ?, ?, 'idle', 'workflow', ?)
+    `).run(
+      sessionId,
+      sessionName,
+      plan.project_id || null,
+      workspacePath,
+      environmentId,
+      plan.sdk_session_id || null,
+      id,
+    )
+
+    // Seed an assistant message with the workflow summary
+    const summaryText = [
+      `## Workflow Concluído: ${sessionName}`,
+      '',
+      `**Status**: ${resultStatus}${resultNotes ? ` — ${resultNotes}` : ''}`,
+      '',
+      '**Tarefas executadas:**',
+      taskNames || 'Nenhuma tarefa registrada',
+      '',
+      taskLogSummaries.length > 0 ? '**Resumo por tarefa:**\n' + taskLogSummaries.slice(0, 10).join('\n') : '',
+      '',
+      '---',
+      '*Esta sessão de chat continua o contexto do workflow acima. Você pode fazer perguntas, solicitar ajustes ou dar nova direção.*',
+    ].filter(Boolean).join('\n')
+
+    const summaryMsgId = randomUUID()
+    db.prepare(
+      'INSERT INTO chat_messages (id, session_id, role, content) VALUES (?, ?, ?, ?)'
+    ).run(summaryMsgId, sessionId, 'assistant', summaryText)
+
+    console.log(`[plans] Converted workflow ${id} to chat session ${sessionId}`)
+
+    return res.status(201).json({
+      data: { id: sessionId, name: sessionName, converted: true },
+      error: null,
+    })
+  } catch (error) {
+    console.error('Error converting plan to chat:', error)
+    res.status(500).json({ data: null, error: 'Failed to convert workflow to chat' })
+  }
+})
+
 export default router

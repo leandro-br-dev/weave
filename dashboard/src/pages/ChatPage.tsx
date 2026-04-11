@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router'
 import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -90,6 +91,7 @@ export default function ChatPage() {
   const [showRename, setShowRename] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const location = useLocation()
 
   const { data: sessions = [] } = useGetSessions()
   const { data: session } = useGetSession(selectedId ?? '')
@@ -106,6 +108,16 @@ export default function ChatPage() {
       markRead.mutate()
     }
   }, [selectedId])
+
+  // Auto-open session when navigated from PlanDetail (workflow-to-chat conversion)
+  useEffect(() => {
+    const openSessionId = (location.state as any)?.openSessionId
+    if (openSessionId && !selectedId) {
+      setSelectedId(openSessionId)
+      // Clear the state to prevent re-triggering on subsequent navigations
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, selectedId])
 
   // SSE for real-time updates
   useEffect(() => {
@@ -188,7 +200,12 @@ export default function ChatPage() {
                 className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate pr-6">{s.name}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {s.source_type === 'workflow' && (
+                      <span title={t('pages.chat.fromWorkflow')}><Zap className="h-3 w-3 text-purple-400 flex-shrink-0" /></span>
+                    )}
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{s.name}</span>
+                  </div>
                   {s.status === 'running' && (
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
                   )}
@@ -243,6 +260,11 @@ export default function ChatPage() {
               </button>
               {isRunning && (
                 <span className="text-xs bg-blue-50 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">{t('pages.chat.thinking')}</span>
+              )}
+              {session?.source_type === 'workflow' && (
+                <span className="text-xs bg-purple-50 text-purple-600 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline-flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> {t('pages.chat.fromWorkflow')}
+                </span>
               )}
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">

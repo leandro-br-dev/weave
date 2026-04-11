@@ -596,4 +596,13 @@ export const migrations: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 43,
+    description: 'Chat sessions — add plan_id and source_type columns to support workflow-to-chat conversion',
+    up: [
+      `ALTER TABLE chat_sessions ADD COLUMN plan_id TEXT`,
+      `ALTER TABLE chat_sessions ADD COLUMN source_type TEXT DEFAULT 'manual' CHECK(source_type IN ('manual', 'workflow'))`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_sessions_plan_id ON chat_sessions(plan_id)`,
+    ],
+  },
 ];
