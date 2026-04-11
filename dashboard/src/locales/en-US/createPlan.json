@@ -24,7 +24,7 @@
     "addTask": "Add Task",
     "remove": "Remove",
     "taskNumber": "Task {{number}}",
-    "selectProjectHint": "Select a project first to load available agents",
+    "selectProjectHint": "Select a project first to load available teams",
     "taskName": {
       "label": "Task Name",
       "placeholder": "Enter task name"
@@ -34,10 +34,10 @@
       "placeholder": "Describe the task..."
     },
     "agent": {
-      "label": "Agent",
-      "selectPlaceholder": "Select an agent...",
+      "label": "Team",
+      "selectPlaceholder": "Select a team...",
       "selectProjectFirst": "Select a project first",
-      "noAgents": "No agents available",
+      "noAgents": "No teams available",
       "createWorkspaceLink": "Create a team"
     },
     "environment": {

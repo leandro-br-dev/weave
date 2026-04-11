@@ -47,79 +47,6 @@ function readJsonSafe(filePath: string): any {
   }
 }
 
-/**
- * Resolve the planner workspace path for a given workspace.
- *
- * Uses a multi-strategy approach:
- *  1. DB lookup by project_id + role (primary)
- *  2. DB lookup by role only, filtered by same project directory on disk
- *  3. Filesystem heuristic: look for team-planner/ in the same teams/ dir
- *
- * If strategy 3 succeeds and the planner is not in the DB, auto-repairs
- * the linkage so future lookups use strategy 1.
- */
-function resolvePlannerWorkspace(workspace: WorkspaceInfo): string | null {
-  // --- Strategy 1: DB lookup by project_id + role (primary) ---
-  if (workspace.project_id) {
-    const plannerRow = db.prepare(`
-      SELECT pa.workspace_path FROM project_agents pa
-      LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
-      WHERE pa.project_id = ? AND COALESCE(wr.role, 'generic') = 'planner'
-      LIMIT 1
-    `).get(workspace.project_id) as any
-
-    if (plannerRow?.workspace_path && fs.existsSync(plannerRow.workspace_path)) {
-      return plannerRow.workspace_path
-    }
-  }
-
-  // --- Strategy 2: DB lookup by role only, filtered by same project dir ---
-  const allPlanners = db.prepare(`
-    SELECT pa.workspace_path FROM project_agents pa
-    LEFT JOIN team_roles wr ON wr.workspace_path = pa.workspace_path
-    WHERE COALESCE(wr.role, 'generic') = 'planner'
-  `).all() as any[]
-
-  const workspaceProjectDir = path.dirname(path.dirname(workspace.path))
-  const match = allPlanners.find(p =>
-    path.dirname(path.dirname(p.workspace_path)) === workspaceProjectDir
-  )
-  if (match?.workspace_path && fs.existsSync(match.workspace_path)) {
-    return match.workspace_path
-  }
-
-  // --- Strategy 3: Filesystem heuristic (same teams/ directory) ---
-  const teamsDir = path.dirname(workspace.path)
-  if (fs.existsSync(teamsDir)) {
-    const plannerDir = path.join(teamsDir, 'team-planner')
-    if (fs.existsSync(plannerDir) && fs.existsSync(path.join(plannerDir, 'CLAUDE.md'))) {
-      // Do NOT auto-repair if the user intentionally deleted this team
-      if (isTeamIntentionallyDeleted(plannerDir)) {
-        console.log(`[teams] Skipping auto-repair for intentionally deleted planner: ${plannerDir}`)
-        return null
-      }
-
-      // Auto-repair: ensure DB linkage exists for future lookups
-      const projectName = path.basename(workspaceProjectDir)
-      const project = db.prepare(
-        'SELECT id FROM projects WHERE name = ? LIMIT 1'
-      ).get(projectName) as any
-      if (project) {
-        db.prepare(
-          'INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
-        ).run(project.id, plannerDir)
-        db.prepare(
-          'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
-        ).run(plannerDir, 'planner')
-        console.log(`[teams] Auto-repaired planner team linkage: ${plannerDir} → project ${project.id}`)
-      }
-      return plannerDir
-    }
-  }
-
-  return null
-}
-
 function listAllWorkspaces(): WorkspaceInfo[] {
   if (!fs.existsSync(AGENTS_BASE_PATH)) {
     return []
@@ -1631,7 +1558,7 @@ router.post('/:id/native-agents/*', authenticateToken, (req, res) => {
   }
 })
 
-// POST /api/workspaces/:id/improve-claude-md — melhorar CLAUDE.md com IA usando planner
+// POST /api/workspaces/:id/improve-claude-md — melhorar CLAUDE.md com IA usando a própria equipe
 router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
   const id = getIdParam(req.params)
   const workspace = listAllWorkspaces().find(ws => ws.id === id)
@@ -1647,15 +1574,9 @@ router.post('/:id/improve-claude-md', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get planner workspace for this project
-    const plannerWorkspace = resolvePlannerWorkspace(workspace)
-
-    if (!plannerWorkspace) {
-      return res.status(400).json({
-        data: null,
-        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
-      })
-    }
+    // Use the target team's own workspace (not a planner workspace)
+    // The team already has its own agents, skills, and settings.local.json with auth
+    const targetWorkspace = workspace.path
 
     // Read current CLAUDE.md if it exists to provide additional context
     let currentClaudeMdContent = ''
@@ -1811,7 +1732,7 @@ Guidelines for improvement:
       name: 'Improve CLAUDE.md with AI',
       prompt,
       cwd: projectCwd,
-      workspace: plannerWorkspace,
+      workspace: targetWorkspace,
       tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',
       depends_on: [],
@@ -1839,7 +1760,7 @@ Guidelines for improvement:
   }
 })
 
-// POST /api/workspaces/:id/improve-agent — melhorar agente com IA usando planner
+// POST /api/workspaces/:id/improve-agent — melhorar agente com IA usando a própria equipe
 router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
   const id = getIdParam(req.params)
   const workspace = listAllWorkspaces().find(ws => ws.id === id)
@@ -1859,15 +1780,9 @@ router.post('/:id/improve-agent', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get planner workspace for this project
-    const plannerWorkspace = resolvePlannerWorkspace(workspace)
-
-    if (!plannerWorkspace) {
-      return res.status(400).json({
-        data: null,
-        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
-      })
-    }
+    // Use the target team's own workspace (not a planner workspace)
+    // The team already has its own CLAUDE.md, agents, and settings.local.json with auth
+    const targetWorkspace = workspace.path
 
     // Read current CLAUDE.md if it exists to provide project context
     let claudeMdContent = ''
@@ -1999,7 +1914,7 @@ Guidelines for improvement:
       name: `Improve agent "${agentName}" with AI`,
       prompt,
       cwd: agentProjectCwd,
-      workspace: plannerWorkspace,
+      workspace: targetWorkspace,
       tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',
       depends_on: [],
@@ -2046,15 +1961,9 @@ router.post('/:id/improve-skill', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Get planner workspace for this project
-    const plannerWorkspace = resolvePlannerWorkspace(workspace)
-
-    if (!plannerWorkspace) {
-      return res.status(400).json({
-        data: null,
-        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
-      })
-    }
+    // Use the target team's own workspace (not a planner workspace)
+    // The team already has its own CLAUDE.md, agents, and settings.local.json with auth
+    const targetWorkspace = workspace.path
 
     // Read current CLAUDE.md if it exists to provide project context
     let claudeMdContent = ''
@@ -2200,7 +2109,7 @@ Guidelines for improvement:
       name: `Improve skill "${skillName}" with AI`,
       prompt,
       cwd: skillProjectCwd,
-      workspace: plannerWorkspace,
+      workspace: targetWorkspace,
       tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
       permission_mode: 'acceptEdits',
       depends_on: [],

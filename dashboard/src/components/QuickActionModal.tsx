@@ -201,7 +201,7 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </Select>
 
-              {/* Agent */}
+              {/* Team */}
               <Select
                 label={t('components.quickAction.agentRequired')}
                 value={teamId}

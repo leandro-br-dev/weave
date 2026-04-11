@@ -28,9 +28,9 @@
       "newChatSession": "New Chat Session",
       "project": "Project",
       "selectProject": "Select a project",
-      "agent": "Agent",
-      "selectAgent": "Select an agent",
-      "noAgentsForProject": "No agents available for this project",
+      "agent": "Team",
+      "selectAgent": "Select a team",
+      "noAgentsForProject": "No teams available for this project",
       "environment": "Environment",
       "noSpecificEnvironment": "No specific environment",
       "cancel": "Cancel",
@@ -54,7 +54,7 @@
         "selectConversation": "Select a conversation",
         "selectConversationDesc": "Choose a conversation from the list or start a new one",
         "filter": {
-          "agent": "Filter by Agent",
+          "agent": "Filter by Team",
           "date": "Filter by Date"
         }
       },

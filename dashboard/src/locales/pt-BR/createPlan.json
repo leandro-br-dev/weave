@@ -24,7 +24,7 @@
     "addTask": "Adicionar Tarefa",
     "remove": "Remover",
     "taskNumber": "Tarefa {{number}}",
-    "selectProjectHint": "Selecione um projeto primeiro para carregar os agentes disponíveis",
+    "selectProjectHint": "Selecione um projeto primeiro para carregar as equipes disponíveis",
     "taskName": {
       "label": "Nome da Tarefa",
       "placeholder": "Digite o nome da tarefa"
@@ -34,10 +34,10 @@
       "placeholder": "Descreva a tarefa..."
     },
     "agent": {
-      "label": "Agente",
-      "selectPlaceholder": "Selecione um agente...",
+      "label": "Equipe",
+      "selectPlaceholder": "Selecione uma equipe...",
       "selectProjectFirst": "Selecione um projeto primeiro",
-      "noAgents": "Nenhum agente disponível",
+      "noAgents": "Nenhuma equipe disponível",
       "createWorkspaceLink": "Criar uma equipe"
     },
     "environment": {

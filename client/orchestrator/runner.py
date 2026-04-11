@@ -119,10 +119,10 @@ STRUCTURED_PATTERNS = [
 ]
 
 
-def agent_name_from_workspace(workspace: str | None) -> str:
-    """Extract agent name from workspace path (last non-empty segment)."""
+def team_name_from_workspace(workspace: str | None) -> str:
+    """Extract team name from workspace path (last non-empty segment)."""
     if not workspace:
-        return 'unknown-agent'
+        return 'unknown-team'
     # Last non-empty segment of the path
     return workspace.rstrip('/').split('/')[-1]
 
@@ -418,7 +418,7 @@ def _load_deny_rules(workspace: str | None, cwd: str) -> list[str]:
     Load deny rules from workspace/.claude/settings.local.json.
 
     Args:
-        workspace: Agent workspace (team) directory — the ONLY source for settings.
+        workspace: Team workspace directory — the ONLY source for settings.
                    Do NOT fall back to cwd; cwd is the project source directory,
                    not a team workspace. See _apply_workspace_env for rationale.
         cwd: Task working directory (unused — kept for API compatibility).
@@ -940,11 +940,11 @@ async def run_task(
 
     logger.task_start(task.id, task.name, task.cwd)
 
-    # Log agent name for better traceability
-    agent_name = agent_name_from_workspace(task.workspace)
-    logger.info(f'[{task.id}] Agent: {agent_name} | cwd: {task.cwd}')
+    # Log team name for better traceability
+    team_name = team_name_from_workspace(task.workspace)
+    logger.info(f'[{task.id}] Team: {team_name} | cwd: {task.cwd}')
 
-    # Prepare agent documentation directory
+    # Prepare team documentation directory
     # Use workflow_path when available (preferred over legacy .agent-docs)
     docs_dir = ''
     if workflow_path:
@@ -955,7 +955,7 @@ async def run_task(
         legacy_dir = prepare_agent_docs_dir(task.workspace, plan_id, task.id)
         if legacy_dir:
             docs_dir = legacy_dir
-            logger.info(f'[{task.id}] Agent docs dir (legacy): {docs_dir}')
+            logger.info(f'[{task.id}] Team docs dir (legacy): {docs_dir}')
 
     # Send initial log message
     if log_callback:

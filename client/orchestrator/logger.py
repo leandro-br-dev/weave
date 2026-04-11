@@ -39,7 +39,7 @@ def wave_start(wave_index: int, task_names: list[str]) -> None:
 
 
 def task_start(task_id: str, task_name: str, cwd: str) -> None:
-    print(f"{GREEN}┌─ Agent started{RESET}  {BOLD}{task_id}{RESET} — {task_name}")
+    print(f"{GREEN}┌─ Team started{RESET}  {BOLD}{task_id}{RESET} — {task_name}")
     print(f"{GREEN}│  cwd:{RESET} {DIM}{cwd}{RESET}")
 
 

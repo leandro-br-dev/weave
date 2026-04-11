@@ -526,7 +526,7 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
   const { data: projects = [] } = useGetProjects()
   const { data: allWorkspaces = [] } = useGetWorkspaces()
 
-  // Filter agents by selected project
+  // Filter teams by selected project
   const filteredWorkspaces = projectId
     ? allWorkspaces.filter(ws => ws.project_id === projectId)
     : allWorkspaces
@@ -559,7 +559,7 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
           onChange={(value) => {
             const newProjectId = value
             setProjectId(newProjectId)
-            // Clear workspace selection if the selected agent doesn't belong to the new project
+            // Clear workspace selection if the selected team doesn't belong to the new project
             if (workspaceId && selectedWs) {
               const ws = allWorkspaces.find(w => w.id === workspaceId)
               if (ws && ws.project_id !== newProjectId) {
@@ -574,7 +574,7 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
         <Select label={t('pages.chat.agent')} value={workspaceId} onChange={e => {
           const newWorkspaceId = e.target.value
           setWorkspaceId(newWorkspaceId)
-          // Auto-select the linked environment when an env-agent is picked
+          // Auto-select the linked environment when a team with linked env is picked
           const ws = allWorkspaces.find(w => w.id === newWorkspaceId)
           if (ws?.environment_id) {
             setEnvironmentId(ws.environment_id)
