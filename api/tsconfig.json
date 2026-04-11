@@ -14,12 +14,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
     "ignoreDeprecations": "5.0",
     "paths": {
-      "@helpers/*": ["tests/helpers/*"],
-      "@fixtures/*": ["tests/fixtures/*"],
-      "@src/*": ["src/*"]
+      "@helpers/*": ["./tests/helpers/*"],
+      "@fixtures/*": ["./tests/fixtures/*"],
+      "@src/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],

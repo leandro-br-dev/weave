@@ -48,9 +48,22 @@ router.post('/prepare-workflow', authenticateToken, (req: Request, res: Response
 
 // Helper function to parse tasks JSON string from SQLite
 function parsePlan(row: any) {
+  const tasks = typeof row.tasks === 'string' ? JSON.parse(row.tasks) : row.tasks
+  // Sanitize tasks: ensure cwd and workspace are always strings (not objects)
+  // The AI planner may occasionally return these as objects instead of path strings
+  if (Array.isArray(tasks)) {
+    for (const task of tasks) {
+      if (task.cwd !== undefined && typeof task.cwd !== 'string') {
+        task.cwd = typeof task.cwd === 'object' ? (task.cwd.path || task.cwd.workspace_path || JSON.stringify(task.cwd)) : String(task.cwd)
+      }
+      if (task.workspace !== undefined && typeof task.workspace !== 'string') {
+        task.workspace = typeof task.workspace === 'object' ? (task.workspace.path || task.workspace.workspace_path || JSON.stringify(task.workspace)) : String(task.workspace)
+      }
+    }
+  }
   return {
     ...row,
-    tasks: typeof row.tasks === 'string' ? JSON.parse(row.tasks) : row.tasks,
+    tasks,
     attachments: typeof row.attachments === 'string' ? JSON.parse(row.attachments) : (row.attachments || []),
   }
 }

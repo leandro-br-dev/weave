@@ -418,15 +418,18 @@ def _load_deny_rules(workspace: str | None, cwd: str) -> list[str]:
     Load deny rules from workspace/.claude/settings.local.json.
 
     Args:
-        workspace: Agent workspace directory
-        cwd: Task working directory
+        workspace: Agent workspace (team) directory — the ONLY source for settings.
+                   Do NOT fall back to cwd; cwd is the project source directory,
+                   not a team workspace. See _apply_workspace_env for rationale.
+        cwd: Task working directory (unused — kept for API compatibility).
 
     Returns:
-        List of deny rules (empty list if no rules found)
+        List of deny rules (empty list if no rules found or no workspace set)
     """
-    # Prefer workspace, fall back to cwd
-    settings_base = workspace if workspace else cwd
-    settings_path = Path(settings_base) / ".claude" / "settings.local.json"
+    if not workspace:
+        return []
+
+    settings_path = Path(workspace) / ".claude" / "settings.local.json"
 
     if not settings_path.exists():
         return []
@@ -527,38 +530,36 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     so env vars declared in settings.local.json arrive too late to affect auth.
     We apply them here, before the SDK is even instantiated.
 
-    workspace (team workspace dir) has precedence over cwd (agent working dir):
+    workspace (team workspace dir) is the ONLY source of settings.local.json:
     - workspace = where CLAUDE.md and .claude/settings.local.json live
-                 (e.g., /root/projects/agent-client-working/projects/weave/team-coder)
+                 (e.g., ~/.local/share/weave/projects/weave/teams/team-coder)
     - cwd = where the agent works (e.g., /tmp, /root/projects/test_web)
+
+    IMPORTANT: Do NOT add a fallback to cwd/.claude/settings.local.json.
+    The cwd is the project source directory, NOT a team workspace. A settings
+    file there would only exist by accident and would mask configuration errors.
+    If the workspace settings file is missing, the team workspace needs to be
+    created/fixed via the /agents page — silently falling back hides the real problem.
 
     Shell environment always wins: we only set a var if it is not already set.
     """
-    # Use workspace if available, otherwise fall back to cwd
-    settings_base = workspace if workspace else cwd
-    settings_path = Path(settings_base) / ".claude" / "settings.local.json"
+    if not workspace:
+        logger.warn(
+            f"⚠ No workspace specified — cannot locate settings.local.json\n"
+            f"  → Agent will use default OAuth auth (may expire)\n"
+            f"  → Ensure the plan task has a 'workspace' pointing to the team directory"
+        )
+        return
+
+    settings_path = Path(workspace) / ".claude" / "settings.local.json"
 
     if not settings_path.exists():
-        # If workspace was specified but didn't work, try cwd as fallback
-        if workspace:
-            fallback_path = Path(cwd) / ".claude" / "settings.local.json"
-            if fallback_path.exists():
-                settings_path = fallback_path
-            else:
-                logger.warn(
-                    f"⚠ No settings.local.json found at {settings_path} or {fallback_path}\n"
-                    f"  → Agent will use default OAuth auth (may expire)\n"
-                    f"  → Create workspace via /agents page with proper ANTHROPIC_BASE_URL"
-                )
-                return
-        else:
-            # No workspace specified, and cwd doesn't have settings
-            logger.warn(
-                f"⚠ No settings.local.json found at {settings_path}\n"
-                f"  → Agent will use default OAuth auth (may expire)\n"
-                f"  → Create workspace via /agents page or run: claude login"
-            )
-            return
+        logger.warn(
+            f"⚠ No settings.local.json found at {settings_path}\n"
+            f"  → Agent will use default OAuth auth (may expire)\n"
+            f"  → Create workspace via /agents page with proper ANTHROPIC_BASE_URL"
+        )
+        return
 
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -566,7 +567,7 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
         for key, value in env_vars.items():
             if key not in os.environ:
                 os.environ[key] = str(value)
-                logger.info(f"  env from settings.local.json ({settings_base}): {key}={value}")
+                logger.info(f"  env from settings.local.json ({workspace}): {key}={value}")
     except Exception as e:
         logger.warn(f"Could not read {settings_path}: {e}")
 

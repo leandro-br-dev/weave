@@ -10,7 +10,7 @@ import { getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.
 import { createDefaultEnvironments, isValidGitUrl, ENV_TYPE_NAMES } from '../services/gitClone.js'
 import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv, isTeamIntentionallyDeleted, clearDeletedTeamFlag } from '../services/environmentTeamBootstrap.js'
 import { seedNativeAgentsForTeam } from '../services/nativeAgentsBootstrap.js'
-import { getProjectsDir, slugify } from '../utils/paths.js'
+import { getProjectsDir, getDataDir, slugify } from '../utils/paths.js'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
@@ -681,14 +681,24 @@ router.put('/:id', authenticateToken, (req, res) => {
 // GET /api/projects/:id/agents-context — returns teams available for planner context injection
 // NOTE: The project_agents table stores TEAM workspace paths, not individual agents.
 // Each team has its own agents defined in .claude/agents/ within the team workspace.
+//
+// IMPORTANT: Only returns workspaces that belong to the CURRENT environment's data
+// directory. This prevents cross-environment contamination (e.g. dev paths leaking
+// into production or vice-versa). Workspaces from other environments are silently
+// filtered out.
 router.get('/:id/agents-context', authenticateToken, (req, res) => {
   try {
     // Verify project exists
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id)
     if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
 
+    // Determine the current environment's data directory for filtering.
+    // This ensures we only return workspaces that belong to this environment,
+    // preventing dev paths (weave-dev) from appearing in production and vice-versa.
+    const currentDataDir = getDataDir()
+
     // Fetch teams linked to the project with their roles
-    const teams = db.prepare(`
+    const allTeams = db.prepare(`
       SELECT
         pa.workspace_path,
         wr.role,
@@ -698,6 +708,29 @@ router.get('/:id/agents-context', authenticateToken, (req, res) => {
       WHERE pa.project_id = ?
       ORDER BY pa.created_at ASC
     `).all(req.params.id) as any[]
+
+    // Filter out workspaces that don't belong to the current environment.
+    // This catches cases where the DB was populated from a different environment
+    // (e.g. dev paths stored while running in production, or old entries that
+    // reference weave-dev when the server is running in prod mode).
+    const teams = allTeams.filter((team) => {
+      const ws = team.workspace_path
+      if (!ws) return false
+      try {
+        const resolved = path.resolve(ws)
+        const dataDirResolved = path.resolve(currentDataDir)
+        if (!resolved.startsWith(dataDirResolved)) {
+          console.warn(
+            `[agents-context] Filtering out workspace '${ws}' — does not belong to ` +
+            `current data dir '${currentDataDir}' (possible cross-environment contamination)`
+          )
+          return false
+        }
+      } catch {
+        return false
+      }
+      return true
+    })
 
     // Format each team for the planner context
     const formattedTeams = teams.map((team) => {

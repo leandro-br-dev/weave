@@ -40,7 +40,8 @@
   },
   "devDependencies": {
     "@types/multer": "^2.1.0",
-    "concurrently": "^8.2.0"
+    "concurrently": "^8.2.0",
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.16"

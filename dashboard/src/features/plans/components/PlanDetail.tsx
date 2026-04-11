@@ -202,7 +202,7 @@ function EditPlanModal({ plan, onClose }: EditPlanModalProps) {
 
 /** Extract team/agent name from a workspace path (last directory segment). */
 function extractTeamName(workspace: string | undefined | null): string | null {
-  if (!workspace) return null;
+  if (!workspace || typeof workspace !== 'string') return null;
   return workspace.replace(/\/+$/, '').split('/').pop() || null;
 }
 
@@ -352,6 +352,42 @@ export function PlanDetail() {
     }
   }, [plan, hasShownImprovement]);
 
+  // Defensive parsing for tasks field (must be before early returns to keep hooks in consistent order)
+  const tasks = plan?.tasks
+    ? (Array.isArray(plan.tasks) ? plan.tasks : JSON.parse(plan.tasks as string))
+    : [];
+
+  // Build a map of task_id → display name for log rendering (must be before early returns)
+  const taskNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of tasks) {
+      // Use task.name as the display label; fall back to extracting workspace directory name
+      // task.workspace may be an object if the planner returned non-string data — coerce to string
+      const ws = typeof task.workspace === 'string' ? task.workspace : null;
+      const displayName = task.name || extractTeamName(ws) || task.id;
+      map.set(task.id, String(displayName));
+    }
+    return map;
+  }, [tasks]);
+
+  // Memoize a lookup function that resolves subagent IDs from log messages (must be before early returns)
+  const subagentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const log of logs) {
+      // Detect "Subagent spawned: <id>" or "Subagent <id> <status>" patterns
+      const spawnMatch = log.message.match(/Subagent spawned:\s+(\S+)/);
+      if (spawnMatch) {
+        const subId = spawnMatch[1];
+        if (!map.has(subId) && log.message.includes('—')) {
+          // Extract description after "—"
+          const desc = log.message.split('—').pop()?.trim() || '';
+          map.set(subId, desc);
+        }
+      }
+    }
+    return map;
+  }, [logs]);
+
   if (planLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -420,40 +456,6 @@ export function PlanDetail() {
       showToast('error', t('planDetail.failedToSaveImprovements'), error instanceof Error ? error.message : t('planDetail.unknownError'));
     }
   };
-
-  // Defensive parsing for tasks field
-  const tasks = Array.isArray(plan.tasks)
-    ? plan.tasks
-    : JSON.parse(plan.tasks as string);
-
-  // Build a map of task_id → display name for log rendering
-  const taskNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const task of tasks) {
-      // Use task.name as the display label; fall back to extracting workspace directory name
-      const displayName = task.name || extractTeamName(task.workspace) || task.id;
-      map.set(task.id, displayName);
-    }
-    return map;
-  }, [tasks]);
-
-  // Memoize a lookup function that resolves subagent IDs from log messages
-  const subagentNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const log of logs) {
-      // Detect "Subagent spawned: <id>" or "Subagent <id> <status>" patterns
-      const spawnMatch = log.message.match(/Subagent spawned:\s+(\S+)/);
-      if (spawnMatch) {
-        const subId = spawnMatch[1];
-        if (!map.has(subId) && log.message.includes('—')) {
-          // Extract description after "—"
-          const desc = log.message.split('—').pop()?.trim() || '';
-          map.set(subId, desc);
-        }
-      }
-    }
-    return map;
-  }, [logs]);
 
   /** Resolve a task_id (from logs) to a human-readable display name */
   const resolveLogLabel = (taskId: string): string => {
@@ -741,7 +743,7 @@ export function PlanDetail() {
                         <dt className="text-sm font-medium text-gray-500">{t('planDetail.actions')}</dt>
                         <dd className="mt-1 text-sm text-gray-900">
                           <button
-                            onClick={() => navigate(`/workspaces/${plan.team_id}`)}
+                            onClick={() => navigate(`/agents?workspace=${plan.team_id}`)}
                             className="text-orange-600 hover:text-orange-800 text-sm font-medium"
                           >
                             {t('planDetail.viewUpdatedClaudeMd')} →
@@ -855,8 +857,8 @@ export function PlanDetail() {
                   <dd className="text-sm text-gray-600 mb-2">{task.prompt}</dd>
                 )}
                 <div className="flex items-center space-x-4 text-xs text-gray-500">
-                  <span>{t('planDetail.cwd')}: {task.cwd}</span>
-                  <span>{t('planDetail.workspace')}: {task.workspace}</span>
+                  <span>{t('planDetail.cwd')}: {typeof task.cwd === 'string' ? task.cwd : JSON.stringify(task.cwd)}</span>
+                  <span>{t('planDetail.workspace')}: {typeof task.workspace === 'string' ? task.workspace : JSON.stringify(task.workspace)}</span>
                 </div>
                 {/* Image previews */}
                 {imageAttachments.length > 0 && (

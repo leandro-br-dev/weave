@@ -497,6 +497,12 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
         # workspace or cwd paths (e.g. from renamed/moved team directories). We resolve
         # them against the live agents-context endpoint so re-runs always use the
         # current team layout.
+        #
+        # IMPORTANT: Environment consistency check — the agents-context endpoint
+        # returns workspace paths stored in the DB, which may belong to a different
+        # environment (e.g. dev paths in production). We detect and skip paths that
+        # don't match the current environment's data directory to prevent cross-env
+        # contamination.
         from pathlib import Path as _Path
         project_id = plan_data.get("project_id")
         if project_id:
@@ -508,12 +514,38 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
                 elif isinstance(agents_ctx_resp, list):
                     agents_list = agents_ctx_resp
 
+                # Determine the current environment's data directory for validation.
+                # If DATA_DIR is set, use it; otherwise derive from APP_ENV.
+                # This prevents dev paths (weave-dev) from leaking into production
+                # and vice-versa.
+                import os as _os
+                _current_data_dir = _os.environ.get("DATA_DIR", "")
+                if not _current_data_dir:
+                    _app_env = _os.environ.get("APP_ENV", _os.environ.get("DATA_DIR_ENV", "prod"))
+                    _current_data_dir = str(_Path(_os.path.expanduser("~")) / ".local" / "share" / f"weave{'-dev' if _app_env == 'dev' else ''}")
+
                 if agents_list:
-                    # Build role → workspace_path and role → name mappings
+                    # Build role → workspace_path mapping, filtering out paths that
+                    # belong to a different environment.
                     role_to_workspace: dict[str, str] = {}
                     for agent in agents_list:
                         role = agent.get("role", "generic")
                         ws = agent.get("workspace_path", "")
+                        # Validate that the workspace path belongs to the current environment.
+                        # Skip paths that reference weave-dev when running in production
+                        # (or weave when running in dev). This catches cases where the DB
+                        # was populated in a different environment.
+                        if ws and _current_data_dir:
+                            # Normalize both paths for comparison
+                            ws_normalized = str(_Path(ws).resolve())
+                            data_dir_normalized = str(_Path(_current_data_dir).resolve())
+                            if not ws_normalized.startswith(data_dir_normalized):
+                                logger.warning(
+                                    f"[plan-refresh] Skipping {role} workspace '{ws}' — "
+                                    f"does not belong to current data dir '{_current_data_dir}' "
+                                    f"(possible cross-environment contamination)"
+                                )
+                                continue
                         if ws and role not in role_to_workspace:
                             role_to_workspace[role] = ws
 
@@ -553,8 +585,10 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
                                 t["workspace"] = new_ws
                                 refreshed_count += 1
 
-                            # Update cwd if it points to the old workspace directory
-                            # and the new workspace exists but the old one doesn't
+                            # Update cwd ONLY if it points to the old workspace directory
+                            # and the new workspace exists but the old one doesn't.
+                            # Do NOT fall back to the repo cwd for settings — settings
+                            # come exclusively from the team workspace.
                             if old_cwd and not _Path(old_cwd).exists() and new_ws and _Path(new_ws).exists():
                                 logger.info(
                                     f"[plan-refresh] Task '{t.get('name', t.get('id'))}': "

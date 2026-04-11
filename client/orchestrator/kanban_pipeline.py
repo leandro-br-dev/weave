@@ -173,21 +173,33 @@ def normalize_plan_tasks(plan_data: dict, planning_context: dict = None) -> dict
             if ws and role not in fallback_workspace_by_role:
                 fallback_workspace_by_role[role] = ws
 
+    def _extract_path(value, *fallbacks, default=''):
+        """Extract a string path from a value that might be a string, dict, or other type."""
+        for v in [value] + list(fallbacks):
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+            if isinstance(v, dict):
+                # Try common path keys from agent/environment objects
+                for key in ('path', 'workspace_path', 'workspace', 'project_path'):
+                    p = v.get(key)
+                    if isinstance(p, str) and p.strip():
+                        return p.strip()
+        return default
+
     normalized_tasks = []
     for i, task in enumerate(plan_data.get('tasks', [])):
         # Normaliza cwd com fallback do environment
-        cwd = (
-            task.get('cwd') or
-            task.get('workingDirectory') or
-            task.get('working_directory') or
-            fallback_cwd or
-            ''
+        cwd = _extract_path(
+            task.get('cwd'),
+            task.get('workingDirectory'),
+            task.get('working_directory'),
+            fallback_cwd,
         )
 
         # workspace pode vir em task.workspace ou task.agent.workspace
-        workspace = task.get('workspace') or ''
+        workspace = _extract_path(task.get('workspace'))
         if not workspace and isinstance(task.get('agent'), dict):
-            workspace = task['agent'].get('workspace', '')
+            workspace = _extract_path(task['agent'].get('workspace'))
 
         # Fallback de workspace por role
         if not workspace:
