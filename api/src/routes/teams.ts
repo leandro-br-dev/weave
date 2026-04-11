@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getDefaultEnvironmentVariables, mergeEnvironmentVariables } from '../utils/environmentVariables.js'
 import { TEAM_TEMPLATES, getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
 import { seedNativeAgentsForTeam } from '../services/nativeAgentsBootstrap.js'
+import { isTeamIntentionallyDeleted, clearDeletedTeamFlag } from '../services/environmentTeamBootstrap.js'
 import { ensureWorkflowDir } from '../services/workflowDir.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -92,6 +93,12 @@ function resolvePlannerWorkspace(workspace: WorkspaceInfo): string | null {
   if (fs.existsSync(teamsDir)) {
     const plannerDir = path.join(teamsDir, 'team-planner')
     if (fs.existsSync(plannerDir) && fs.existsSync(path.join(plannerDir, 'CLAUDE.md'))) {
+      // Do NOT auto-repair if the user intentionally deleted this team
+      if (isTeamIntentionallyDeleted(plannerDir)) {
+        console.log(`[teams] Skipping auto-repair for intentionally deleted planner: ${plannerDir}`)
+        return null
+      }
+
       // Auto-repair: ensure DB linkage exists for future lookups
       const projectName = path.basename(workspaceProjectDir)
       const project = db.prepare(
@@ -1046,24 +1053,49 @@ router.delete('/:id', authenticateToken, (req, res) => {
     'DELETE FROM project_agents WHERE workspace_path = ?'
   ).run(teamPath)
 
-  // Also remove from team_roles table if it exists
+  // Remove from team_roles table
   try {
     db.prepare(
       'DELETE FROM team_roles WHERE workspace_path = ?'
     ).run(teamPath)
   } catch {}
 
-  // Also remove from team_models table if it exists
+  // Remove from team_models table
   try {
     db.prepare(
       'DELETE FROM team_models WHERE workspace_path = ?'
     ).run(teamPath)
   } catch {}
 
-  // Also remove from agent_environments table if any links exist
+  // Remove from agent_environments table
   db.prepare(
     'DELETE FROM agent_environments WHERE workspace_path = ?'
   ).run(teamPath)
+
+  // Remove from team_native_agents table
+  try {
+    db.prepare(
+      'DELETE FROM team_native_agents WHERE team_workspace_path = ?'
+    ).run(teamPath)
+  } catch {}
+
+  // Clear environments.default_team and environments.team_workspace references
+  // that point to this workspace, preventing stale pointers that trigger re-creation
+  db.prepare(
+    'UPDATE environments SET default_team = NULL WHERE default_team = ?'
+  ).run(teamPath)
+  db.prepare(
+    'UPDATE environments SET team_workspace = NULL WHERE team_workspace = ?'
+  ).run(teamPath)
+
+  // Record this workspace as intentionally deleted to prevent auto-recreation
+  try {
+    db.prepare(
+      'INSERT OR IGNORE INTO deleted_teams (workspace_path, deleted_at) VALUES (?, datetime(\'now\'))'
+    ).run(teamPath)
+  } catch {
+    // Table may not exist yet — non-fatal
+  }
 
   // Delete ONLY the specific workspace directory, not the entire project
   fs.rmSync(teamPath, { recursive: true, force: true })
@@ -1988,6 +2020,207 @@ Guidelines for improvement:
     })
   } catch (error) {
     console.error('Error creating improve agent plan:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to create improvement task'
+    })
+  }
+})
+
+router.post('/:id/improve-skill', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  const { skillName, currentContent, userInstructions } = req.body
+
+  if (!skillName || typeof skillName !== 'string') {
+    return res.status(400).json({ data: null, error: 'skillName is required' })
+  }
+
+  if (!currentContent || typeof currentContent !== 'string') {
+    return res.status(400).json({ data: null, error: 'currentContent is required' })
+  }
+
+  try {
+    // Get planner workspace for this project
+    const plannerWorkspace = resolvePlannerWorkspace(workspace)
+
+    if (!plannerWorkspace) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have a planner team. AI improvements require a planner team with a valid workspace. Please create a planner team for this project first.'
+      })
+    }
+
+    // Read current CLAUDE.md if it exists to provide project context
+    let claudeMdContent = ''
+    const claudeMdPath = path.join(workspace.path, 'CLAUDE.md')
+    if (fs.existsSync(claudeMdPath)) {
+      claudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8')
+    }
+
+    // Read all skill files to provide team context
+    const skillsDir = path.join(workspace.path, '.claude', 'skills')
+    let otherSkillsContext = ''
+    if (fs.existsSync(skillsDir)) {
+      const skillFiles = fs.readdirSync(skillsDir).filter(f => f.endsWith('.md'))
+      for (const sf of skillFiles) {
+        const skillContent = fs.readFileSync(path.join(skillsDir, sf), 'utf-8')
+        if (!sf.startsWith(skillName)) {
+          otherSkillsContext += `\n--- ${sf} ---\n${skillContent.substring(0, 500)}\n`
+        }
+      }
+    }
+
+    // Read agent files to understand what agents are available on the team
+    const agentsDir = path.join(workspace.path, '.claude', 'agents')
+    let agentsContext = ''
+    if (fs.existsSync(agentsDir)) {
+      const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'))
+      for (const af of agentFiles) {
+        const agentContent = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+        agentsContext += `\n--- ${af} ---\n${agentContent.substring(0, 300)}\n`
+      }
+    }
+
+    // Create the plan first (so we can use planId and workflowPath in the prompt)
+    const planId = uuidv4()
+    const taskId = uuidv4()
+
+    // Create workflow directory for this plan
+    let projectName = 'unknown'
+    if (workspace.project_id) {
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(workspace.project_id) as any
+      if (project) projectName = project.name
+    }
+
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(projectName, planId)
+      console.log(`[teams] Workflow directory created for skill improvement: ${workflowPath}`)
+    } catch (dirError) {
+      console.error(`[teams] Failed to create workflow directory for skill improvement plan ${planId}:`, dirError)
+    }
+
+    // Build user instructions section if provided
+    const skillUserInstructionsSection = userInstructions && userInstructions.trim()
+      ? `\n## User Instructions\n\nThe user has provided specific instructions for this improvement. Follow these directions carefully:\n\n${userInstructions.trim()}\n`
+      : ''
+
+    // Create improvement prompt
+    const prompt = `You are an expert at writing clear, concise, and effective skill definitions for AI coding agents (Claude Code). Your task is to improve the following skill definition while maintaining its core purpose and structure.
+
+Context:
+- This skill is named "${skillName}" and belongs to the "${workspace.name}" team
+- The team workspace is located at: ${workspace.path}
+- The team role is: ${workspace.role || 'generic'}
+
+Team CLAUDE.md (project context):
+${claudeMdContent || '(No CLAUDE.md file found)'}
+
+Other skills on this team (for coordination context):
+${otherSkillsContext || '(No other skills on this team)'}
+
+Agents on this team (to understand how skills integrate):
+${agentsContext || '(No agents on this team)'}
+
+Current skill definition to improve:
+${currentContent}
+${skillUserInstructionsSection}
+Guidelines for improvement:
+1. Make the skill's purpose and triggers clearer and more specific
+2. Improve YAML frontmatter (name, description) if present
+3. Add detailed instructions for when and how to invoke this skill
+4. Improve organization, readability, and structure of the markdown content
+5. Add missing important context, examples, or behavior guidelines
+6. Remove redundant or verbose content
+7. Ensure the tone is professional and directive
+8. Consider the team's CLAUDE.md context and other skills for coordination
+9. Keep any project-specific information and frontmatter structure intact
+10. Optimize the skill to work well with the available agents on the team
+
+## IMPORTANT: Output format — READ CAREFULLY
+
+1. Write the improved skill definition to the file: ${workflowPath}/skill-improvement.json
+   The file must contain a JSON object with the field "skillContent" containing the FULL improved skill definition (including any YAML frontmatter and all markdown content).
+   Example:
+   { "skillContent": "---\\nname: skill-name\\ndescription: \\"Improved description\\"\\n---\\n\\n# Skill Name\\n\\nImproved content here..." }
+
+2. Validate by running in the terminal: weave-validate skill ${workflowPath}/skill-improvement.json
+
+3. If validation fails, read the error from the terminal and fix the JSON file accordingly. Do NOT finish until the validation command passes.`
+
+    // Resolve the actual project source directory (not the API server cwd)
+    let skillProjectCwd: string | undefined
+
+    // First try: find the default environment for this project
+    const skillDefaultEnvRow = db.prepare(`
+      SELECT e.project_path FROM environments e
+      WHERE e.project_id = ?
+      AND e.project_path IS NOT NULL AND e.project_path != ''
+      ORDER BY
+        CASE WHEN e.env_type = 'dev' THEN 0
+             WHEN e.env_type = 'plan' THEN 1
+             WHEN e.env_type = 'staging' THEN 2
+             ELSE 3 END
+      LIMIT 1
+    `).get(workspace.project_id) as any
+
+    if (skillDefaultEnvRow?.project_path) {
+      skillProjectCwd = skillDefaultEnvRow.project_path
+    }
+
+    // Second try: find environment linked to the specific workspace
+    if (!skillProjectCwd) {
+      const skillProjectEnvRow = db.prepare(`
+        SELECT e.project_path FROM agent_environments ae
+        JOIN environments e ON e.id = ae.environment_id
+        WHERE ae.workspace_path = ?
+        AND e.project_path IS NOT NULL AND e.project_path != ''
+        LIMIT 1
+      `).get(workspace.path) as any
+      if (skillProjectEnvRow?.project_path) {
+        skillProjectCwd = skillProjectEnvRow.project_path
+      }
+    }
+
+    if (!skillProjectCwd) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have any environment with a valid project path. AI improvements require access to the project source code. Please set up at least one environment (dev, plan, or staging) with a project path.'
+      })
+    }
+
+    const tasks = [{
+      id: taskId,
+      name: `Improve skill "${skillName}" with AI`,
+      prompt,
+      cwd: skillProjectCwd,
+      workspace: plannerWorkspace,
+      tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
+      permission_mode: 'acceptEdits',
+      depends_on: [],
+    }]
+
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id, workflow_path)
+      VALUES (?, ?, ?, 'pending', ?, 'improve_skill', ?, ?)
+    `).run(planId, `Improve skill "${skillName}" for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id, workflowPath)
+
+    return res.status(201).json({
+      data: {
+        planId,
+        taskId,
+        message: `Skill "${skillName}" improvement task created successfully`
+      },
+      error: null
+    })
+  } catch (error) {
+    console.error('Error creating improve skill plan:', error)
     return res.status(500).json({
       data: null,
       error: error instanceof Error ? error.message : 'Failed to create improvement task'

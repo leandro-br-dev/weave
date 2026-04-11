@@ -586,4 +586,14 @@ export const migrations: Migration[] = [
       `ALTER TABLE plans ADD COLUMN sdk_session_id TEXT`,
     ],
   },
+  {
+    version: 42,
+    description: 'Deleted teams tracking — prevent auto-recreation of intentionally deleted team workspaces',
+    up: [
+      `CREATE TABLE IF NOT EXISTS deleted_teams (
+        workspace_path TEXT PRIMARY KEY,
+        deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    ],
+  },
 ];

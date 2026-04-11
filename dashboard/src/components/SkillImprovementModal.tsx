@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Wand2, Check, Trash2, Edit3 } from 'lucide-react'
+import { X, Wand2, Check, Trash2, Edit3, Code } from 'lucide-react'
 import { Button } from './Button'
 import {
   modalColors,
@@ -15,27 +15,29 @@ import {
   withDarkMode,
 } from '@/lib/colors'
 
-interface ClaudeMdImprovementModalProps {
+interface SkillImprovementModalProps {
   isOpen: boolean
+  skillName: string
   improvedContent: string
   onApprove: (content: string) => void
   onDiscard: () => void
   isLoading?: boolean
 }
 
-export function ClaudeMdImprovementModal({
+export function SkillImprovementModal({
   isOpen,
+  skillName,
   improvedContent,
   onApprove,
   onDiscard,
   isLoading = false,
-}: ClaudeMdImprovementModalProps) {
+}: SkillImprovementModalProps) {
   const [editedContent, setEditedContent] = useState(improvedContent)
   const [isEditing, setIsEditing] = useState(false)
   const prevIsOpenRef = useRef(isOpen)
 
   // Reset internal state when the modal closes to prevent stale content
-  // from appearing when it reopens
+  // from appearing when it reopens for a different skill
   useEffect(() => {
     if (prevIsOpenRef.current && !isOpen) {
       setEditedContent('')
@@ -50,13 +52,6 @@ export function ClaudeMdImprovementModal({
       setEditedContent(improvedContent)
     }
   }, [improvedContent]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Debug log to track when modal receives content
-  console.log('[ClaudeMdImprovementModal] rendered with:', {
-    isOpen,
-    improvedContentLength: improvedContent?.length || 0,
-    editedContentLength: editedContent?.length || 0
-  })
 
   // Close on Escape key
   useEffect(() => {
@@ -91,8 +86,16 @@ export function ClaudeMdImprovementModal({
         {/* Header */}
         <div className={`flex items-center justify-between p-6 border-b ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
           <div className="flex items-center gap-3">
-            <Wand2 className="text-orange-600 dark:text-orange-400" size={24} />
-            <h2 className={`text-xl font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>AI-Improved CLAUDE.md</h2>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900">
+              <Code className="text-green-600 dark:text-green-400" size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <Wand2 className="text-orange-600 dark:text-orange-400" size={18} />
+                <h2 className={`text-xl font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>AI-Improved Skill</h2>
+              </div>
+              <p className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} mt-0.5`}>{skillName}</p>
+            </div>
           </div>
           <button
             onClick={onDiscard}

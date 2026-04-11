@@ -1,10 +1,10 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, type EnvironmentVariableValue } from '@/components'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, SkillImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, type EnvironmentVariableValue } from '@/components'
 import { getActiveToken, getApiUrl } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -1360,6 +1360,7 @@ function SettingsTab({ teamId, settings }: { teamId: string; settings: any }) {
 
 function SkillsTab({ teamId, skills }: { teamId: string; skills: Array<{ name: string; hasSkillMd: boolean }> }) {
   const { t } = useTranslation()
+  const { showToast } = useToast()
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingSkill, setEditingSkill] = useState<string | null>(null)
   const [skillName, setSkillName] = useState('')
@@ -1367,12 +1368,23 @@ function SkillsTab({ teamId, skills }: { teamId: string; skills: Array<{ name: s
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const importSkillRef = useRef<HTMLInputElement>(null)
 
+  // Skill improvement state
+  const [improvingSkillName, setImprovingSkillName] = useState<string | null>(null)
+  const [improvementPlanId, setImprovementPlanId] = useState<string | null>(null)
+  const [improvedSkillContent, setImprovedSkillContent] = useState('')
+  const [showSkillImprovementModal, setShowSkillImprovementModal] = useState(false)
+  const [showSkillInstructionsDialog, setShowSkillInstructionsDialog] = useState(false)
+  const [skillImprovementError, setSkillImprovementError] = useState<string | null>(null)
+  const [showedSkillStartToast, setShowedSkillStartToast] = useState(false)
+  const hasShownSkillModalRef = useRef(false)
+
   const installSkill = useInstallSkill(teamId)
   const deleteSkill = useDeleteSkill(teamId)
   const { data: skillData } = useGetSkill(teamId, editingSkill || '')
   const { data: nativeSkills = [] } = useGetNativeSkills()
   const installNativeSkill = useInstallNativeSkill()
   const importCustomSkill = useImportCustomSkill()
+  const improveSkill = useImproveSkill()
 
   const handleNewSkill = () => {
     setSkillName('')
@@ -1446,6 +1458,175 @@ description: "Descreva quando usar esta skill"
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Skill improvement flow
+  // ---------------------------------------------------------------------------
+
+  // Load improvement plan ID from localStorage on mount
+  useEffect(() => {
+    if (!improvingSkillName) return
+    try {
+      const key = `skill-improvement-${teamId}-${improvingSkillName}`
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        const data = JSON.parse(stored)
+        const oneHourAgo = Date.now() - 60 * 60 * 1000
+        if (data.timestamp && data.timestamp > oneHourAgo && data.planId) {
+          setImprovementPlanId(data.planId)
+        } else {
+          localStorage.removeItem(key)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading skill improvement state from localStorage:', error)
+    }
+  }, [teamId, improvingSkillName])
+
+  // Save improvement plan ID to localStorage when it changes
+  useEffect(() => {
+    if (!improvingSkillName) return
+    try {
+      const key = `skill-improvement-${teamId}-${improvingSkillName}`
+      if (improvementPlanId) {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            planId: improvementPlanId,
+            timestamp: Date.now(),
+          })
+        )
+      } else {
+        localStorage.removeItem(key)
+      }
+    } catch (error) {
+      console.error('Error saving skill improvement state to localStorage:', error)
+    }
+  }, [improvementPlanId, teamId, improvingSkillName])
+
+  // Skill improvement polling
+  const { improvedContent: polledSkillContent, isImproving: isSkillImproving, error: skillPollingError } = useImprovementStatus(
+    improvementPlanId,
+    improvementPlanId !== null
+  )
+
+  // Show toast when skill improvement starts
+  useEffect(() => {
+    if ((improveSkill.isPending || isSkillImproving) && !showedSkillStartToast && improvingSkillName) {
+      showToast('info', t('pages.agents.skillsTab.improvementStarted'), t('pages.agents.skillsTab.improvementStartedDesc', { name: improvingSkillName }))
+      setShowedSkillStartToast(true)
+    }
+  }, [improveSkill.isPending, isSkillImproving, showedSkillStartToast, showToast, improvingSkillName, t])
+
+  // Handle successful skill improvement completion
+  useEffect(() => {
+    if (polledSkillContent && !hasShownSkillModalRef.current && improvingSkillName) {
+      hasShownSkillModalRef.current = true
+      setImprovedSkillContent(polledSkillContent)
+      setShowSkillImprovementModal(true)
+      setImprovementPlanId(null)
+      setSkillImprovementError(null)
+      setShowedSkillStartToast(false)
+      showToast('success', t('pages.agents.skillsTab.improvementComplete'), t('pages.agents.skillsTab.improvementCompleteDesc'))
+    }
+  }, [polledSkillContent, showToast, improvingSkillName, t])
+
+  // Handle polling error
+  useEffect(() => {
+    if (skillPollingError) {
+      setSkillImprovementError(skillPollingError)
+      setShowedSkillStartToast(false)
+      setImprovementPlanId(null)
+      setImprovingSkillName(null)
+      showToast('error', t('pages.agents.skillsTab.improvementError'), skillPollingError)
+    }
+  }, [skillPollingError, showToast, improvingSkillName, t])
+
+  const handleImproveSkill = (skillNameToImprove: string) => {
+    // Clear any stale improvement state from a previous skill
+    setShowSkillImprovementModal(false)
+    setImprovedSkillContent('')
+    setImprovementPlanId(null)
+    hasShownSkillModalRef.current = false
+    setSkillImprovementError(null)
+    setShowedSkillStartToast(false)
+
+    setImprovingSkillName(skillNameToImprove)
+    setShowSkillInstructionsDialog(true)
+  }
+
+  const handleImproveSkillConfirm = async (instructions: string) => {
+    setShowSkillInstructionsDialog(false)
+    if (!improvingSkillName) return
+    setSkillImprovementError(null)
+    hasShownSkillModalRef.current = false
+
+    try {
+      // Fetch the current skill content
+      const skillResponse = await fetch(`${getApiUrl()}/api/teams/${teamId}/skills/${encodeURIComponent(improvingSkillName)}`, {
+        headers: { 'Authorization': `Bearer ${getActiveToken()}` }
+      })
+      if (!skillResponse.ok) throw new Error('Failed to fetch skill content')
+      const skillJson = await skillResponse.json()
+      const currentContent = skillJson.data?.content
+
+      if (!currentContent) {
+        showToast('error', t('pages.agents.skillsTab.improvementError'), t('pages.agents.skillsTab.noContent'))
+        setImprovingSkillName(null)
+        return
+      }
+
+      const result = await improveSkill.mutateAsync({
+        teamId,
+        skillName: improvingSkillName,
+        currentContent,
+        userInstructions: instructions || undefined,
+      })
+
+      if (result?.planId) {
+        setImprovementPlanId(result.planId)
+      }
+    } catch (error) {
+      console.error('Error improving skill:', error)
+      setSkillImprovementError('Failed to improve skill. Please try again.')
+      setImprovementPlanId(null)
+      setImprovingSkillName(null)
+    }
+  }
+
+  const handleApproveSkillImprovement = (approvedContent: string) => {
+    if (!improvingSkillName) return
+    const skillNameSnapshot = improvingSkillName
+    // Clear ALL improvement state immediately to prevent stale content
+    setShowSkillImprovementModal(false)
+    setImprovedSkillContent('')
+    setImprovingSkillName(null)
+    setImprovementPlanId(null)
+    hasShownSkillModalRef.current = false
+    installSkill.mutate(
+      { name: skillNameSnapshot, content: approvedContent },
+      {
+        onSuccess: () => {
+          showToast('success', t('pages.agents.skillsTab.skillSaved'), t('pages.agents.skillsTab.skillSavedDesc', { name: skillNameSnapshot }))
+        },
+      }
+    )
+  }
+
+  const handleDiscardSkillImprovement = () => {
+    setShowSkillImprovementModal(false)
+    setImprovedSkillContent('')
+    setImprovingSkillName(null)
+    setImprovementPlanId(null)
+    hasShownSkillModalRef.current = false
+  }
+
+  // Check if any skill is currently being improved
+  const isAnySkillImproving = improveSkill.isPending || isSkillImproving
+
+  // ---------------------------------------------------------------------------
+  // End skill improvement flow
+  // ---------------------------------------------------------------------------
+
   // Update content when editing skill data loads
   if (editingSkill && skillData && skillContent === '') {
     setSkillContent(skillData.content)
@@ -1487,6 +1668,40 @@ description: "Descreva quando usar esta skill"
           </Button>
         </div>
       </div>
+
+      {/* Skill improvement progress indicator */}
+      {isAnySkillImproving && improvingSkillName && (
+        <div className={`p-4 bg-gradient-to-r from-green-50 dark:from-green-950 to-purple-50 dark:to-purple-950 border-2 ${withDarkMode(infoColors.border, darkModeInfoColors.border)} rounded-lg shadow-sm`}>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="animate-spin rounded-full h-6 w-6 border-3 border-green-200 dark:border-green-800"></div>
+              <div className="absolute top-0 left-0 animate-spin rounded-full h-6 w-6 border-3 border-t-green-600 border-r-transparent border-b-transparent border-l-transparent"></div>
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-semibold ${withDarkMode(infoColors.textAlt, darkModeInfoColors.textAlt)}`}>
+                {improveSkill.isPending
+                  ? t('pages.agents.skillsTab.improvementStarting')
+                  : t('pages.agents.skillsTab.improvementInProgress', { name: improvingSkillName })}
+              </p>
+              <p className={`text-xs ${withDarkMode(infoColors.text, darkModeInfoColors.text)} mt-1`}>
+                {improveSkill.isPending ? t('pages.agents.skillsTab.improvementInitializing') : t('pages.agents.skillsTab.improvementWait')}
+              </p>
+            </div>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full animate-pulse delay-75"></div>
+              <div className="w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full animate-pulse delay-150"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Skill improvement error */}
+      {skillImprovementError && (
+        <div className={`p-3 ${errorColors.bg} border ${errorColors.border} rounded-lg`}>
+          <p className={`text-sm ${errorColors.text}`}>{skillImprovementError}</p>
+        </div>
+      )}
 
       {/* Native Skills Section */}
       <div className="mb-6">
@@ -1569,7 +1784,20 @@ description: "Descreva quando usar esta skill"
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleImproveSkill(skill.name)}
+                    disabled={isAnySkillImproving}
+                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 hover:bg-green-100 dark:hover:bg-green-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                    title={t('pages.agents.skillsTab.improveWithAi')}
+                  >
+                    {improvingSkillName === skill.name && (improveSkill.isPending || isSkillImproving) ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={13} />
+                    )}
+                    {t('pages.agents.skillsTab.improveWithAi')}
+                  </button>
                   <Button variant="ghost" size="sm" onClick={() => handleEdit(skill.name)} title="Edit skill">
                     <Edit3 size={16} />
                   </Button>
@@ -1594,6 +1822,23 @@ description: "Descreva quando usar esta skill"
         confirmLabel="Delete"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirm(null)}
+      />
+
+      <SkillImprovementModal
+        key={improvingSkillName || '__none__'}
+        isOpen={showSkillImprovementModal}
+        skillName={improvingSkillName || ''}
+        improvedContent={improvedSkillContent}
+        onApprove={handleApproveSkillImprovement}
+        onDiscard={handleDiscardSkillImprovement}
+        isLoading={installSkill.isPending}
+      />
+
+      <ImprovementInstructionsDialog
+        open={showSkillInstructionsDialog}
+        targetLabel={improvingSkillName || undefined}
+        onConfirm={handleImproveSkillConfirm}
+        onCancel={() => { setShowSkillInstructionsDialog(false); setImprovingSkillName(null) }}
       />
     </div>
   )
@@ -2073,17 +2318,17 @@ Descreva a especialidade e comportamento deste agente.
   const handleApproveAgentImprovement = (approvedContent: string) => {
     if (!improvingAgentName) return
     const agentNameSnapshot = improvingAgentName
-    // Clear modal state immediately to prevent stale content from appearing
+    // Clear ALL improvement state immediately to prevent stale content from appearing
     // when the user starts improving another agent before the save completes
     setShowAgentImprovementModal(false)
     setImprovedAgentContent('')
+    setImprovingAgentName(null)
+    setImprovementPlanId(null)
     hasShownAgentModalRef.current = false
     saveAgent.mutate(
       { name: agentNameSnapshot, content: approvedContent },
       {
         onSuccess: () => {
-          setImprovingAgentName(null)
-          setImprovementPlanId(null)
           showToast('success', t('pages.agents.agentsTab.agentSaved'), t('pages.agents.agentsTab.agentSavedDesc', { name: agentNameSnapshot }))
         },
       }
@@ -2268,6 +2513,7 @@ Descreva a especialidade e comportamento deste agente.
       />
 
       <AgentImprovementModal
+        key={improvingAgentName || '__none__'}
         isOpen={showAgentImprovementModal}
         agentName={improvingAgentName || ''}
         improvedContent={improvedAgentContent}

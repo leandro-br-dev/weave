@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Wand2, Check, Trash2, Edit3, Users } from 'lucide-react'
 import { Button } from './Button'
 import {
@@ -34,6 +34,17 @@ export function AgentImprovementModal({
 }: AgentImprovementModalProps) {
   const [editedContent, setEditedContent] = useState(improvedContent)
   const [isEditing, setIsEditing] = useState(false)
+  const prevIsOpenRef = useRef(isOpen)
+
+  // Reset internal state when the modal closes to prevent stale content
+  // from appearing when it reopens for a different agent
+  useEffect(() => {
+    if (prevIsOpenRef.current && !isOpen) {
+      setEditedContent('')
+      setIsEditing(false)
+    }
+    prevIsOpenRef.current = isOpen
+  }, [isOpen])
 
   // Sync editedContent when improvedContent changes (can arrive after mount)
   useEffect(() => {

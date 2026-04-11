@@ -114,7 +114,20 @@
         "customSkills": "Custom Skills",
         "noCustomSkills": "No custom skills installed",
         "deleteTitle": "Delete Skill",
-        "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+        "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+        "improveWithAi": "Improve with AI",
+        "improvementStarted": "AI Improvement Started",
+        "improvementStartedDesc": "Skill \"{{name}}\" is being analyzed and improved...",
+        "improvementComplete": "Improvement Complete!",
+        "improvementCompleteDesc": "Review the AI-suggested changes below.",
+        "improvementError": "Improvement Error",
+        "noContent": "No skill content found to improve.",
+        "improvementStarting": "Starting AI Improvement...",
+        "improvementInProgress": "AI is Improving Skill \"{{name}}\"...",
+        "improvementInitializing": "Initializing team connection...",
+        "improvementWait": "This may take 2-5 minutes. Please wait.",
+        "skillSaved": "Skill Saved",
+        "skillSavedDesc": "Skill \"{{name}}\" has been updated successfully."
       },
       "agentsTab": {
         "title": "Agents ({{count}})",

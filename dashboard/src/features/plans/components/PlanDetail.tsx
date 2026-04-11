@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePlan, useEditPlan, useCheckCompletion, useReworkPlan } from '@/api/plans';
 import { useSaveClaudeMd } from '@/api/teams';
@@ -198,6 +198,12 @@ function EditPlanModal({ plan, onClose }: EditPlanModalProps) {
       </div>
     </div>
   );
+}
+
+/** Extract team/agent name from a workspace path (last directory segment). */
+function extractTeamName(workspace: string | undefined | null): string | null {
+  if (!workspace) return null;
+  return workspace.replace(/\/+$/, '').split('/').pop() || null;
 }
 
 export function PlanDetail() {
@@ -419,6 +425,51 @@ export function PlanDetail() {
   const tasks = Array.isArray(plan.tasks)
     ? plan.tasks
     : JSON.parse(plan.tasks as string);
+
+  // Build a map of task_id → display name for log rendering
+  const taskNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of tasks) {
+      // Use task.name as the display label; fall back to extracting workspace directory name
+      const displayName = task.name || extractTeamName(task.workspace) || task.id;
+      map.set(task.id, displayName);
+    }
+    return map;
+  }, [tasks]);
+
+  // Memoize a lookup function that resolves subagent IDs from log messages
+  const subagentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const log of logs) {
+      // Detect "Subagent spawned: <id>" or "Subagent <id> <status>" patterns
+      const spawnMatch = log.message.match(/Subagent spawned:\s+(\S+)/);
+      if (spawnMatch) {
+        const subId = spawnMatch[1];
+        if (!map.has(subId) && log.message.includes('—')) {
+          // Extract description after "—"
+          const desc = log.message.split('—').pop()?.trim() || '';
+          map.set(subId, desc);
+        }
+      }
+    }
+    return map;
+  }, [logs]);
+
+  /** Resolve a task_id (from logs) to a human-readable display name */
+  const resolveLogLabel = (taskId: string): string => {
+    // 1. Check if it matches a plan task
+    const taskName = taskNameMap.get(taskId);
+    if (taskName && taskName !== taskId) {
+      return taskName;
+    }
+    // 2. Check if it's a known subagent
+    const subName = subagentNameMap.get(taskId);
+    if (subName) {
+      return subName;
+    }
+    // 3. Fallback: return the raw ID (already short enough)
+    return taskId;
+  };
 
   return (
     <div className="space-y-6">
@@ -982,7 +1033,7 @@ export function PlanDetail() {
                   <span className="text-gray-400 mr-2">
                     {new Date(log.created_at).toLocaleTimeString()}
                   </span>
-                  <span className="text-blue-400 mr-2">[{log.task_id}]</span>
+                  <span className="text-blue-400 mr-2" title={log.task_id}>[{resolveLogLabel(log.task_id)}]</span>
                   {log.message}
                 </div>
               ))}

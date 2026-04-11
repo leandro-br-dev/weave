@@ -114,7 +114,20 @@
         "customSkills": "Skills Personalizadas",
         "noCustomSkills": "Nenhuma skill personalizada instalada",
         "deleteTitle": "Excluir Skill",
-        "deleteConfirm": "Tem certeza de que deseja excluir \"{{name}}\"? Esta ação não pode ser desfeita."
+        "deleteConfirm": "Tem certeza de que deseja excluir \"{{name}}\"? Esta ação não pode ser desfeita.",
+        "improveWithAi": "Melhorar com IA",
+        "improvementStarted": "Melhoria com IA Iniciada",
+        "improvementStartedDesc": "A skill \"{{name}}\" está sendo analisada e melhorada...",
+        "improvementComplete": "Melhoria Concluída!",
+        "improvementCompleteDesc": "Revise as alterações sugeridas pela IA abaixo.",
+        "improvementError": "Erro na Melhoria",
+        "noContent": "Nenhum conteúdo de skill encontrado para melhorar.",
+        "improvementStarting": "Iniciando melhoria com IA...",
+        "improvementInProgress": "IA está melhorando a skill \"{{name}}\"...",
+        "improvementInitializing": "Inicializando conexão com a equipe...",
+        "improvementWait": "Isso pode levar 2-5 minutos. Aguarde.",
+        "skillSaved": "Skill Salva",
+        "skillSavedDesc": "A skill \"{{name}}\" foi atualizada com sucesso."
       },
       "agentsTab": {
         "title": "Agentes ({{count}})",

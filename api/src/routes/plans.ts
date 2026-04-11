@@ -259,6 +259,7 @@ router.get('/pending', authenticateToken, (req: Request, res: Response) => {
           started_at,
           completed_at,
           created_at,
+          project_id,
           attachments,
           workflow_path,
           sdk_session_id

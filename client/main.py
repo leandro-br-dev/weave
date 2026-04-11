@@ -492,6 +492,82 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
             logger.error(f"Failed to start plan {plan_id}: {start_response.error}")
             return
 
+        # Refresh stale workspace/cwd paths from the current project team configuration.
+        # When a plan is re-executed, the tasks stored in the DB may contain outdated
+        # workspace or cwd paths (e.g. from renamed/moved team directories). We resolve
+        # them against the live agents-context endpoint so re-runs always use the
+        # current team layout.
+        from pathlib import Path as _Path
+        project_id = plan_data.get("project_id")
+        if project_id:
+            try:
+                agents_ctx_resp = await client._get(f"/projects/{project_id}/agents-context")
+                agents_list = []
+                if isinstance(agents_ctx_resp, dict):
+                    agents_list = agents_ctx_resp.get("data") or []
+                elif isinstance(agents_ctx_resp, list):
+                    agents_list = agents_ctx_resp
+
+                if agents_list:
+                    # Build role → workspace_path and role → name mappings
+                    role_to_workspace: dict[str, str] = {}
+                    for agent in agents_list:
+                        role = agent.get("role", "generic")
+                        ws = agent.get("workspace_path", "")
+                        if ws and role not in role_to_workspace:
+                            role_to_workspace[role] = ws
+
+                    refreshed_count = 0
+                    for t in tasks_data:
+                        old_cwd = t.get("cwd", "")
+                        old_ws = t.get("workspace") or t.get("workspace_path", "")
+
+                        # Detect role from workspace name (e.g. team-coder → coder)
+                        old_path = old_ws or old_cwd or ""
+                        detected_role = None
+                        for role_key in role_to_workspace:
+                            if role_key in old_path.lower():
+                                detected_role = role_key
+                                break
+                        if not detected_role:
+                            # Fallback heuristic from common directory names
+                            if "coder" in old_path.lower():
+                                detected_role = "coder"
+                            elif "planner" in old_path.lower():
+                                detected_role = "planner"
+                            elif "reviewer" in old_path.lower():
+                                detected_role = "reviewer"
+                            elif "tester" in old_path.lower():
+                                detected_role = "tester"
+                            elif "debugger" in old_path.lower():
+                                detected_role = "debugger"
+
+                        if detected_role and detected_role in role_to_workspace:
+                            new_ws = role_to_workspace[detected_role]
+                            # Update workspace if it changed
+                            if old_ws and old_ws != new_ws:
+                                logger.info(
+                                    f"[plan-refresh] Task '{t.get('name', t.get('id'))}': "
+                                    f"workspace {old_ws} → {new_ws}"
+                                )
+                                t["workspace"] = new_ws
+                                refreshed_count += 1
+
+                            # Update cwd if it points to the old workspace directory
+                            # and the new workspace exists but the old one doesn't
+                            if old_cwd and not _Path(old_cwd).exists() and new_ws and _Path(new_ws).exists():
+                                logger.info(
+                                    f"[plan-refresh] Task '{t.get('name', t.get('id'))}': "
+                                    f"cwd {old_cwd} → {new_ws} (old cwd does not exist)"
+                                )
+                                t["cwd"] = new_ws
+                                refreshed_count += 1
+
+                    if refreshed_count:
+                        logger.info(f"[plan-refresh] Refreshed {refreshed_count} stale path(s) for plan {plan_id}")
+            except Exception as e:
+                logger.warning(f"[plan-refresh] Failed to refresh workspace paths: {e}")
+
         # Convert API plan format to internal Plan format
         from orchestrator.plan import Task, Plan
         tasks = [

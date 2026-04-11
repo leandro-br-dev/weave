@@ -40,8 +40,42 @@ export interface BootstrapResult {
   workspacePath: string
   /** Whether the workspace + team were actually created (false if already existed) */
   created: boolean
+  /** Whether the bootstrap was skipped because this team was intentionally deleted */
+  skipped?: boolean
   /** Summary of native agents that were seeded into the database */
   nativeAgents?: SeedResult
+}
+
+// ---------------------------------------------------------------------------
+// Deleted teams tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a team workspace was intentionally deleted by the user.
+ * Used to prevent auto-recreation via bootstrap or repair-teams.
+ */
+export function isTeamIntentionallyDeleted(workspacePath: string): boolean {
+  try {
+    const row = db.prepare(
+      'SELECT 1 FROM deleted_teams WHERE workspace_path = ? LIMIT 1'
+    ).get(workspacePath) as any
+    return !!row
+  } catch {
+    // Table may not exist yet — assume not deleted
+    return false
+  }
+}
+
+/**
+ * Clear a team from the deleted_teams registry (e.g. when the user explicitly
+ * re-creates or re-links it).
+ */
+export function clearDeletedTeamFlag(workspacePath: string): void {
+  try {
+    db.prepare('DELETE FROM deleted_teams WHERE workspace_path = ?').run(workspacePath)
+  } catch {
+    // Non-fatal
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +139,20 @@ export function bootstrapTeamForEnvironment(
   const teamName = `team-${role === 'planner' ? 'planner' : role === 'reviewer' ? 'reviewer' : 'coder'}`
   const projectSlug = slugify(projectName)
   const workspacePath = teamWorkspacePath(AGENTS_BASE_PATH, projectSlug, teamName)
+
+  // Check if this team was intentionally deleted by the user — if so, do NOT recreate
+  if (isTeamIntentionallyDeleted(workspacePath)) {
+    console.log(
+      `[environmentTeamBootstrap] Skipping ${teamName} for "${projectName}" — intentionally deleted`,
+    )
+    return {
+      envName,
+      teamId,
+      workspacePath,
+      created: false,
+      skipped: true,
+    }
+  }
 
   // If the workspace directory already exists, just link it (idempotent).
   const alreadyExists = fs.existsSync(workspacePath)
@@ -195,6 +243,9 @@ export function bootstrapTeamForEnvironment(
   })
 
   insertEnvTeam()
+
+  // Clear the "deleted" flag since this team is being (re-)created
+  clearDeletedTeamFlag(workspacePath)
 
   // --- Seed native agents for this team type ---
   let nativeAgents: SeedResult | undefined

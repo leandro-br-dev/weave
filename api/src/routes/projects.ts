@@ -8,7 +8,7 @@ import { execSync } from 'child_process'
 import { envTeamPath, envTeamPlannerPath, AGENTS_BASE_PATH, teamWorkspacePath, envDirPath } from '../utils/paths.js'
 import { getTeamTemplateById, renderTeamClaudeMd } from '../utils/teamTemplates.js'
 import { createDefaultEnvironments, isValidGitUrl, ENV_TYPE_NAMES } from '../services/gitClone.js'
-import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv } from '../services/environmentTeamBootstrap.js'
+import { bootstrapTeamsForEnvironments, bootstrapTeamForEnvironment, resolveTeamIdForEnv, isTeamIntentionallyDeleted, clearDeletedTeamFlag } from '../services/environmentTeamBootstrap.js'
 import { seedNativeAgentsForTeam } from '../services/nativeAgentsBootstrap.js'
 import { getProjectsDir, slugify } from '../utils/paths.js'
 import { fileURLToPath } from 'url'
@@ -305,8 +305,45 @@ router.delete('/:projectId/environments/:envId', authenticateToken, (req, res) =
   // Verify project exists
   const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.projectId)
   if (!project) return res.status(404).json({ data: null, error: 'Project not found' })
-  db.prepare('DELETE FROM environments WHERE id=? AND project_id=?').run(req.params.envId, req.params.projectId)
-  return res.json({ data: { deleted: true }, error: null })
+
+  const envId = req.params.envId
+
+  // Before deleting the environment, clean up any team workspaces linked to it
+  const envTeams = db.prepare(
+    'SELECT workspace_path FROM agent_environments WHERE environment_id = ?'
+  ).all(envId) as any[]
+
+  const deletedTeams: string[] = []
+  for (const team of envTeams) {
+    const teamPath = team.workspace_path
+
+    // Clean all DB references for this team
+    db.prepare('DELETE FROM project_agents WHERE workspace_path = ?').run(teamPath)
+    try { db.prepare('DELETE FROM team_roles WHERE workspace_path = ?').run(teamPath) } catch {}
+    try { db.prepare('DELETE FROM team_models WHERE workspace_path = ?').run(teamPath) } catch {}
+    db.prepare('DELETE FROM agent_environments WHERE workspace_path = ?').run(teamPath)
+    try { db.prepare('DELETE FROM team_native_agents WHERE team_workspace_path = ?').run(teamPath) } catch {}
+
+    // Clear stale environment references
+    db.prepare('UPDATE environments SET default_team = NULL WHERE default_team = ?').run(teamPath)
+    db.prepare('UPDATE environments SET team_workspace = NULL WHERE team_workspace = ?').run(teamPath)
+
+    // Record as intentionally deleted
+    try {
+      db.prepare(
+        'INSERT OR IGNORE INTO deleted_teams (workspace_path, deleted_at) VALUES (?, datetime(\'now\'))'
+      ).run(teamPath)
+    } catch {}
+
+    // Remove filesystem directory
+    try { fs.rmSync(teamPath, { recursive: true, force: true }) } catch {}
+    deletedTeams.push(teamPath)
+  }
+
+  // Delete the environment record (CASCADE will clean agent_environments rows too)
+  db.prepare('DELETE FROM environments WHERE id=? AND project_id=?').run(envId, req.params.projectId)
+
+  return res.json({ data: { deleted: true, cleanedTeams: deletedTeams }, error: null })
 })
 
 // PUT /api/projects/:projectId/environments/:envId/default-team — set (or clear) the default team for an environment
@@ -465,6 +502,23 @@ router.post('/:projectId/repair-teams', authenticateToken, (req, res) => {
         continue
       }
 
+      // Check if the team that would be created was intentionally deleted
+      const projectSlug = slugify(project.name)
+      const teamName = envName === 'plan' ? 'team-planner'
+        : envName === 'staging' ? 'team-reviewer'
+        : 'team-coder'
+      const wouldBePath = teamWorkspacePath(AGENTS_BASE_PATH, projectSlug, teamName)
+
+      if (isTeamIntentionallyDeleted(wouldBePath)) {
+        results.push({
+          action: 'skipped_intentionally_deleted',
+          envName,
+          teamPath: wouldBePath,
+          created: false,
+        })
+        continue
+      }
+
       try {
         const bootResult = bootstrapTeamForEnvironment(
           projectId,
@@ -473,12 +527,21 @@ router.post('/:projectId/repair-teams', authenticateToken, (req, res) => {
           env.project_path,
           project.name,
         )
-        results.push({
-          action: bootResult.created ? 'team_created' : 'team_linked',
-          envName,
-          teamPath: bootResult.workspacePath,
-          created: bootResult.created,
-        })
+        if (bootResult.skipped) {
+          results.push({
+            action: 'skipped_intentionally_deleted',
+            envName,
+            teamPath: bootResult.workspacePath,
+            created: false,
+          })
+        } else {
+          results.push({
+            action: bootResult.created ? 'team_created' : 'team_linked',
+            envName,
+            teamPath: bootResult.workspacePath,
+            created: bootResult.created,
+          })
+        }
       } catch (teamErr: any) {
         results.push({
           action: 'team_error',
@@ -543,12 +606,47 @@ router.delete('/:id/agents', authenticateToken, (req, res) => {
 })
 
 // DELETE /api/projects/:id
-
-// DELETE /api/projects/:id
 router.delete('/:id', authenticateToken, (req, res) => {
-  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(req.params.id)
+  const projectId = req.params.id
+
+  // First, gather all team workspaces linked to this project's environments
+  // so we can clean up both DB and filesystem
+  const projectEnvs = db.prepare(
+    'SELECT id, default_team, team_workspace FROM environments WHERE project_id = ?'
+  ).all(projectId) as any[]
+
+  // Also get any teams directly linked via project_agents
+  const projectAgents = db.prepare(
+    'SELECT workspace_path FROM project_agents WHERE project_id = ?'
+  ).all(projectId) as any[]
+
+  // Collect all unique team paths to clean up
+  const teamPaths = new Set<string>()
+  for (const env of projectEnvs) {
+    if (env.default_team) teamPaths.add(env.default_team)
+    if (env.team_workspace) teamPaths.add(env.team_workspace)
+  }
+  for (const agent of projectAgents) {
+    if (agent.workspace_path) teamPaths.add(agent.workspace_path)
+  }
+
+  // Clean up each team workspace (DB + filesystem)
+  const cleanedTeams: string[] = []
+  for (const teamPath of teamPaths) {
+    db.prepare('DELETE FROM project_agents WHERE workspace_path = ?').run(teamPath)
+    try { db.prepare('DELETE FROM team_roles WHERE workspace_path = ?').run(teamPath) } catch {}
+    try { db.prepare('DELETE FROM team_models WHERE workspace_path = ?').run(teamPath) } catch {}
+    db.prepare('DELETE FROM agent_environments WHERE workspace_path = ?').run(teamPath)
+    try { db.prepare('DELETE FROM team_native_agents WHERE team_workspace_path = ?').run(teamPath) } catch {}
+    try { fs.rmSync(teamPath, { recursive: true, force: true }) } catch {}
+    cleanedTeams.push(teamPath)
+  }
+
+  // Delete the project (CASCADE will clean environments, project_agents, etc.)
+  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
   if (result.changes === 0) return res.status(404).json({ data: null, error: 'Project not found' })
-  return res.json({ data: { deleted: true }, error: null })
+
+  return res.json({ data: { deleted: true, cleanedTeams }, error: null })
 })
 
 // PUT /api/projects/:id
@@ -1257,6 +1355,8 @@ router.post('/:projectId/default-agents', authenticateToken, (req, res) => {
         db.prepare(
           'INSERT OR REPLACE INTO team_roles (workspace_path, role) VALUES (?, ?)'
         ).run(workspacePath, role)
+        // Clear any "deleted" flag since user is explicitly re-linking
+        clearDeletedTeamFlag(workspacePath)
         return
       }
 
@@ -1350,6 +1450,8 @@ You are a team workspace for the **${project.name}** project.
     if (create_coder) {
       const coderPath = teamWorkspacePath(AGENTS_BASE_PATH, project.name, 'team-coder')
       createAgentWorkspace(coderPath, 'team-coder', 'coder', env.project_path)
+      // Clear the "deleted" flag since user is explicitly re-creating
+      clearDeletedTeamFlag(coderPath)
       // Update the environment's team_workspace and default_team now that the user has confirmed creation
       db.prepare('UPDATE environments SET team_workspace = ?, default_team = ? WHERE id = ?').run(coderPath, coderPath, environment_id)
       // Also link this workspace to the specific environment in agent_environments table
@@ -1367,6 +1469,8 @@ You are a team workspace for the **${project.name}** project.
     if (create_planner) {
       const plannerPath = teamWorkspacePath(AGENTS_BASE_PATH, project.name, 'team-planner')
       createAgentWorkspace(plannerPath, 'team-planner', 'planner', env.project_path)
+      // Clear the "deleted" flag since user is explicitly re-creating
+      clearDeletedTeamFlag(plannerPath)
       // Also link this workspace to the specific environment in agent_environments table
       db.prepare('INSERT OR IGNORE INTO agent_environments (workspace_path, environment_id) VALUES (?, ?)').run(plannerPath, environment_id)
       // Seed native agents for this team type

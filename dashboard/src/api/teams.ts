@@ -425,6 +425,16 @@ export function useImproveAgent() {
   })
 }
 
+export function useImproveSkill() {
+  return useMutation({
+    mutationFn: ({ teamId, skillName, currentContent, userInstructions }: { teamId: string; skillName: string; currentContent: string; userInstructions?: string }) =>
+      apiClient.post<{ planId: string; taskId: string; message: string }>(
+        `/api/teams/${teamId}/improve-skill`,
+        { skillName, currentContent, userInstructions }
+      ),
+  })
+}
+
 export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'error' | 'cancelled'
 
 export type Plan = {
@@ -436,6 +446,7 @@ export type Plan = {
       improvedContent?: string
       claudeMd?: string
       agentContent?: string
+      skillContent?: string
     }
   }
   error?: string
@@ -463,7 +474,7 @@ export function useImprovementStatus(
     if (so.improvedContent) return so.improvedContent
     // Wrapped format from save_structured_output: { content: { agentContent | claudeMd | improvedContent } }
     if (so.content) {
-      return so.content.agentContent ?? so.content.claudeMd ?? so.content.improvedContent
+      return so.content.agentContent ?? so.content.skillContent ?? so.content.claudeMd ?? so.content.improvedContent
     }
     return undefined
   }
