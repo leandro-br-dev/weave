@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Zap, ChevronRight, Paperclip } from 'lucide-react'
-import { Button, Select } from '@/components'
+import { Button, Select, ProjectSelectDropdown } from '@/components'
 import { FileAttachmentInput, type FileAttachment } from '@/components/FileAttachmentInput'
 import { useCreateQuickAction } from '@/api/quickActions'
 import { useGetProjects } from '@/api/projects'
@@ -192,14 +192,15 @@ export function QuickActionModal({ onClose }: QuickActionModalProps) {
           {step === 'form' && (
             <>
               {/* Project */}
-              <Select
+              <ProjectSelectDropdown
                 label={t('components.quickAction.project')}
                 value={projectId}
-                onChange={e => { setProjectId(e.target.value); setTeamId(''); setEnvironmentId('') }}
-              >
-                <option value="">{t('components.quickAction.allProjects')}</option>
-                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </Select>
+                onChange={(value) => { setProjectId(value); setTeamId(''); setEnvironmentId('') }}
+                projects={projects}
+                placeholder={t('components.quickAction.selectProject')}
+                showAllOption
+                allOptionLabel={t('components.quickAction.allProjects')}
+              />
 
               {/* Team */}
               <Select

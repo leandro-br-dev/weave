@@ -83,7 +83,8 @@
     "reviewAndCreate": "Review & Create",
     "close": "Close",
     "run": "Run",
-    "attachmentsIncluded": "{{count}} attachment(s) included"
+    "attachmentsIncluded": "{{count}} attachment(s) included",
+    "selectProject": "Select a project"
   },
   "contextModal": {
     "title": "Project Context",

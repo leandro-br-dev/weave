@@ -83,7 +83,8 @@
     "reviewAndCreate": "Revisar e Criar",
     "close": "Fechar",
     "run": "Executar",
-    "attachmentsIncluded": "{{count}} anexo(s) incluído(s)"
+    "attachmentsIncluded": "{{count}} anexo(s) incluído(s)",
+    "selectProject": "Selecione um projeto"
   },
   "contextModal": {
     "title": "Contexto do Projeto",

@@ -43,7 +43,9 @@
           "client": "Client",
           "when": "When",
           "export": "Export as JSON",
-          "created": "Created"
+          "created": "Created",
+          "childWorkflowTooltip": "Child workflow (created via Rework)",
+          "viewParentTooltip": "Go to parent workflow"
         }
       },
       "header": {

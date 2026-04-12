@@ -43,7 +43,9 @@
           "client": "Cliente",
           "when": "Quando",
           "export": "Exportar como JSON",
-          "created": "Criado em"
+          "created": "Criado em",
+          "childWorkflowTooltip": "Fluxo filho (criado via Refazer)",
+          "viewParentTooltip": "Ir para o fluxo original"
         }
       },
       "header": {

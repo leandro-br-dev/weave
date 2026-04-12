@@ -199,6 +199,7 @@ async def trigger_dev_team(
         'project_id': project_id,
         'status': 'pending',  # Daemon vai executar automaticamente
         'type': 'workflow',
+        'team_id': dev_workspace,  # Persist team workspace for plan-to-chat conversion
     }
 
     created = await client.create_plan_from_data(execution_plan)
@@ -328,6 +329,7 @@ async def trigger_staging_team(
         'project_id': project_id,
         'status': 'pending',
         'type': 'workflow',
+        'team_id': staging_workspace,  # Persist team workspace for plan-to-chat conversion
     }
 
     created = await client.create_plan_from_data(staging_plan)

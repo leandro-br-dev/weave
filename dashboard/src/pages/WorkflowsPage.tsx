@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router'
-import { Plus, Upload, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip } from 'lucide-react'
+import { Plus, Upload, Loader2, ChevronUp, ChevronDown, ChevronsUpDown, Paperclip, GitBranch, ArrowUpRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   PageHeader,
@@ -405,12 +405,29 @@ export default function WorkflowsPage() {
                                 size={16}
                               />
                             )}
+                            {plan.parent_plan_id && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-purple-500 dark:text-purple-400"
+                                title={t('pages.workflows.list.table.childWorkflowTooltip')}
+                              >
+                                <GitBranch className="h-3.5 w-3.5" />
+                              </span>
+                            )}
                             <Link
                               to={`/plans/${plan.id}`}
                               className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')}`}
                             >
                               {plan.name}
                             </Link>
+                            {plan.parent_plan_id && (
+                              <Link
+                                to={`/plans/${plan.parent_plan_id}`}
+                                className={`inline-flex items-center gap-0.5 text-xs ${withDarkMode('text-purple-500 hover:text-purple-700', 'dark:text-purple-400 dark:hover:text-purple-300')}`}
+                                title={t('pages.workflows.list.table.viewParentTooltip')}
+                              >
+                                <ArrowUpRight className="h-3 w-3" />
+                              </Link>
+                            )}
                             {attachmentCount > 0 && (
                               <span className={`inline-flex items-center gap-0.5 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`} title={`${attachmentCount} attachment(s)`}>
                                 <Paperclip className="h-3 w-3" />
@@ -481,12 +498,29 @@ export default function WorkflowsPage() {
                             size={16}
                           />
                         )}
+                        {plan.parent_plan_id && (
+                          <span
+                            className="inline-flex items-center gap-0.5 text-purple-500 dark:text-purple-400 flex-shrink-0"
+                            title={t('pages.workflows.list.table.childWorkflowTooltip')}
+                          >
+                            <GitBranch className="h-3.5 w-3.5" />
+                          </span>
+                        )}
                         <Link
                           to={`/plans/${plan.id}`}
                           className={`text-sm font-medium ${withDarkMode(textColors.primary, darkModeTextColors.primary)} ${withDarkMode('hover:text-gray-600', 'dark:hover:text-gray-300')} truncate`}
                         >
                           {plan.name}
                         </Link>
+                        {plan.parent_plan_id && (
+                          <Link
+                            to={`/plans/${plan.parent_plan_id}`}
+                            className={`inline-flex items-center gap-0.5 text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 flex-shrink-0`}
+                            title={t('pages.workflows.list.table.viewParentTooltip')}
+                          >
+                            <ArrowUpRight className="h-3 w-3" />
+                          </Link>
+                        )}
                         {attachmentCount > 0 && (
                           <span className={`inline-flex items-center gap-0.5 text-xs ${withDarkMode(textColors.muted, darkModeTextColors.veryMuted)}`} title={`${attachmentCount} attachment(s)`}>
                             <Paperclip className="h-3 w-3" />

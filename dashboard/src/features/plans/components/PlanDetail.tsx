@@ -4,7 +4,7 @@ import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePla
 import { useSaveClaudeMd } from '@/api/teams';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
-import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn, MessageSquare } from 'lucide-react';
+import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn, MessageSquare, ArrowLeft } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -247,9 +247,13 @@ export function PlanDetail() {
   // Image lightbox state
   const [lightboxImage, setLightboxImage] = useState<{ src: string; fileName: string } | null>(null);
 
-  // Determine back navigation from router state
-  const backTo = location.state?.from || '/';
-  const backLabel = location.state?.fromLabel || t('createPlan.plans');
+  // Determine back navigation: if this is a child workflow, prioritize going to parent
+  const backTo = plan?.parent_plan_id
+    ? `/plans/${plan.parent_plan_id}`
+    : location.state?.from || '/';
+  const backLabel = plan?.parent_plan_id
+    ? t('planDetail.parentPlan')
+    : location.state?.fromLabel || t('createPlan.plans');
 
   const handleExport = () => {
     if (!plan) return;
@@ -495,12 +499,22 @@ export function PlanDetail() {
         <div className="px-4 py-5 sm:px-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate(backTo)}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                ← {backLabel}
-              </button>
+              {plan.parent_plan_id ? (
+                <button
+                  onClick={() => navigate(backTo)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  {backLabel}
+                </button>
+              ) : (
+                <button
+                  onClick={() => navigate(backTo)}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  ← {backLabel}
+                </button>
+              )}
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold text-gray-900">{plan.name}</h1>
                 {plan.parent_plan_id && (

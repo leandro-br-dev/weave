@@ -544,6 +544,10 @@ async def process_kanban_task(task: dict, client) -> None:
         auto_approve = project_settings.get("auto_approve_workflows", False)
         plan_data["status"] = "pending" if auto_approve else "awaiting_approval"
 
+        # Persist team_id (planner workspace) for plan-to-chat conversion
+        if planner_workspace and not plan_data.get("team_id"):
+            plan_data["team_id"] = planner_workspace
+
         # Cria o workflow — reusing the pre-created workflow_id
         logger.info(f'[KanbanPipeline] Step 10: creating workflow from plan (status={plan_data["status"]})...')
         plan_data["workflow_id"] = workflow_id

@@ -73,6 +73,7 @@ interface CreatePlanBody {
   name: string
   tasks: any[] | string
   project_id?: string
+  team_id?: string
 }
 
 interface StartPlanBody {
@@ -128,6 +129,7 @@ router.get('/', authenticateToken, (req: Request, res: Response) => {
         project_id,
         parent_plan_id,
         rework_prompt,
+        rework_mode,
         attachments
       FROM plans
       ${whereClause}
@@ -149,7 +151,7 @@ router.get('/', authenticateToken, (req: Request, res: Response) => {
 // If workflow_id is provided, reuses the pre-created workflow directory (Blackboard pattern).
 router.post('/', authenticateToken, (req: Request, res: Response) => {
   try {
-    const { name, tasks, project_id, status: requestedStatus, workflow_id }: CreatePlanBody & { status?: string; workflow_id?: string } = req.body
+    const { name, tasks, project_id, status: requestedStatus, workflow_id, team_id: requestTeamId }: CreatePlanBody & { status?: string; workflow_id?: string } = req.body
 
     console.log(`[plans] Creating plan: name="${name}", project_id=${project_id}, tasks_count=${Array.isArray(tasks) ? tasks.length : 'parsed'}, workflow_id=${workflow_id || 'none'}`)
 
@@ -204,9 +206,9 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
 
       // Update the draft plan with actual content
       db.prepare(`
-        UPDATE plans SET name = ?, tasks = ?, status = ?, project_id = ?, attachments = ?, workflow_path = ?
+        UPDATE plans SET name = ?, tasks = ?, status = ?, project_id = ?, attachments = ?, workflow_path = ?, team_id = ?
         WHERE id = ? AND status = 'draft'
-      `).run(name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), workflowPath, id)
+      `).run(name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), workflowPath, requestTeamId || null, id)
     } else {
       // ── Legacy path: create new plan with new workflow directory ──
       id = randomUUID()
@@ -229,9 +231,9 @@ router.post('/', authenticateToken, (req: Request, res: Response) => {
       }
 
       db.prepare(`
-        INSERT INTO plans (id, name, tasks, status, project_id, attachments, created_at, workflow_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), now, workflowPath)
+        INSERT INTO plans (id, name, tasks, status, project_id, attachments, created_at, workflow_path, team_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, name, JSON.stringify(sanitizedTasks), status, project_id ?? null, JSON.stringify(allAttachmentIds), now, workflowPath, requestTeamId || null)
     }
 
     const plan = db
@@ -1732,35 +1734,57 @@ router.post('/:id/convert-to-chat', authenticateToken, (req: Request, res: Respo
     }
 
     // Determine the workspace_path for the new chat session.
-    // Use the plan's team_id (which is a workspace path) if available,
-    // otherwise fall back to the first task's workspace.
+    // The workspace_path must point to a valid team workspace directory
+    // (under .../teams/team-*) for settings.local.json discovery to work.
+    //
+    // Resolution order:
+    // 1. plan.team_id (set when plan was created from team_trigger)
+    // 2. First task's workspace (if it points to a valid team directory)
+    // 3. Resolve from project's environment default_team (project_id → environments → default_team)
     let workspacePath = plan.team_id || ''
-    if (!workspacePath) {
+    if (!workspacePath || !fs.existsSync(workspacePath)) {
+      // Try first task's workspace
       try {
         const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : plan.tasks
         if (Array.isArray(tasks) && tasks.length > 0 && tasks[0].workspace) {
-          workspacePath = tasks[0].workspace
+          if (fs.existsSync(tasks[0].workspace)) {
+            workspacePath = tasks[0].workspace
+          }
         }
       } catch {
         // ignore parse errors
       }
     }
 
-    if (!workspacePath) {
+    // If still not resolved or path doesn't exist, try environment's default_team
+    if (!workspacePath || !fs.existsSync(workspacePath)) {
+      if (plan.project_id) {
+        const env = db.prepare(
+          `SELECT e.default_team, e.id as env_id
+           FROM environments e
+           WHERE e.project_id = ?
+           ORDER BY e.env_type = 'dev' DESC, e.created_at ASC
+           LIMIT 1`
+        ).get(plan.project_id) as any
+        if (env?.default_team && fs.existsSync(env.default_team)) {
+          workspacePath = env.default_team
+        }
+      }
+    }
+
+    if (!workspacePath || !fs.existsSync(workspacePath)) {
       return res.status(400).json({
         data: null,
-        error: 'Cannot determine workspace for this workflow',
+        error: 'Cannot determine a valid workspace for this workflow',
       })
     }
 
-    // Resolve environment_id from the plan's team workspace
+    // Resolve environment_id from the workspace_path
     let environmentId: string | null = null
-    if (plan.team_id) {
-      const env = db.prepare(
-        'SELECT e.id FROM environments e WHERE e.default_team = ? LIMIT 1'
-      ).get(plan.team_id) as any
-      if (env) environmentId = env.id
-    }
+    const envMatch = db.prepare(
+      'SELECT e.id FROM environments e WHERE e.default_team = ? LIMIT 1'
+    ).get(workspacePath) as any
+    if (envMatch) environmentId = envMatch.id
 
     // Build a summary of the workflow to seed as the first assistant message
     const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : (plan.tasks || [])
