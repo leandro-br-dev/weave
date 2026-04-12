@@ -16,6 +16,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { execSync } from 'child_process'
 import { v4 as uuid } from 'uuid'
 import { db } from '../db/index.js'
 import {
@@ -210,7 +211,20 @@ export function bootstrapTeamForEnvironment(
       }
       fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
     }
-}
+
+    // Initialize a git repository so the Claude SDK can detect git info
+    // and avoid "Git remote URL: null" warnings.
+    try {
+      if (!fs.existsSync(path.join(workspacePath, '.git'))) {
+        execSync('git init && git add -A && git commit -m "Initial team workspace configuration"', {
+          cwd: workspacePath,
+          stdio: 'pipe',
+        })
+      }
+    } catch {
+      // Non-fatal: git init failure should not block team creation
+    }
+  }
 
   // --- Database operations (wrapped in a transaction) ---
   const insertEnvTeam = db.transaction(() => {

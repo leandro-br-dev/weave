@@ -28,6 +28,7 @@ from claude_agent_sdk._errors import ProcessError
 from orchestrator import logger
 from orchestrator.attachments import build_prompt_with_attachments
 from orchestrator.runner import (
+    _apply_workspace_env,
     extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir,
     list_agent_docs,
 )
@@ -103,6 +104,12 @@ async def run_chat_turn(
     Returns:
         O sdk_session_id (novo ou existente) para persistência
     """
+    # Apply env vars from workspace settings.local.json BEFORE SDK init.
+    # The SDK resolves auth on startup — if ANTHROPIC_BASE_URL isn't in os.environ
+    # at that point, it falls back to the global ~/.claude OAuth token, causing 401 errors.
+    # This mirrors what runner.py does for plan tasks (line 973).
+    _apply_workspace_env(workspace_path, cwd)
+
     # Build options for the SDK
     # IMPORTANT: cwd MUST be workspace_path to ensure settings.local.json is discovered.
     # The SDK walks up from cwd to find .claude/settings.local.json. If we use

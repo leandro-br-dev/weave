@@ -1468,6 +1468,19 @@ You are a team workspace for the **${project.name}** project.
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
       }
 
+      // Initialize a git repository so the Claude SDK can detect git info
+      // and avoid "Git remote URL: null" warnings.
+      try {
+        if (!fs.existsSync(path.join(workspacePath, '.git'))) {
+          execSync('git init && git add -A && git commit -m "Initial team workspace configuration"', {
+            cwd: workspacePath,
+            stdio: 'pipe',
+          })
+        }
+      } catch {
+        // Non-fatal: git init failure should not block workspace creation
+      }
+
       // Link to project
       db.prepare(
         'INSERT OR IGNORE INTO project_agents (project_id, workspace_path) VALUES (?, ?)'
