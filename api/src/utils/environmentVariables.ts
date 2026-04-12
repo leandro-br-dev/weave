@@ -200,6 +200,13 @@ export function initializeDefaultEnvironmentVariables(): {
       is_secret: false
     },
     {
+      key: 'ANTHROPIC_API_KEY',
+      value: '',
+      description: 'API key for Anthropic (used by Claude CLI for authentication)',
+      category: 'anthropic',
+      is_secret: true
+    },
+    {
       key: 'ANTHROPIC_API_URL',
       value: 'https://api.anthropic.com/v1/messages',
       description: 'API URL for Anthropic messages endpoint',

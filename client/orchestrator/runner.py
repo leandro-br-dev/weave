@@ -542,6 +542,10 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     created/fixed via the /agents page — silently falling back hides the real problem.
 
     Shell environment always wins: we only set a var if it is not already set.
+
+    Backward-compatibility: if the settings file contains ANTTHROPIC_AUTH_TOKEN
+    (an old/incorrect key) and no ANTTHROPIC_API_KEY, remap it automatically.
+    The Claude CLI requires ANTTHROPIC_API_KEY for authentication.
     """
     if not workspace:
         logger.warn(
@@ -564,6 +568,16 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         env_vars: dict[str, str] = data.get("env", {})
+
+        # Backward-compat: remap ANTTHROPIC_AUTH_TOKEN → ANTTHROPIC_API_KEY
+        # The Claude CLI uses ANTTHROPIC_API_KEY; the old name was incorrect.
+        if "ANTHROPIC_AUTH_TOKEN" in env_vars and "ANTHROPIC_API_KEY" not in env_vars:
+            env_vars["ANTHROPIC_API_KEY"] = env_vars.pop("ANTHROPIC_AUTH_TOKEN")
+            logger.warn(
+                f"  ⚠ Remapped ANTTHROPIC_AUTH_TOKEN → ANTTHROPIC_API_KEY in {settings_path}\n"
+                f"    Update settings.local.json to use the correct key name."
+            )
+
         for key, value in env_vars.items():
             if key not in os.environ:
                 os.environ[key] = str(value)
