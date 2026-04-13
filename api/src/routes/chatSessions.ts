@@ -50,6 +50,11 @@ router.patch('/mark-read', authenticateToken, (_req, res) => {
 
 // GET /api/sessions/pending — daemon polling (sessões running sem sdk_session_id, ou running com)
 router.get('/pending', authenticateToken, (_req, res) => {
+  // Clean up cancelled sessions — reset to idle so they can be reused
+  db.prepare(
+    "UPDATE chat_sessions SET status = 'idle' WHERE status = 'cancelled'"
+  ).run()
+
   const sessions = db.prepare(
     "SELECT s.*, m.content as last_user_message, m.attachments as last_user_message_attachment_ids, e.project_path as env_project_path " +
     "FROM chat_sessions s " +
@@ -112,6 +117,9 @@ router.delete('/:id/messages/:msgId', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Message not found' })
   }
 
+  // Delete associated message_attachments first (no CASCADE on this table)
+  db.prepare('DELETE FROM message_attachments WHERE message_id = ?').run(msgId)
+
   db.prepare('DELETE FROM chat_messages WHERE id = ?').run(msgId)
 
   return res.json({ data: { deleted: true }, error: null })
@@ -126,6 +134,11 @@ router.delete('/:id/messages', authenticateToken, (req, res) => {
   if (!session) {
     return res.status(404).json({ data: null, error: 'Session not found' })
   }
+
+  // Delete associated message_attachments first (no CASCADE on this table)
+  db.prepare(
+    'DELETE FROM message_attachments WHERE message_id IN (SELECT id FROM chat_messages WHERE session_id = ?)'
+  ).run(id)
 
   const result = db.prepare('DELETE FROM chat_messages WHERE session_id = ?').run(id)
 
@@ -244,18 +257,59 @@ router.delete('/:id', authenticateToken, (req, res) => {
     return res.status(409).json({ data: null, error: 'Cannot delete a running session. Wait for it to complete.' })
   }
 
+  // Delete message_attachments first (no CASCADE on this table)
+  db.prepare(
+    'DELETE FROM message_attachments WHERE message_id IN (SELECT id FROM chat_messages WHERE session_id = ?)'
+  ).run(id)
+
+  // If this session was created from a workflow (source_type='workflow'),
+  // clear the plan's sdk_session_id so re-conversion won't inherit stale context
+  if (session.plan_id && session.source_type === 'workflow') {
+    db.prepare(
+      "UPDATE plans SET sdk_session_id = NULL WHERE id = ?"
+    ).run(session.plan_id)
+  }
+
   // Deletar sessão (messages serão deletadas em cascade pelo banco)
   db.prepare('DELETE FROM chat_sessions WHERE id = ?').run(id)
 
   return res.json({ data: { deleted: true, id }, error: null })
 })
 
+// POST /api/sessions/:id/cancel — cancelar sessão em execução
+router.post('/:id/cancel', authenticateToken, (req, res) => {
+  const { id } = req.params
+
+  // Verify session exists
+  const session = db.prepare('SELECT id, status FROM chat_sessions WHERE id = ?').get(id) as any
+  if (!session) {
+    return res.status(404).json({ data: null, error: 'Session not found' })
+  }
+
+  // Only cancel running sessions
+  if (session.status !== 'running') {
+    return res.status(400).json({ data: null, error: 'Session is not running' })
+  }
+
+  // Set status to 'cancelled' — daemon will detect and stop processing
+  db.prepare(
+    "UPDATE chat_sessions SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?"
+  ).run(id)
+
+  return res.json({ data: { cancelled: true, id }, error: null })
+})
+
 // POST /api/sessions/:id/message — enviar mensagem (inicia execução no daemon)
 router.post('/:id/message', authenticateToken, (req, res) => {
   const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(req.params.id) as any
   if (!session) return res.status(404).json({ data: null, error: 'Not found' })
-  if (session.status === 'running') {
-    return res.status(409).json({ data: null, error: 'Session is already running' })
+  if (session.status === 'running' || session.status === 'cancelled') {
+    // Reset cancelled sessions to idle before allowing new messages
+    if (session.status === 'cancelled') {
+      db.prepare("UPDATE chat_sessions SET status = 'idle' WHERE id = ?").run(req.params.id)
+    } else {
+      return res.status(409).json({ data: null, error: 'Session is already running' })
+    }
   }
 
   const { content, attachment_ids } = req.body

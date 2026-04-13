@@ -923,6 +923,26 @@ class DaemonClient:
         except Exception as e:
             return PlanResponse(data=None, error=f"Request failed: {e}")
 
+    def get_session_status(self, session_id: str) -> PlanResponse:
+        """
+        Check the current status of a chat session.
+
+        GET /api/sessions/:id (returns just the status)
+
+        Args:
+            session_id: ID of the session
+
+        Returns:
+            PlanResponse with data=session or error
+        """
+        try:
+            response = self._client.get(f"/sessions/{session_id}")
+            return self._handle_response(response)
+        except httpx.HTTPError as e:
+            return PlanResponse(data=None, error=f"HTTP error: {e}")
+        except Exception as e:
+            return PlanResponse(data=None, error=f"Request failed: {e}")
+
     def save_sdk_session_id(self, session_id: str, sdk_session_id: str) -> PlanResponse:
         """
         Save SDK session ID for a chat session.

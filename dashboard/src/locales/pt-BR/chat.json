@@ -22,6 +22,8 @@
   "deleteConversationTitle": "Excluir Conversa",
   "deleteConversationDesc": "Tem certeza de que deseja excluir esta conversa? Esta ação não pode ser desfeita.",
   "delete": "Excluir",
+  "cancel": "Parar",
+  "cancelSession": "Parar agente",
   "clearHistory": "Limpar Histórico",
   "clearHistoryDesc": "Tem certeza de que deseja limpar o histórico do chat?",
   "chatWithName": "Conversar com {{name}}",

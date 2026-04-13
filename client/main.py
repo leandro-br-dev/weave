@@ -1055,6 +1055,7 @@ async def process_chat_session(session: dict, client: object) -> None:
     Process a chat session from the daemon.
 
     Executes a single turn of the conversation and saves the assistant's response.
+    Supports cancellation and timeout.
 
     Args:
         session: Session data from the API
@@ -1084,6 +1085,13 @@ async def process_chat_session(session: dict, client: object) -> None:
 
     async def on_response(text: str, structured):
         """Callback when assistant response is complete."""
+        # Check if session was cancelled before saving response
+        status_check = client.get_session_status(session_id)
+        if not status_check.error and status_check.data:
+            current_status = status_check.data.get('status') if isinstance(status_check.data, dict) else None
+            if current_status == 'cancelled':
+                logger.info(f'Session {session_id[:8]} was cancelled — skipping response save')
+                return
         response = client.save_assistant_message(session_id, text, structured)
         if response.error:
             logger.error(f'Failed to save assistant message: {response.error}')
@@ -1107,24 +1115,42 @@ async def process_chat_session(session: dict, client: object) -> None:
     logger.info(f"[Session] environment_id={session.get('environment_id')} env_project_path={session.get('env_project_path')}")
     logger.info(f"[Session] cwd resolved={cwd}")
 
+    # Chat timeout configuration (default 30 minutes)
+    import os as _os
+    chat_timeout = int(_os.environ.get('CHAT_TIMEOUT_SECONDS', '1800'))
+
     try:
-        new_sdk_session_id = await run_chat_turn(
-            session_id=session_id,
-            message=user_message,
-            workspace_path=workspace_path,
-            cwd=cwd,
-            sdk_session_id=sdk_session_id,
-            source_type=source_type,
-            on_sdk_session=on_sdk_session,
-            on_response=on_response,
-            log_callback=log_callback,
-            client=client,  # Pass DaemonClient for fetching agents context
-            project_id=session.get('project_id'),  # Pass project_id for fetching agents context
+        new_sdk_session_id = await asyncio.wait_for(
+            run_chat_turn(
+                session_id=session_id,
+                message=user_message,
+                workspace_path=workspace_path,
+                cwd=cwd,
+                sdk_session_id=sdk_session_id,
+                source_type=source_type,
+                on_sdk_session=on_sdk_session,
+                on_response=on_response,
+                log_callback=log_callback,
+                client=client,  # Pass DaemonClient for fetching agents context
+                project_id=session.get('project_id'),  # Pass project_id for fetching agents context
+            ),
+            timeout=chat_timeout,
         )
 
         logger.info(f'Session {session_id[:8]} completed')
+    except asyncio.TimeoutError:
+        logger.warning(f'Chat session {session_id[:8]} timed out after {chat_timeout}s')
+        # Save timeout as assistant message
+        await on_response(f'⏱️ A sessão excedeu o tempo limite de {chat_timeout // 60} minutos e foi interrompida.', None)
     except Exception as e:
         logger.error(f'Chat session {session_id[:8]} error: {e}')
+        # Check if session was cancelled — don't save error if cancelled
+        status_check = client.get_session_status(session_id)
+        if not status_check.error and status_check.data:
+            current_status = status_check.data.get('status') if isinstance(status_check.data, dict) else None
+            if current_status == 'cancelled':
+                logger.info(f'Session {session_id[:8]} was cancelled — not saving error response')
+                return
         # Save error as assistant message
         await on_response(f'Error: {str(e)}', None)
 

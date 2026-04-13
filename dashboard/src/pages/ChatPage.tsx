@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
-import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText } from 'lucide-react'
+import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText, Square } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown, FileAttachmentInput
 } from '@/components'
 import type { FileAttachment } from '@/components'
-import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession, useMarkMessagesRead } from '@/api/sessions'
+import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession, useMarkMessagesRead, useCancelSession } from '@/api/sessions'
 import { useGetProjects } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/teams'
 import { useCreatePlan } from '@/api/plans'
@@ -101,6 +101,10 @@ export default function ChatPage() {
   const deleteMessage = useDeleteMessage()
   const clearHistory = useClearHistory()
   const markRead = useMarkMessagesRead()
+  const cancelSession = useCancelSession()
+
+  // Track how long the session has been running (for UI display)
+  const runningStartTime = useRef<number | null>(null)
 
   // Mark messages as read when user opens a chat session
   useEffect(() => {
@@ -172,6 +176,21 @@ export default function ChatPage() {
 
   const isRunning = session?.status === 'running'
   const isSending = sendMessage.isPending || uploadFiles.isPending
+
+  // Track when a session started running
+  useEffect(() => {
+    if (isRunning && !runningStartTime.current) {
+      runningStartTime.current = Date.now()
+    } else if (!isRunning) {
+      runningStartTime.current = null
+    }
+  }, [isRunning])
+
+  const handleCancel = () => {
+    if (selectedId) {
+      cancelSession.mutate(selectedId)
+    }
+  }
 
   return (
     <div className="h-full flex flex-col sm:flex-row">
@@ -260,6 +279,16 @@ export default function ChatPage() {
               </button>
               {isRunning && (
                 <span className="text-xs bg-blue-50 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full animate-pulse whitespace-nowrap">{t('pages.chat.thinking')}</span>
+              )}
+              {isRunning && (
+                <button
+                  onClick={handleCancel}
+                  className="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 transition-colors"
+                  title={t('pages.chat.cancelSession')}
+                >
+                  <Square className="h-3 w-3" />
+                  {t('pages.chat.cancel')}
+                </button>
               )}
               {session?.source_type === 'workflow' && (
                 <span className="text-xs bg-purple-50 text-purple-600 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap hidden sm:inline-flex items-center gap-1">
@@ -474,6 +503,16 @@ export default function ChatPage() {
               >
                 <Send className="h-4 w-4" />
               </Button>
+              {isRunning && (
+                <Button
+                  variant="secondary"
+                  onClick={handleCancel}
+                  className="text-red-600 hover:bg-red-50 border-red-200 dark:border-red-800"
+                  title={t('pages.chat.cancelSession')}
+                >
+                  <Square className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>

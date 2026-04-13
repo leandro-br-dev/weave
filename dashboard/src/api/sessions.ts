@@ -86,6 +86,18 @@ export function useDeleteSession() {
   })
 }
 
+export function useCancelSession() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/sessions/${id}/cancel`, { method: 'POST' }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      qc.invalidateQueries({ queryKey: ['session', id] })
+    },
+  })
+}
+
 export function useDeleteMessage() {
   const qc = useQueryClient()
   return useMutation({
