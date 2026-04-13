@@ -522,6 +522,42 @@ def _load_dependency_context(task: Task, ctx_dir: Path) -> str:
 """
 
 
+def _fix_global_claude_settings() -> None:
+    """
+    Ensure the global ~/.claude/settings.json uses ANTTHROPIC_API_KEY (not
+    the incorrect ANTTHROPIC_AUTH_TOKEN).
+
+    The Claude Agent SDK reads ~/.claude/settings.json on startup and uses
+    its ``env`` section for authentication.  If that file contains the old
+    ANTTHROPIC_AUTH_TOKEN key the SDK will fail with 401 errors, because
+    the SDK only recognises ANTTHROPIC_API_KEY.
+
+    This runs early (before any SDK instantiation) and auto-corrects the
+    file so that manual creation with the wrong key name does not break
+    chat sessions.
+    """
+    global_settings = Path.home() / ".claude" / "settings.json"
+    if not global_settings.exists():
+        return
+    try:
+        data = json.loads(global_settings.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    env_vars = data.get("env", {})
+    if not isinstance(env_vars, dict):
+        return
+
+    if "ANTHROPIC_AUTH_TOKEN" in env_vars and "ANTHROPIC_API_KEY" not in env_vars:
+        env_vars["ANTHROPIC_API_KEY"] = env_vars.pop("ANTHROPIC_AUTH_TOKEN")
+        data["env"] = env_vars
+        global_settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        logger.warn(
+            f"  ⚠ Auto-fixed ~/.claude/settings.json: remapped "
+            f"ANTHROPIC_AUTH_TOKEN → ANTTHROPIC_API_KEY"
+        )
+
+
 def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     """
     Read env vars from workspace/.claude/settings.local.json and apply them to os.environ.
@@ -547,6 +583,9 @@ def _apply_workspace_env(workspace: str | None, cwd: str) -> None:
     (an old/incorrect key) and no ANTTHROPIC_API_KEY, remap it automatically.
     The Claude CLI requires ANTTHROPIC_API_KEY for authentication.
     """
+    # Fix global ~/.claude/settings.json before doing anything else.
+    _fix_global_claude_settings()
+
     if not workspace:
         logger.warn(
             f"⚠ No workspace specified — cannot locate settings.local.json\n"
