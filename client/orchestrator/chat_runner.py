@@ -72,6 +72,7 @@ async def run_chat_turn(
     workspace_path: str,
     cwd: str,
     sdk_session_id: str | None = None,
+    source_type: str = 'manual',  # 'manual' or 'workflow' (from plan-to-chat conversion)
     on_sdk_session: Callable[[str], Awaitable[None]] | None = None,
     on_response: Callable[[str, dict | None], Awaitable[None]] | None = None,
     log_callback: Callable[[list], Awaitable[None]] | None = None,
@@ -92,6 +93,7 @@ async def run_chat_turn(
         workspace_path: Caminho do workspace para o agente
         cwd: Diretório de trabalho para o agente
         sdk_session_id: ID da sessão do SDK (para retomar conversa)
+        source_type: Tipo da sessão ('manual' ou 'workflow')
         on_sdk_session: Callback chamado quando novo sdk_session_id é gerado
         on_response: Callback chamado quando resposta completa é recebida
         log_callback: Callback para streaming de logs em tempo real
@@ -110,16 +112,45 @@ async def run_chat_turn(
     # This mirrors what runner.py does for plan tasks (line 973).
     _apply_workspace_env(workspace_path, cwd)
 
-    # Build options for the SDK
-    # IMPORTANT: cwd MUST be workspace_path to ensure settings.local.json is discovered.
-    # The SDK walks up from cwd to find .claude/settings.local.json. If we use
-    # env_project_path as cwd, the SDK won't be able to reach the workspace settings.
-    # The env_project_path (passed as 'cwd' parameter) should only be used for context,
-    # not as the SDK's working directory.
+    # Determine the SDK's cwd.
+    #
+    # The Claude CLI stores session files under ~/.claude/projects/<encoded-cwd>/.
+    # When --resume is used, the CLI derives the project path from cwd to locate
+    # the session.  If cwd doesn't match the directory where the session was
+    # originally created, the CLI won't find the session, will attempt a fresh
+    # bootstrap against api.anthropic.com, and exit with code 1 (the proxy API
+    # key is not a valid Anthropic key for direct calls).
+    #
+    # There are two scenarios:
+    #
+    # 1. Chat from plan-to-chat conversion (source_type='workflow'): the
+    #    sdk_session_id comes from a workflow that used cwd = project dir.
+    #    We MUST use the same project dir as cwd so the CLI finds the session.
+    #
+    # 2. Native chat (source_type='manual'): the first message uses
+    #    workspace_path as cwd (so the SDK discovers settings.local.json from
+    #    the team workspace).  Subsequent messages must keep using
+    #    workspace_path to find the session created by the first message.
+    #
+    # Env vars from settings.local.json are pre-injected into os.environ by
+    # _apply_workspace_env above, so they are inherited by the CLI subprocess
+    # regardless of which cwd we use here.
+    if source_type == 'workflow' and cwd and cwd != workspace_path:
+        # Session from a plan-to-chat conversion: use project dir to match
+        # the original workflow's cwd where the session was created.
+        sdk_cwd = cwd
+        sdk_setting_sources = ["project"]
+        logger.info(f"[ChatTurn] Workflow session — using project cwd={sdk_cwd} (workspace={workspace_path})")
+    else:
+        # Native chat or workspace-based session: use workspace_path.
+        sdk_cwd = workspace_path
+        sdk_setting_sources = ["project", "local"]
+        logger.info(f"[ChatTurn] Native session — using workspace cwd={sdk_cwd}")
+
     options_kwargs = {
-        "cwd": workspace_path,
+        "cwd": sdk_cwd,
         "permission_mode": "acceptEdits",
-        "setting_sources": ["project", "local"],  # Load .claude/settings.local.json from workspace (same as runner.py)
+        "setting_sources": sdk_setting_sources,
     }
 
     # Unset CLAUDECODE to prevent nested session detection

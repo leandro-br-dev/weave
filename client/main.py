@@ -1069,6 +1069,7 @@ async def process_chat_session(session: dict, client: object) -> None:
     cwd = session.get('env_project_path') or session.get('cwd') or workspace_path
 
     sdk_session_id = session.get('sdk_session_id')
+    source_type = session.get('source_type', 'manual')  # 'manual' or 'workflow'
     user_message = session.get('last_user_message', '')
 
     logger.info(f'Processing chat session {session_id[:8]}...')
@@ -1113,6 +1114,7 @@ async def process_chat_session(session: dict, client: object) -> None:
             workspace_path=workspace_path,
             cwd=cwd,
             sdk_session_id=sdk_session_id,
+            source_type=source_type,
             on_sdk_session=on_sdk_session,
             on_response=on_response,
             log_callback=log_callback,
