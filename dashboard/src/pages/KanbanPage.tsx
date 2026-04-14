@@ -7,7 +7,7 @@ import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectI
 import { type FileAttachment } from '@/components';
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads';
 import { kanbanColors, darkModeKanbanColors } from '@/lib/colors';
-import { useGetProjects, useUpdateProject } from '@/api/projects';
+import { useGetProjects, useUpdateProject, type Environment } from '@/api/projects';
 import { useApprovePlan } from '@/api/plans';
 import { useToast } from '@/contexts/ToastContext';
 import {
@@ -126,6 +126,7 @@ export default function KanbanPage() {
     priority: 3 as 1 | 2 | 3 | 4 | 5,
     column: 'backlog' as KanbanTask['column'],
     attachment_ids: [] as string[],
+    environment_id: '' as string,
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -178,6 +179,7 @@ export default function KanbanPage() {
       priority: 3,
       column: column || 'backlog',
       attachment_ids: [],
+      environment_id: '',
     });
     setFileAttachments([]);
     // Set the project ID for creating the task
@@ -205,6 +207,7 @@ export default function KanbanPage() {
       priority: task.priority,
       column: task.column,
       attachment_ids: existingAttachmentIds,
+      environment_id: task.environment_id || '',
     });
     setFileAttachments([]); // Existing attachments are already uploaded
     setModalOpen(true);
@@ -237,6 +240,7 @@ export default function KanbanPage() {
         priority: formData.priority,
         column: formData.column,
         attachments: JSON.stringify(uploadedIds),
+        environment_id: formData.environment_id || null,
       });
     } else {
       // For creating tasks, use the createProjectId state
@@ -249,6 +253,7 @@ export default function KanbanPage() {
           priority: formData.priority,
           column: formData.column,
           attachments: JSON.stringify(uploadedIds),
+          environment_id: formData.environment_id || null,
         },
       });
     }
@@ -1026,6 +1031,43 @@ export default function KanbanPage() {
                 </div>
               )}
 
+              {/* Environment selector */}
+              {(() => {
+                const selectedProjectId = editingTask?.project_id || createProjectId || (projectFilter && projectFilter !== 'all' ? projectFilter : projects.length === 1 ? projects[0]?.id : '');
+                const project = projects.find(p => p.id === selectedProjectId);
+                const envs: Environment[] = project?.environments || [];
+                if (envs.length < 2) return null;
+                return (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('pages.kanban.modal.environment')}
+                    </label>
+                    <Select
+                      value={formData.environment_id}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          environment_id: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="">
+                        {t('pages.kanban.modal.noEnvironment')}
+                      </option>
+                      {envs.map((env) => (
+                        <option key={env.id} value={env.id}>
+                          {env.name}
+                          {env.env_type ? ` (${env.env_type})` : ''}
+                        </option>
+                      ))}
+                    </Select>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {t('pages.kanban.modal.environmentHint')}
+                    </p>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('pages.kanban.modal.title')}
@@ -1524,6 +1566,12 @@ function TaskCard({
               {task.project_name}
             </span>
           </div>
+        )}
+
+        {task.environment_name && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">
+            🌐 {task.environment_name}
+          </span>
         )}
 
         {task.result_status && (

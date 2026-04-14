@@ -1028,6 +1028,32 @@ class DaemonClient:
         except Exception as e:
             return PlanResponse(data=None, error=f"Request failed: {e}")
 
+    def send_chat_logs(self, session_id: str, logs: list[dict[str, Any]]) -> PlanResponse:
+        """
+        Send streaming log entries for a chat session.
+
+        POST /api/sessions/:id/logs
+        Body: [{level: string, message: string}, ...]
+
+        Args:
+            session_id: ID of the chat session
+            logs: List of log entries with level and message
+
+        Returns:
+            PlanResponse with data={inserted: number} or error
+        """
+        try:
+            response = self._client.post(
+                f"/sessions/{session_id}/logs",
+                json=logs,
+                timeout=10.0,
+            )
+            return self._handle_response(response)
+        except httpx.HTTPError as e:
+            return PlanResponse(data=None, error=f"HTTP error: {e}")
+        except Exception as e:
+            return PlanResponse(data=None, error=f"Request failed: {e}")
+
     # ── Attachment methods ──────────────────────────────────────────────
 
     def get_message_attachments(self, session_id: str) -> list[dict[str, Any]]:

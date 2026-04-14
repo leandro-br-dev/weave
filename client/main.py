@@ -1097,10 +1097,13 @@ async def process_chat_session(session: dict, client: object) -> None:
             logger.error(f'Failed to save assistant message: {response.error}')
 
     async def log_callback(logs: list):
-        """Callback for streaming logs."""
-        # We don't need to stream logs separately for chat
-        # The full response is saved via on_response
-        pass
+        """Callback for streaming logs to the API."""
+        if not logs:
+            return
+        # Send logs to the API for real-time streaming
+        response = client.send_chat_logs(session_id, logs)
+        if response.error:
+            logger.debug(f'Failed to send chat logs: {response.error}')
 
     # Check if user message exists
     if not user_message:

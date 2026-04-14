@@ -98,5 +98,7 @@
     "systemPrompt": "Prompt do Sistema",
     "streamResponse": "Resposta em Fluxo"
   },
-  "fromWorkflow": "Originado de um workflow"
+  "fromWorkflow": "Originado de um workflow",
+  "thoughtProcess": "Processo de pensamento",
+  "thinking": "Pensando..."
 }

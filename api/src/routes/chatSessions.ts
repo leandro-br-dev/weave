@@ -142,6 +142,9 @@ router.delete('/:id/messages', authenticateToken, (req, res) => {
 
   const result = db.prepare('DELETE FROM chat_messages WHERE session_id = ?').run(id)
 
+  // Also clear chat logs (thinking/streaming data)
+  db.prepare('DELETE FROM chat_logs WHERE session_id = ?').run(id)
+
   // Resetar sdk_session_id pois o contexto foi perdido
   db.prepare(
     "UPDATE chat_sessions SET sdk_session_id = NULL, status = 'idle', updated_at = datetime('now') WHERE id = ?"
@@ -449,12 +452,15 @@ router.get('/:id/stream', authenticateToken, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders()
 
   const sessionId = req.params.id
   let lastMessageId = ''
+  let lastLogId = 0
 
   const interval = setInterval(() => {
+    // Send new messages
     const newMessages = db.prepare(
       'SELECT * FROM chat_messages WHERE session_id = ? AND id > ? ORDER BY created_at ASC'
     ).all(sessionId, lastMessageId) as any[]
@@ -464,7 +470,17 @@ router.get('/:id/stream', authenticateToken, (req, res) => {
       lastMessageId = msg.id
     }
 
-    // Também enviar status da sessão
+    // Send new chat logs (for thinking/streaming display)
+    const newLogs = db.prepare(
+      'SELECT id, session_id, level, message, created_at FROM chat_logs WHERE session_id = ? AND id > ? ORDER BY id ASC'
+    ).all(sessionId, lastLogId) as any[]
+
+    for (const log of newLogs) {
+      res.write(`event: log\ndata: ${JSON.stringify(log)}\n\n`)
+      lastLogId = log.id
+    }
+
+    // Send session status
     const session = db.prepare('SELECT status FROM chat_sessions WHERE id = ?').get(sessionId) as any
     if (session) {
       res.write(`event: status\ndata: ${JSON.stringify({ status: session.status })}\n\n`)
@@ -472,6 +488,114 @@ router.get('/:id/stream', authenticateToken, (req, res) => {
   }, 500)
 
   req.on('close', () => clearInterval(interval))
+})
+
+// POST /api/sessions/:id/logs — append log entries (from daemon)
+router.post('/:id/logs', authenticateToken, (req: any, res: any) => {
+  const { id } = req.params
+
+  const session = db.prepare('SELECT id FROM chat_sessions WHERE id = ?').get(id)
+  if (!session) return res.status(404).json({ data: null, error: 'Session not found' })
+
+  const logs: Array<{ level: string; message: string }> = req.body
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return res.status(400).json({ data: null, error: 'logs must be a non-empty array' })
+  }
+
+  const now = new Date().toISOString()
+  const insertLog = db.prepare(`
+    INSERT INTO chat_logs (session_id, level, message, created_at)
+    VALUES (?, ?, ?, ?)
+  `)
+
+  const insertMany = db.transaction((entries: Array<{ level: string; message: string }>) => {
+    for (const log of entries) {
+      insertLog.run(id, log.level || 'info', log.message, now)
+    }
+  })
+
+  insertMany(logs)
+
+  res.json({ data: { inserted: logs.length }, error: null })
+})
+
+// GET /api/sessions/:id/logs — get all log entries for a session
+router.get('/:id/logs', authenticateToken, (req: any, res: any) => {
+  const { id } = req.params
+
+  const session = db.prepare('SELECT id FROM chat_sessions WHERE id = ?').get(id)
+  if (!session) return res.status(404).json({ data: null, error: 'Session not found' })
+
+  const logs = db.prepare(`
+    SELECT id, session_id, level, message, created_at
+    FROM chat_logs
+    WHERE session_id = ?
+    ORDER BY created_at ASC
+  `).all(id)
+
+  res.json({ data: logs, error: null })
+})
+
+// GET /api/sessions/:id/logs/stream — SSE for chat logs (dedicated stream)
+router.get('/:id/logs/stream', authenticateToken, (req: any, res: any) => {
+  const { id } = req.params
+
+  const session = db.prepare('SELECT id, status FROM chat_sessions WHERE id = ?').get(id) as any
+  if (!session) return res.status(404).json({ data: null, error: 'Session not found' })
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  let lastLogId = 0
+
+  // Send initial batch of existing logs
+  const existing = db.prepare(
+    'SELECT id, session_id, level, message, created_at FROM chat_logs WHERE session_id = ? ORDER BY id ASC'
+  ).all(id) as any[]
+
+  for (const log of existing) {
+    res.write(`data: ${JSON.stringify(log)}\n\n`)
+    lastLogId = log.id
+  }
+
+  // Poll for new logs
+  const interval = setInterval(() => {
+    const newLogs = db.prepare(
+      'SELECT id, session_id, level, message, created_at FROM chat_logs WHERE session_id = ? AND id > ? ORDER BY id ASC'
+    ).all(id, lastLogId) as any[]
+
+    for (const log of newLogs) {
+      res.write(`data: ${JSON.stringify(log)}\n\n`)
+      lastLogId = log.id
+    }
+
+    // Close stream when session is idle (no longer running)
+    const currentSession = db.prepare('SELECT status FROM chat_sessions WHERE id = ?').get(id) as any
+    if (currentSession && currentSession.status === 'idle') {
+      // Wait a bit to flush remaining logs
+      setTimeout(() => {
+        res.write(`event: done\ndata: ${JSON.stringify({ status: 'idle' })}\n\n`)
+        clearInterval(interval)
+        res.end()
+      }, 1000)
+    }
+  }, 500)
+
+  req.on('close', () => clearInterval(interval))
+})
+
+// DELETE /api/sessions/:id/logs — clear logs for a session (called when messages are cleared)
+router.delete('/:id/logs', authenticateToken, (req: any, res: any) => {
+  const { id } = req.params
+
+  const session = db.prepare('SELECT id FROM chat_sessions WHERE id = ?').get(id)
+  if (!session) return res.status(404).json({ data: null, error: 'Session not found' })
+
+  const result = db.prepare('DELETE FROM chat_logs WHERE session_id = ?').run(id)
+  res.json({ data: { deleted: result.changes }, error: null })
 })
 
 export default router

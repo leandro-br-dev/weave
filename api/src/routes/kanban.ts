@@ -14,10 +14,12 @@ router.get('/', authenticateToken, (req: Request, res: Response) => {
              p.description as project_description,
              p.settings as project_settings,
              w.status as workflow_status,
-             w.name as workflow_name
+             w.name as workflow_name,
+             e.name as environment_name
       FROM kanban_tasks kt
       JOIN projects p ON p.id = kt.project_id
       LEFT JOIN plans w ON w.id = kt.workflow_id
+      LEFT JOIN environments e ON e.id = kt.environment_id
       ORDER BY kt.column, kt.priority ASC, kt.order_index ASC
     `).all()
     res.json({ data: tasks, error: null })
@@ -80,9 +82,13 @@ router.get('/:projectId', authenticateToken, (req: Request, res: Response) => {
     }
 
     const tasks = db.prepare(`
-      SELECT kt.*, p.status as workflow_status, p.name as workflow_name
+      SELECT kt.*,
+             p.status as workflow_status,
+             p.name as workflow_name,
+             e.name as environment_name
       FROM kanban_tasks kt
       LEFT JOIN plans p ON p.id = kt.workflow_id
+      LEFT JOIN environments e ON e.id = kt.environment_id
       WHERE kt.project_id = ?
       ORDER BY kt.column, kt.priority ASC, kt.order_index ASC
     `).all(req.params.projectId)
@@ -97,7 +103,7 @@ router.get('/:projectId', authenticateToken, (req: Request, res: Response) => {
 // POST /api/kanban/:projectId — criar task
 router.post('/:projectId', authenticateToken, (req: Request, res: Response) => {
   try {
-    const { title, description = '', column = 'backlog', priority = 3, attachment_ids } = req.body
+    const { title, description = '', column = 'backlog', priority = 3, attachment_ids, environment_id } = req.body
     if (!title) {
       return res.status(400).json({ data: null, error: 'title is required' })
     }
@@ -108,11 +114,19 @@ router.post('/:projectId', authenticateToken, (req: Request, res: Response) => {
       return res.status(404).json({ data: null, error: 'Project not found' })
     }
 
+    // Validate environment_id if provided
+    if (environment_id) {
+      const env = db.prepare('SELECT id FROM environments WHERE id = ? AND project_id = ?').get(environment_id, req.params.projectId)
+      if (!env) {
+        return res.status(400).json({ data: null, error: 'Invalid environment_id for this project' })
+      }
+    }
+
     const attachmentsJson = Array.isArray(attachment_ids) ? JSON.stringify(attachment_ids) : '[]'
     const id = randomUUID()
     db.prepare(
-      'INSERT INTO kanban_tasks (id, project_id, title, description, column, priority, attachments) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, req.params.projectId, title, description, column, priority, attachmentsJson)
+      'INSERT INTO kanban_tasks (id, project_id, title, description, column, priority, attachments, environment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, req.params.projectId, title, description, column, priority, attachmentsJson, environment_id || null)
     const task = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(id)
     res.status(201).json({ data: task, error: null })
   } catch (err: any) {
@@ -124,7 +138,7 @@ router.post('/:projectId', authenticateToken, (req: Request, res: Response) => {
 // PUT /api/kanban/:projectId/:taskId — atualizar task
 router.put('/:projectId/:taskId', authenticateToken, (req: Request, res: Response) => {
   try {
-    const { title, description, column, priority, order_index, workflow_id, result_status, result_notes, pipeline_status, attachment_ids } = req.body
+    const { title, description, column, priority, order_index, workflow_id, result_status, result_notes, pipeline_status, attachment_ids, environment_id } = req.body
     // Verify project exists
     const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(req.params.projectId)
     if (!project) {
@@ -133,6 +147,14 @@ router.put('/:projectId/:taskId', authenticateToken, (req: Request, res: Respons
     const task = db.prepare('SELECT * FROM kanban_tasks WHERE id = ? AND project_id = ?').get(req.params.taskId, req.params.projectId) as any
     if (!task) {
       return res.status(404).json({ data: null, error: 'Task not found' })
+    }
+
+    // Validate environment_id if provided
+    if (environment_id) {
+      const env = db.prepare('SELECT id FROM environments WHERE id = ? AND project_id = ?').get(environment_id, req.params.projectId)
+      if (!env) {
+        return res.status(400).json({ data: null, error: 'Invalid environment_id for this project' })
+      }
     }
 
     const attachmentsJson = attachment_ids !== undefined
@@ -151,9 +173,10 @@ router.put('/:projectId/:taskId', authenticateToken, (req: Request, res: Respons
         result_notes = COALESCE(?, result_notes),
         pipeline_status = COALESCE(?, pipeline_status),
         attachments = COALESCE(?, attachments),
+        environment_id = COALESCE(?, environment_id),
         updated_at = datetime('now')
       WHERE id = ? AND project_id = ?
-    `).run(title, description, column, priority, order_index, workflow_id, result_status, result_notes, pipeline_status ?? null, attachmentsJson, req.params.taskId, req.params.projectId)
+    `).run(title, description, column, priority, order_index, workflow_id, result_status, result_notes, pipeline_status ?? null, attachmentsJson, environment_id ?? null, req.params.taskId, req.params.projectId)
 
     const updated = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.taskId)
     res.json({ data: updated, error: null })
@@ -207,7 +230,16 @@ router.get('/:projectId/pending-pipeline', authenticateToken, (req: Request, res
       ...t,
       project_settings: JSON.parse(t.project_settings || '{}')
     }))
-    res.json({ data: result, error: null })
+
+    // Also fetch environments for the project so the pipeline can resolve env-specific teams
+    const environments = db.prepare(`
+      SELECT id, name, type, env_type, project_path, team_workspace
+      FROM environments
+      WHERE project_id = ?
+      ORDER BY created_at ASC
+    `).all(req.params.projectId)
+
+    res.json({ data: result, environments, error: null })
   } catch (err: any) {
     console.error('Error fetching pending pipeline tasks:', err)
     res.status(500).json({ data: null, error: err.message })

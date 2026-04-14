@@ -21,6 +21,7 @@ from claude_agent_sdk import (
     TaskStartedMessage,
     TextBlock,
     ToolPermissionContext,
+    ToolUseBlock,
     query,
 )
 from claude_agent_sdk._errors import ProcessError
@@ -63,6 +64,88 @@ async def _chat_can_use_tool(
     """
     logger.info(f"[ChatPermission] Auto-approved tool '{tool_name}'")
     return PermissionResultAllow()
+
+
+# Standard tools available to all chat sessions, matching workflow task defaults.
+# This ensures chat agents have the same capabilities as workflow teams.
+CHAT_STANDARD_TOOLS = [
+    'Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep',
+    'WebFetch', 'NotebookEdit', 'Task',
+]
+
+
+def _ensure_chat_permissions(workspace_path: str) -> None:
+    """
+    Ensure the workspace settings.local.json includes proper permissions for chat.
+
+    Teams created via Claude Code CLI directly may have settings files that
+    lack the necessary tool permissions (especially Bash). This function
+    repairs the settings file to include the standard chat tool set.
+    """
+    import json as _json
+
+    settings_path = os.path.join(workspace_path, '.claude', 'settings.local.json')
+    if not os.path.exists(settings_path):
+        # No settings file at all — create one with full permissions
+        claude_dir = os.path.dirname(settings_path)
+        os.makedirs(claude_dir, exist_ok=True)
+        default_settings = {
+            'permissions': {
+                'allow': CHAT_STANDARD_TOOLS,
+                'deny': [],
+            }
+        }
+        try:
+            with open(settings_path, 'w') as f:
+                _json.dump(default_settings, f, indent=2)
+            logger.info(f"[ChatPermissions] Created settings.local.json with standard permissions at {settings_path}")
+        except Exception as e:
+            logger.warning(f"[ChatPermissions] Failed to create settings: {e}")
+        return
+
+    try:
+        with open(settings_path) as f:
+            settings = _json.load(f)
+
+        # Check if permissions exist and have the required tools
+        permissions = settings.get('permissions', {})
+        allow_list = permissions.get('allow', [])
+
+        # Check if Bash is allowed (either as generic 'Bash' or any 'Bash(...)' pattern)
+        has_bash = 'Bash' in allow_list or any(s.startswith('Bash') for s in allow_list)
+        has_read = 'Read' in allow_list
+        has_write = 'Write' in allow_list
+        has_edit = 'Edit' in allow_list
+
+        needs_repair = not has_bash or not has_read or not has_write or not has_edit
+
+        if needs_repair:
+            # Merge standard tools into the existing allow list
+            merged_allow = list(allow_list)
+            for tool in CHAT_STANDARD_TOOLS:
+                # Only add if no version of this tool exists
+                if tool not in merged_allow and not any(
+                    existing.startswith(tool + '(') or existing == tool
+                    for existing in merged_allow
+                ):
+                    merged_allow.append(tool)
+
+            settings['permissions'] = {
+                'allow': merged_allow,
+                'deny': permissions.get('deny', []),
+                **{k: v for k, v in permissions.items() if k not in ('allow', 'deny')},
+            }
+
+            with open(settings_path, 'w') as f:
+                _json.dump(settings, f, indent=2)
+
+            logger.info(
+                f"[ChatPermissions] Repaired settings.local.json — "
+                f"added missing tools (bash={has_bash}, read={has_read}, "
+                f"write={has_write}, edit={has_edit})"
+            )
+    except Exception as e:
+        logger.warning(f"[ChatPermissions] Failed to check/repair settings: {e}")
 
 
 async def run_chat_turn(
@@ -112,6 +195,12 @@ async def run_chat_turn(
     # This mirrors what runner.py does for plan tasks (line 973).
     _apply_workspace_env(workspace_path, cwd)
 
+    # Ensure the workspace has proper permissions for chat sessions.
+    # Teams created via Claude Code CLI may have empty or restrictive settings.local.json
+    # that lack Bash/Read/Write/Edit permissions needed for chat to function properly.
+    # This mirrors how runner.py passes allowed_tools explicitly for workflow tasks.
+    _ensure_chat_permissions(workspace_path)
+
     # Determine the SDK's cwd.
     #
     # The Claude CLI stores session files under ~/.claude/projects/<encoded-cwd>/.
@@ -151,6 +240,7 @@ async def run_chat_turn(
         "cwd": sdk_cwd,
         "permission_mode": "acceptEdits",
         "setting_sources": sdk_setting_sources,
+        "allowed_tools": CHAT_STANDARD_TOOLS,
     }
 
     # Unset CLAUDECODE to prevent nested session detection
@@ -202,6 +292,37 @@ async def run_chat_turn(
     captured_texts = []
     final_result = None
     new_sdk_session_id = None
+    logs_buffer: list[dict] = []
+
+    def add_log(level: str, message: str) -> None:
+        """Add a log entry to buffer and optionally send immediately."""
+        entry = {
+            'level': level,
+            'message': message,
+        }
+        logs_buffer.append(entry)
+        # Print to terminal for debugging
+        prefix = {
+            'debug': '  🔧',
+            'info': '  💬',
+            'tool': '  ⚙',
+            'warning': '  ⚠',
+            'error': '  ❌',
+        }.get(level, '  📝')
+        logger.info(f"[ChatLog]{prefix} {message[:200]}")
+        # Send in batch: every 3 logs or immediately for important ones
+        if log_callback and len(logs_buffer) >= 3:
+            _flush_logs()
+
+    async def _flush_logs() -> None:
+        """Flush buffered logs to the API."""
+        if log_callback and logs_buffer:
+            batch = logs_buffer.copy()
+            logs_buffer.clear()
+            try:
+                await log_callback(batch)
+            except Exception as e:
+                logger.warning(f"[ChatTurn] Failed to send logs: {e}")
 
     # Build the prompt with project context, environment info, and working directory
     full_prompt = message
@@ -289,22 +410,47 @@ async def run_chat_turn(
                         text = getattr(block, 'text', '')
                         if text:  # Only append non-empty text
                             captured_texts.append(text)
-                            if log_callback:
-                                await log_callback([{
-                                    'session_id': session_id,
-                                    'role': 'assistant_chunk',
-                                    'message': text
-                                }])
+                            # Stream text as 'info' level logs for real-time display
+                            add_log('info', text)
+
+                    # Capture tool use blocks — stream tool usage for transparency
+                    elif isinstance(block, ToolUseBlock):
+                        tool_name = getattr(block, 'name', 'unknown')
+                        tool_input = getattr(block, 'input', {})
+                        add_log('tool', f"Using {tool_name}")
+                        # Log relevant details for key tools
+                        if tool_name == 'Read':
+                            fp = tool_input.get('file_path', '')
+                            if fp:
+                                add_log('debug', f"Reading {fp}")
+                        elif tool_name == 'Write':
+                            fp = tool_input.get('file_path', '')
+                            if fp:
+                                add_log('debug', f"Writing {fp}")
+                        elif tool_name == 'Edit':
+                            fp = tool_input.get('file_path', '')
+                            if fp:
+                                add_log('debug', f"Editing {fp}")
+                        elif tool_name == 'Bash':
+                            cmd = tool_input.get('command', '')
+                            if cmd:
+                                # Show first 150 chars of the command
+                                add_log('debug', f"$ {cmd[:150]}{'...' if len(cmd) > 150 else ''}")
+                        elif tool_name == 'Grep':
+                            pattern = tool_input.get('pattern', '')
+                            add_log('debug', f"Searching: {pattern[:100]}")
+                        elif tool_name == 'Glob':
+                            pattern = tool_input.get('pattern', '')
+                            add_log('debug', f"Finding files: {pattern[:100]}")
+                        elif tool_name == 'Agent':
+                            desc = tool_input.get('prompt', '')[:80]
+                            add_log('tool', f"Spawning agent: {desc}")
 
             elif isinstance(message_obj, TaskStartedMessage):
                 type_label = f" ({message_obj.task_type})" if getattr(message_obj, 'task_type', None) else ""
                 logger.subagent_start("chat", message_obj.task_id, message_obj.description, task_type=getattr(message_obj, 'task_type', None))
-                if log_callback:
-                    await log_callback([{
-                        'session_id': session_id,
-                        'role': 'assistant_chunk',
-                        'message': f"🔄 Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}"
-                    }])
+                add_log('tool', f"Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}")
+                await _flush_logs()  # Flush immediately so the log is visible
 
             elif isinstance(message_obj, TaskProgressMessage):
                 usage = getattr(message_obj, 'usage', None) or {}
@@ -314,13 +460,10 @@ async def run_chat_turn(
                 status = getattr(message_obj, 'status', 'unknown')
                 summary = getattr(message_obj, 'summary', '')
                 logger.subagent_done("chat", message_obj.task_id, status, summary)
-                if log_callback:
-                    symbol = '✔' if status == 'completed' else ('⏹' if status == 'stopped' else '✘')
-                    await log_callback([{
-                        'session_id': session_id,
-                        'role': 'assistant_chunk',
-                        'message': f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}"
-                    }])
+                symbol = '✔' if status == 'completed' else ('⏹' if status == 'stopped' else '✘')
+                level = 'info' if status == 'completed' else ('warning' if status == 'stopped' else 'error')
+                add_log(level, f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}")
+                await _flush_logs()  # Flush immediately
 
             elif msg_type in ('result', 'ResultMessage') or isinstance(message_obj, ResultMessage):
                 final_result = message_obj
@@ -329,6 +472,8 @@ async def run_chat_turn(
                     getattr(message_obj, 'session_id', None) or
                     getattr(message_obj, 'sessionId', None)
                 )
+                add_log('info', f"✔ Completed — {getattr(final_result, 'stop_reason', 'end_turn')}")
+                await _flush_logs()  # Flush remaining logs
 
     except ProcessError as e:
         # Enhanced error handling for ProcessError from SDK
@@ -370,6 +515,8 @@ async def run_chat_turn(
                 pass  # Ignore errors when trying to provide helpful context
 
         logger.error(f'Chat turn ProcessError: {error_details}')
+        add_log('error', f'Process error: {str(e)[:200]}')
+        await _flush_logs()
         if on_response:
             await on_response(f'❌ {error_details}', None)
         return sdk_session_id
@@ -390,9 +537,14 @@ async def run_chat_turn(
             error_details += f"\nStderr: {e.stderr}"
 
         logger.error(f'Chat turn error: {error_details}')
+        add_log('error', f'Error: {str(e)[:200]}')
+        await _flush_logs()
         if on_response:
             await on_response(f'❌ {error_details}', None)
         return sdk_session_id
+
+    # Flush any remaining logs
+    await _flush_logs()
 
     # Montar resposta completa
     full_text = '\n'.join(captured_texts)

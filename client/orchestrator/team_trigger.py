@@ -43,16 +43,20 @@ async def find_team_workspace(
     project_id: str,
     role: str,
     client: Any,
+    environment_id: str = None,
 ) -> str | None:
     """
     Encontra o workspace do time com o role especificado para o projeto.
 
     Uses the agents-context endpoint to find workspace by role.
+    If environment_id is provided, prefers teams linked to that environment.
+    If no team with the exact role is found, falls back to any available team.
 
     Args:
         project_id: ID do projeto
         role: Role do time (planner, coder, reviewer, tester, devops, generic)
         client: DaemonClient instance
+        environment_id: ID do ambiente selecionado (opcional)
 
     Returns:
         Caminho do workspace do time ou None se não encontrado
@@ -72,12 +76,43 @@ async def find_team_workspace(
             logger.warning(f'[TeamTrigger] No agents found for project {project_id}')
             return None
 
-        # Find agent with matching role
-        for agent in agents:
-            if agent.get('role') == role:
-                workspace = agent.get('workspace_path')
-                logger.info(f'[TeamTrigger] Found {role} workspace: {workspace}')
-                return workspace
+        # Build environment team mapping for filtering
+        env_team_map: dict[str, str] = {}
+        if environment_id:
+            try:
+                planning_context = await client.get_project_planning_context(project_id)
+                for env in planning_context.get('environments', []):
+                    env_id = env.get('id', '')
+                    team_ws = env.get('team_workspace', '')
+                    if env_id and team_ws:
+                        env_team_map[env_id] = team_ws
+            except Exception as e:
+                logger.warning(f'[TeamTrigger] Failed to fetch environments: {e}')
+
+        def _is_env_workspace(workspace_path: str) -> bool:
+            if not environment_id or not env_team_map:
+                return True
+            return env_team_map.get(environment_id, '') == workspace_path
+
+        # Find agent with matching role (prefer environment-linked)
+        role_agents = [a for a in agents if a.get('role') == role]
+        env_role_agents = [a for a in role_agents if _is_env_workspace(a.get('workspace_path', ''))]
+
+        if env_role_agents:
+            workspace = env_role_agents[0].get('workspace_path')
+            logger.info(f'[TeamTrigger] Found {role} workspace (env-linked): {workspace}')
+            return workspace
+
+        if role_agents:
+            workspace = role_agents[0].get('workspace_path')
+            logger.info(f'[TeamTrigger] Found {role} workspace (any): {workspace}')
+            return workspace
+
+        # Fallback: any available team
+        if agents:
+            workspace = agents[0].get('workspace_path')
+            logger.info(f'[TeamTrigger] No {role} found, using available team: {workspace}')
+            return workspace
 
         available_roles = [a.get('role') for a in agents]
         logger.warning(

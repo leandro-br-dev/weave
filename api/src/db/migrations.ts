@@ -605,4 +605,26 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_chat_sessions_plan_id ON chat_sessions(plan_id)`,
     ],
   },
+  {
+    version: 44,
+    description: 'Chat logs table — real-time log streaming for chat sessions (thinking/streaming)',
+    up: [
+      `CREATE TABLE IF NOT EXISTS chat_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        level TEXT NOT NULL DEFAULT 'info',
+        message TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_logs_session_id ON chat_logs(session_id)`,
+    ],
+  },
+  {
+    version: 45,
+    description: 'Kanban tasks — add environment_id column for environment-specific planning',
+    up: [
+      `ALTER TABLE kanban_tasks ADD COLUMN environment_id TEXT REFERENCES environments(id) ON DELETE SET NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_kanban_tasks_environment_id ON kanban_tasks(environment_id)`,
+    ],
+  },
 ];

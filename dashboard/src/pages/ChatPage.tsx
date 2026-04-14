@@ -13,6 +13,8 @@ import { useCreatePlan } from '@/api/plans'
 import { getApiUrl, getActiveToken } from '@/api/client'
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads'
 import { useNavigate } from 'react-router'
+import { useChatLogStream } from '@/features/chat/hooks/useChatLogStream'
+import { ThinkingBubble } from '@/features/chat/components/ThinkingBubble'
 
 interface PlanData {
   name: string
@@ -176,6 +178,9 @@ export default function ChatPage() {
 
   const isRunning = session?.status === 'running'
   const isSending = sendMessage.isPending || uploadFiles.isPending
+
+  // Real-time chat log stream for thinking bubble
+  const { logs: chatLogs, streamStatus: logStreamStatus } = useChatLogStream(selectedId ?? '', isRunning)
 
   // Track when a session started running
   useEffect(() => {
@@ -443,20 +448,13 @@ export default function ChatPage() {
               )
             })}
 
+            {/* Thinking bubble with streaming logs */}
             {isRunning && (
-              <div className="flex justify-start">
-                <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl rounded-bl-sm px-4 py-3">
-                  <div className="flex gap-1">
-                    {[0, 1, 2].map(i => (
-                      <span
-                        key={i}
-                        className="h-1.5 w-1.5 bg-gray-400 rounded-full animate-bounce"
-                        style={{ animationDelay: `${i * 150}ms` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <ThinkingBubble
+                logs={chatLogs}
+                streamStatus={logStreamStatus}
+                isRunning={isRunning}
+              />
             )}
 
             <div ref={messagesEndRef} />

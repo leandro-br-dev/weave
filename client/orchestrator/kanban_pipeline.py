@@ -246,6 +246,7 @@ async def build_planning_prompt(
     skill_content: str,
     workflow_context: str = '',
     workflow_dir: str = '',
+    environment_id: str = None,
 ) -> str:
     """Monta o prompt completo para o agente planejador."""
     project = planning_context.get('project', {})
@@ -260,14 +261,26 @@ Name: {project.get('name', 'Unknown')}
 Description: {project.get('description', 'No description')}
 """
 
-    # Seção de ambientes
+    # Determine the target environment
+    target_env = None
+    if environment_id:
+        target_env = next((e for e in environments if e.get('id') == environment_id), None)
+
+    # Seção de ambientes — highlight the target environment
     env_lines = []
     for env in environments:
+        is_target = target_env and env.get('id') == environment_id
+        prefix = '🎯 **[TARGET]** ' if is_target else ''
         env_lines.append(
-            f"- **{env.get('name')}** ({env.get('type')})\n"
+            f"{prefix}- **{env.get('name')}** ({env.get('type')})\n"
             f"  project_path: `{env.get('project_path')}`"
         )
-    env_section = "## Environments\n\n" + ("\n".join(env_lines) if env_lines else "No environments configured.")
+
+    env_section_header = "## Environments\n\n"
+    if target_env:
+        env_section_header += f"**Target environment**: {target_env.get('name')} ({target_env.get('type')}) — `{target_env.get('project_path')}`\n"
+        env_section_header += "Use the target environment's project_path as the cwd for all tasks.\n\n"
+    env_section = env_section_header + ("\n".join(env_lines) if env_lines else "No environments configured.")
 
     # Seção de equipes disponíveis (teams, não agents individuais)
     team_lines = []
@@ -303,8 +316,14 @@ Description:
 - `workspace`: path to the team's workspace folder (where .claude/settings.local.json lives)
 - `cwd`: the project directory where the code lives (use environment project_path above)
 
-For coder teams: set cwd = the environment project_path, workspace = team workspace_path
+For coder teams: set cwd = the target environment's project_path, workspace = team workspace_path
 For reviewer/tester teams: same pattern
+"""
+    if target_env:
+        cwd_instruction += f"""
+**CRITICAL**: This task targets the environment "{target_env.get('name')}".
+- Use `{target_env.get('project_path')}` as the `cwd` for ALL tasks.
+- Use the team's workspace_path as the `workspace` for each task.
 """
 
     # Inject workflow context if available
@@ -330,16 +349,24 @@ Analyze the task, read the relevant codebase using the project_path above, and g
 Save the plan to `{workflow_dir}/plan.json` and validate it with `weave-validate plan {workflow_dir}/plan.json`.'''
 
 
-async def find_planner_workspace(project_id: str, client) -> str | None:
+async def find_planner_workspace(project_id: str, client, environment_id: str = None) -> str | None:
     """
-    Encontra o workspace do agente planner do projeto.
+    Encontra o workspace do agente planner do projeto com fallback.
+
+    Ordem de prioridade para selecionar a equipe:
+      1. planner com vínculo ao ambiente selecionado (environment_id)
+      2. planner sem vínculo específico (qualquer planner do projeto)
+      3. coder com vínculo ao ambiente selecionado
+      4. coder sem vínculo específico
+      5. Qualquer equipe disponível para o projeto
 
     Args:
         project_id: ID do projeto
         client: DaemonClient instance
+        environment_id: ID do ambiente selecionado (opcional)
 
     Returns:
-        Caminho do workspace do planner ou None se não encontrado
+        Caminho do workspace do time selecionado ou None se não encontrado
     """
     try:
         url = f"/projects/{project_id}/agents-context"
@@ -362,14 +389,61 @@ async def find_planner_workspace(project_id: str, client) -> str | None:
 
         logger.info(f'[KanbanPipeline] Agents for project: {[(a.get("name"), a.get("role")) for a in agents]}')
 
-        planners = [a for a in agents if a.get('role') == 'planner']
-        if not planners:
-            logger.warning(f'[KanbanPipeline] No planner among agents: {[a.get("name") for a in agents]}')
-            return None
+        # Fetch environments to get team_workspace mapping for filtering by environment
+        env_team_map: dict[str, str] = {}  # env_id -> team_workspace path
+        if environment_id:
+            try:
+                planning_context = await client.get_project_planning_context(project_id)
+                for env in planning_context.get('environments', []):
+                    env_id = env.get('id', '')
+                    team_ws = env.get('team_workspace', '')
+                    if env_id and team_ws:
+                        env_team_map[env_id] = team_ws
+            except Exception as e:
+                logger.warning(f'[KanbanPipeline] Failed to fetch environments for filtering: {e}')
 
-        workspace = planners[0].get('workspace_path')
-        logger.info(f'[KanbanPipeline] Found planner workspace: {workspace}')
-        return workspace
+        # Helper: check if a workspace belongs to the selected environment
+        def _is_env_workspace(workspace_path: str) -> bool:
+            if not environment_id or not env_team_map:
+                return True  # No env filter, any workspace is fine
+            return env_team_map.get(environment_id, '') == workspace_path
+
+        # Priority 1: planner linked to the environment
+        planners = [a for a in agents if a.get('role') == 'planner']
+        env_planners = [p for p in planners if _is_env_workspace(p.get('workspace_path', ''))]
+        if env_planners:
+            workspace = env_planners[0].get('workspace_path')
+            logger.info(f'[KanbanPipeline] Found environment-linked planner workspace: {workspace}')
+            return workspace
+
+        # Priority 2: any planner
+        if planners:
+            workspace = planners[0].get('workspace_path')
+            logger.info(f'[KanbanPipeline] Found planner workspace (no env link): {workspace}')
+            return workspace
+
+        # Priority 3: coder linked to the environment
+        coders = [a for a in agents if a.get('role') == 'coder']
+        env_coders = [c for c in coders if _is_env_workspace(c.get('workspace_path', ''))]
+        if env_coders:
+            workspace = env_coders[0].get('workspace_path')
+            logger.info(f'[KanbanPipeline] No planner found, using environment-linked coder workspace: {workspace}')
+            return workspace
+
+        # Priority 4: any coder
+        if coders:
+            workspace = coders[0].get('workspace_path')
+            logger.info(f'[KanbanPipeline] No planner found, using coder workspace: {workspace}')
+            return workspace
+
+        # Priority 5: any available team
+        if agents:
+            workspace = agents[0].get('workspace_path')
+            logger.info(f'[KanbanPipeline] No planner/coder found, using available team: {workspace}')
+            return workspace
+
+        logger.warning(f'[KanbanPipeline] No teams available for project {project_id}')
+        return None
     except Exception as e:
         logger.warning(f'Could not find planner workspace: {type(e).__name__}: {e}')
         return None
@@ -390,6 +464,7 @@ async def process_kanban_task(task: dict, client) -> None:
     project_id = task["project_id"]
     title = task.get("title", "Untitled")
     description = task.get("description", "")
+    environment_id = task.get("environment_id")
     project_settings = task.get("project_settings", {})
     if isinstance(project_settings, str):
         try:
@@ -405,7 +480,8 @@ async def process_kanban_task(task: dict, client) -> None:
     try:
         # Log cada etapa para diagnóstico
         logger.info('[KanbanPipeline] Step 1: finding planner workspace...')
-        planner_workspace = await find_planner_workspace(project_id, client)
+        logger.info(f'[KanbanPipeline] environment_id={environment_id or "not set"}')
+        planner_workspace = await find_planner_workspace(project_id, client, environment_id=environment_id)
         logger.info(f'[KanbanPipeline] Planner workspace: {planner_workspace}')
 
         if not planner_workspace:
@@ -429,22 +505,61 @@ async def process_kanban_task(task: dict, client) -> None:
 
         # Load planning instructions from native-skills (injected directly into prompt).
         # The planning skill is a centralized file, NOT a per-workspace skill.
-        skill_path = os.path.join(os.path.dirname(__file__), '..', 'native-skills', 'planning', 'SKILL.md')
+        # We search multiple candidate paths to handle different installation layouts:
+        #   1. <client/orchestrator>/../native-skills/planning/SKILL.md  (dev repo layout)
+        #   2. <client>/native-skills/planning/SKILL.md               (installed layout)
+        #   3. <WEAVE_ROOT>/native-skills/planning/SKILL.md           (monorepo root)
         skill_content = ''
-        if os.path.exists(skill_path):
+        skill_path = None
+
+        # Determine WEAVE_ROOT: the repository root that contains native-skills/
+        # In the dev repo layout:  dev/client/orchestrator/kanban_pipeline.py
+        #                         dev/native-skills/planning/SKILL.md
+        # In installed layout:   <install>/client/orchestrator/kanban_pipeline.py
+        #                         <install>/native-skills/planning/SKILL.md
+        _orchestrator_dir = os.path.dirname(os.path.abspath(__file__))  # .../client/orchestrator
+        _client_dir = os.path.dirname(_orchestrator_dir)                # .../client
+        _repo_root = os.path.dirname(_client_dir)                       # .../dev or .../<install>
+
+        candidate_paths = [
+            # Dev repo layout: native-skills is at repo root (sibling of client/)
+            os.path.join(_repo_root, 'native-skills', 'planning', 'SKILL.md'),
+            # Installed layout: native-skills inside client/
+            os.path.join(_client_dir, 'native-skills', 'planning', 'SKILL.md'),
+            # Fallback: native-skills alongside orchestrator/
+            os.path.join(_orchestrator_dir, '..', 'native-skills', 'planning', 'SKILL.md'),
+        ]
+
+        # Also try WEAVE_ROOT from environment variable
+        _weave_root = os.environ.get('WEAVE_ROOT', '')
+        if _weave_root:
+            candidate_paths.insert(0, os.path.join(_weave_root, 'native-skills', 'planning', 'SKILL.md'))
+            candidate_paths.insert(0, os.path.join(_weave_root, 'client', 'native-skills', 'planning', 'SKILL.md'))
+
+        for candidate in candidate_paths:
+            candidate = os.path.normpath(candidate)
+            if os.path.isfile(candidate):
+                skill_path = candidate
+                break
+
+        if skill_path:
             with open(skill_path) as f:
                 skill_content = f.read()
             # Substitute the [WORKFLOW_DIR] placeholder with the actual workflow directory
             skill_content = skill_content.replace('[WORKFLOW_DIR]', workflow_dir)
-            logger.info(f'[KanbanPipeline] Loaded planning instructions from native-skills ({len(skill_content)} chars)')
+            logger.info(f'[KanbanPipeline] Loaded planning instructions from {skill_path} ({len(skill_content)} chars)')
         else:
-            raise FileNotFoundError(f'[KanbanPipeline] Native planning skill not found at {skill_path}. Ensure native-skills/planning/SKILL.md exists in the client directory.')
+            raise FileNotFoundError(
+                f'[KanbanPipeline] Native planning skill not found. '
+                f'Searched: {candidate_paths}. '
+                f'Ensure native-skills/planning/SKILL.md exists in the weave installation directory.'
+            )
 
         logger.info('[KanbanPipeline] Step 4: building planning prompt...')
         prompt = await build_planning_prompt({
             'title': title,
             'description': description
-        }, planning_context, skill_content, workflow_context, workflow_dir=workflow_dir)
+        }, planning_context, skill_content, workflow_context, workflow_dir=workflow_dir, environment_id=environment_id)
         logger.info(f'[KanbanPipeline] Prompt length: {len(prompt)} chars')
 
         # Executa o planning agent via SDK
