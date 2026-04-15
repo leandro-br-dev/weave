@@ -344,6 +344,9 @@ router.post('/:id/message', authenticateToken, (req, res) => {
     }
   }
 
+  // Clear previous chat logs so each turn starts with a clean log stream
+  db.prepare('DELETE FROM chat_logs WHERE session_id = ?').run(req.params.id)
+
   // Marcar como running — o daemon vai pegar via polling
   db.prepare(
     "UPDATE chat_sessions SET status = 'running', updated_at = datetime('now') WHERE id = ?"

@@ -93,6 +93,11 @@ export const useGetPlan = (id: string) => {
     queryKey: ['plans', id],
     queryFn: () => apiClient.get<Plan>(`/api/plans/${id}`),
     enabled: !!id,
+    refetchInterval: (query) => {
+      const plan = query.state.data as Plan | undefined;
+      const isActive = plan?.status === 'running' || plan?.status === 'pending';
+      return isActive ? 2000 : 30000;
+    },
   });
 };
 

@@ -839,10 +839,10 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
 
     <ConfirmDialog
       open={showDeleteConfirm}
-      title="Delete Team"
-      description={`Are you sure you want to delete "${workspace.name}"? This action cannot be undone.`}
+      title={t('pages.agents.delete.title')}
+      description={t('pages.agents.delete.confirm', { name: workspace.name })}
       variant="danger"
-      confirmLabel="Delete"
+      confirmLabel={t('components.confirmDialog.delete')}
       onConfirm={handleDelete}
       onCancel={() => setShowDeleteConfirm(false)}
       loading={isDeleting}

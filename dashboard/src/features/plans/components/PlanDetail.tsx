@@ -10,6 +10,7 @@ import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
+import { StatusBadge } from '@/components/StatusBadge';
 import { ClaudeMdImprovementModal } from '@/components/ClaudeMdImprovementModal';
 import { useToast } from '@/contexts/ToastContext';
 import { useTranslation } from 'react-i18next';
@@ -37,36 +38,10 @@ function usePlanAttachments(planId: string | undefined, attachmentIds: string[] 
   });
 }
 
-const statusColors = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  running: 'bg-blue-100 text-blue-800',
-  success: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  awaiting_approval: 'bg-amber-100 text-amber-800',
-};
-
 const improvementStatusColors = {
   awaiting_approval: 'bg-amber-100 text-amber-800',
   approved: 'bg-green-100 text-green-800',
 };
-
-interface StatusBadgeProps {
-  status: keyof typeof statusColors;
-}
-
-function StatusBadge({ status }: StatusBadgeProps) {
-  const { t } = useTranslation();
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-        statusColors[status]
-      )}
-    >
-      {t(`status.${status}`)}
-    </span>
-  );
-}
 
 interface ImprovementStatusBadgeProps {
   status: 'awaiting_approval' | 'approved';
@@ -528,7 +503,7 @@ export function PlanDetail() {
                 )}
               </div>
             </div>
-            <StatusBadge status={plan.status} />
+            <StatusBadge status={plan.status} animate />
           </div>
 
           <div className="flex space-x-3">
@@ -727,7 +702,7 @@ export function PlanDetail() {
             <div>
               <dt className="text-sm font-medium text-gray-500">{t('planDetail.status')}</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                <StatusBadge status={plan.status} />
+                <StatusBadge status={plan.status} animate />
               </dd>
             </div>
             <div>

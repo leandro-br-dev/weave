@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { getApiUrl, getActiveToken } from '@/api/client'
 
 export type ChatLogLine = {
@@ -14,11 +14,18 @@ type StreamStatus = 'connecting' | 'streaming' | 'done' | 'error'
 export function useChatLogStream(sessionId: string, enabled: boolean) {
   const [logs, setLogs] = useState<ChatLogLine[]>([])
   const [streamStatus, setStreamStatus] = useState<StreamStatus>('connecting')
+  const [hasLogs, setHasLogs] = useState(false)
   const esRef = useRef<EventSource | null>(null)
+
+  // Clear logs when session changes
+  useEffect(() => {
+    setLogs([])
+    setStreamStatus('connecting')
+    setHasLogs(false)
+  }, [sessionId])
 
   useEffect(() => {
     if (!enabled || !sessionId) {
-      setLogs([])
       setStreamStatus('connecting')
       return
     }
@@ -37,6 +44,7 @@ export function useChatLogStream(sessionId: string, enabled: boolean) {
           if (prev.some(l => l.id === log.id)) return prev
           return [...prev, log]
         })
+        setHasLogs(true)
       } catch {
         // ignore parse errors
       }
@@ -58,11 +66,12 @@ export function useChatLogStream(sessionId: string, enabled: boolean) {
     }
   }, [sessionId, enabled])
 
-  // Clear logs when session changes
-  useEffect(() => {
+  // Reset logs when session stops running and no longer enabled
+  const clearLogs = useCallback(() => {
     setLogs([])
+    setHasLogs(false)
     setStreamStatus('connecting')
-  }, [sessionId])
+  }, [])
 
-  return { logs, streamStatus }
+  return { logs, streamStatus, hasLogs, clearLogs }
 }

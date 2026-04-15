@@ -20,13 +20,6 @@ export function ThinkingBubble({ logs, streamStatus, isRunning }: ThinkingBubble
     }
   }, [logs.length, expanded])
 
-  // Collapse when session stops running and we have a done status
-  useEffect(() => {
-    if (!isRunning && streamStatus === 'done') {
-      setExpanded(false)
-    }
-  }, [isRunning, streamStatus])
-
   // Get the latest non-tool log message for the preview
   const previewLogs = logs.filter(l => l.level === 'info')
   const latestPreview = previewLogs.length > 0 ? previewLogs[previewLogs.length - 1].message : ''
@@ -42,7 +35,7 @@ export function ThinkingBubble({ logs, streamStatus, isRunning }: ThinkingBubble
       <div className="flex justify-start">
         <div className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl rounded-bl-sm px-4 py-3">
           <div className="flex items-center gap-2">
-            <Brain className="h-3.5 w-3.5 text-blue-500" />
+            <Brain className="h-3.5 w-3.5 text-blue-500 animate-pulse" />
             <span className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
               Thinking...
             </span>
@@ -68,7 +61,7 @@ export function ThinkingBubble({ logs, streamStatus, isRunning }: ThinkingBubble
           ? 'border-blue-300 dark:border-blue-700 rounded-2xl rounded-bl-sm'
           : 'border-gray-200 dark:border-gray-600 rounded-2xl rounded-bl-sm'
       } overflow-hidden`}>
-        {/* Thinking header - always visible */}
+        {/* Thinking header - always visible and clickable */}
         <button
           onClick={() => setExpanded(!expanded)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600/50 transition-colors text-left"

@@ -1118,9 +1118,9 @@ async def process_chat_session(session: dict, client: object) -> None:
     logger.info(f"[Session] environment_id={session.get('environment_id')} env_project_path={session.get('env_project_path')}")
     logger.info(f"[Session] cwd resolved={cwd}")
 
-    # Chat timeout configuration (default 30 minutes)
+    # Chat timeout configuration (default 1 hour)
     import os as _os
-    chat_timeout = int(_os.environ.get('CHAT_TIMEOUT_SECONDS', '1800'))
+    chat_timeout = int(_os.environ.get('CHAT_TIMEOUT_SECONDS', '3600'))
 
     try:
         new_sdk_session_id = await asyncio.wait_for(
