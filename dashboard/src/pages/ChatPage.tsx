@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
-import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText, Square } from 'lucide-react'
+import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText, Square, ArrowLeftRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown, FileAttachmentInput
 } from '@/components'
 import type { FileAttachment } from '@/components'
-import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession, useMarkMessagesRead, useCancelSession } from '@/api/sessions'
+import { useGetSessions, useGetSession, useCreateSession, useSendMessage, useDeleteSession, useDeleteMessage, useClearHistory, useUpdateSession, useMarkMessagesRead, useCancelSession, useSwitchSessionEnvironment } from '@/api/sessions'
 import { useGetProjects } from '@/api/projects'
 import { useGetWorkspaces } from '@/api/teams'
 import { useCreatePlan } from '@/api/plans'
@@ -91,6 +91,7 @@ export default function ChatPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [showRename, setShowRename] = useState<string | null>(null)
+  const [showSwitchEnv, setShowSwitchEnv] = useState(false)
   const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
@@ -104,6 +105,11 @@ export default function ChatPage() {
   const clearHistory = useClearHistory()
   const markRead = useMarkMessagesRead()
   const cancelSession = useCancelSession()
+  const switchEnvironment = useSwitchSessionEnvironment()
+
+  // Data for environment/team switching
+  const { data: projects = [] } = useGetProjects()
+  const { data: allWorkspaces = [] } = useGetWorkspaces()
 
   // Track how long the session has been running (for UI display)
   const runningStartTime = useRef<number | null>(null)
@@ -306,6 +312,15 @@ export default function ChatPage() {
               )}
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              {!isRunning && (
+                <button
+                  onClick={() => setShowSwitchEnv(true)}
+                  className="text-gray-400 hover:text-blue-500 hidden sm:block"
+                  title={t('pages.chat.switchEnvironmentTitle')}
+                >
+                  <ArrowLeftRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </button>
+              )}
               <button
                 onClick={() => setConfirmClear(true)}
                 className="text-gray-400 hover:text-amber-500"
@@ -548,6 +563,21 @@ export default function ChatPage() {
         />
       )}
 
+      {/* Switch environment/team modal */}
+      {showSwitchEnv && selectedId && (
+        <SwitchEnvironmentModal
+          sessionId={selectedId}
+          currentWorkspacePath={session?.workspace_path || ''}
+          currentEnvironmentId={session?.environment_id || null}
+          projectId={session?.project_id || ''}
+          projects={projects}
+          allWorkspaces={allWorkspaces}
+          onClose={() => setShowSwitchEnv(false)}
+          onSwitched={() => setShowSwitchEnv(false)}
+          switchMutation={switchEnvironment}
+        />
+      )}
+
       <ConfirmDialog
         open={!!deleteConfirm}
         title={t('pages.chat.deleteConversationTitle')}
@@ -668,6 +698,122 @@ function NewChatModal({ onClose, onCreate }: { onClose: () => void; onCreate: (i
             loading={createSession.isPending}
           >
             {t('pages.chat.startChat')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface SwitchEnvironmentModalProps {
+  sessionId: string
+  currentWorkspacePath: string
+  currentEnvironmentId: string | null
+  projectId: string
+  projects: any[]
+  allWorkspaces: any[]
+  onClose: () => void
+  onSwitched: () => void
+  switchMutation: any
+}
+
+function SwitchEnvironmentModal({
+  sessionId,
+  currentWorkspacePath,
+  currentEnvironmentId,
+  projectId,
+  projects,
+  allWorkspaces,
+  onClose,
+  onSwitched,
+  switchMutation,
+}: SwitchEnvironmentModalProps) {
+  const { t } = useTranslation()
+
+  // Find current workspace from path
+  const currentWs = allWorkspaces.find(ws => ws.path === currentWorkspacePath)
+
+  // Resolve the workspace's project if not directly available
+  const sessionProjectId = projectId || currentWs?.project_id || ''
+  const sessionProject = projects.find(p => p.id === sessionProjectId)
+  const environments = sessionProject?.environments ?? []
+
+  // Filter workspaces by session's project
+  const filteredWorkspaces = sessionProjectId
+    ? allWorkspaces.filter(ws => ws.project_id === sessionProjectId)
+    : allWorkspaces
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 p-6 max-w-md w-full mx-4 space-y-4">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('pages.chat.switchEnvironment')}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{t('pages.chat.switchEnvironmentDesc')}</p>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.chat.currentTeam')}</label>
+          <div className="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 rounded px-3 py-2">
+            {currentWs?.name || currentWorkspacePath}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('pages.chat.currentEnvironment')}</label>
+          <div className="text-xs text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 rounded px-3 py-2">
+            {currentEnvironmentId
+              ? (environments.find((e: any) => e.id === currentEnvironmentId)?.name || currentEnvironmentId)
+              : t('pages.chat.noSpecificEnvironment')}
+          </div>
+        </div>
+
+        <Select
+          label={t('pages.chat.newTeam')}
+          value={currentWorkspacePath}
+          onChange={async (e) => {
+            const newWs = allWorkspaces.find(ws => ws.id === e.target.value)
+            if (!newWs || newWs.path === currentWorkspacePath) return
+            const newEnvId = newWs.environment_id || null
+            await switchMutation.mutateAsync({
+              id: sessionId,
+              workspace_path: newWs.path,
+              environment_id: newEnvId,
+            })
+            onSwitched()
+          }}
+        >
+          {filteredWorkspaces.map(ws => (
+            <option key={ws.id} value={ws.path} disabled={ws.path === currentWorkspacePath}>
+              {ws.name}
+            </option>
+          ))}
+        </Select>
+
+        {environments.length > 0 && (
+          <Select
+            label={t('pages.chat.newEnvironment')}
+            value={currentEnvironmentId || ''}
+            onChange={async (e) => {
+              const newVal = e.target.value || null
+              if (newVal === currentEnvironmentId) return
+              await switchMutation.mutateAsync({
+                id: sessionId,
+                environment_id: newVal,
+              })
+              onSwitched()
+            }}
+          >
+            <option value="">{t('pages.chat.noSpecificEnvironment')}</option>
+            {environments.map((env: any) => (
+              <option key={env.id} value={env.id} disabled={env.id === currentEnvironmentId}>
+                {env.name}
+              </option>
+            ))}
+          </Select>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={onClose} disabled={switchMutation.isPending}>
+            {t('pages.chat.close')}
           </Button>
         </div>
       </div>

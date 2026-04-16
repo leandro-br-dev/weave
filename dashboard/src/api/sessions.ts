@@ -115,3 +115,25 @@ export function useClearHistory() {
     onSuccess: (_, sessionId) => qc.invalidateQueries({ queryKey: ['session', sessionId] }),
   })
 }
+
+export function useSwitchSessionEnvironment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, workspace_path, environment_id }: {
+      id: string
+      workspace_path?: string
+      environment_id?: string | null
+    }) =>
+      apiFetch(`/api/sessions/${id}/switch-environment`, {
+        method: 'POST',
+        body: JSON.stringify({
+          workspace_path,
+          environment_id,
+        }),
+      }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      qc.invalidateQueries({ queryKey: ['session', vars.id] })
+    },
+  })
+}

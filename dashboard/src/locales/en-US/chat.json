@@ -100,5 +100,13 @@
   },
   "fromWorkflow": "From a workflow",
   "thoughtProcess": "Thought process",
-  "thinking": "Thinking..."
+  "thinking": "Thinking...",
+  "switchEnvironmentTitle": "Switch environment/team",
+  "switchEnvironment": "Switch Environment / Team",
+  "switchEnvironmentDesc": "Change the team or environment for this chat session. The SDK session will be reset to apply the new context.",
+  "currentTeam": "Current team",
+  "currentEnvironment": "Current environment",
+  "newTeam": "Switch to team",
+  "newEnvironment": "Switch to environment",
+  "close": "Close"
 }

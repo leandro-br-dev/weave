@@ -1737,26 +1737,42 @@ router.post('/:id/convert-to-chat', authenticateToken, (req: Request, res: Respo
     // The workspace_path must point to a valid team workspace directory
     // (under .../teams/team-*) for settings.local.json discovery to work.
     //
+    // IMPORTANT: When converting a workflow to chat, we want the LAST step's
+    // environment and team — this is where the actual development happened and
+    // where the user will want to ask questions about.  Using the first step
+    // (e.g. a planner team) would point to the wrong environment.
+    //
     // Resolution order:
-    // 1. plan.team_id (set when plan was created from team_trigger)
-    // 2. First task's workspace (if it points to a valid team directory)
+    // 1. Last task's workspace (if it points to a valid team directory) ← preferred
+    // 2. plan.team_id (set when plan was created from team_trigger)
     // 3. Resolve from project's environment default_team (project_id → environments → default_team)
-    let workspacePath = plan.team_id || ''
-    if (!workspacePath || !fs.existsSync(workspacePath)) {
-      // Try first task's workspace
-      try {
-        const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : plan.tasks
-        if (Array.isArray(tasks) && tasks.length > 0 && tasks[0].workspace) {
-          if (fs.existsSync(tasks[0].workspace)) {
-            workspacePath = tasks[0].workspace
-          }
-        }
-      } catch {
-        // ignore parse errors
+    let workspacePath = ''
+    let resolvedFromLastTask = false
+
+    // Parse tasks once for reuse
+    let tasks: any[] = []
+    try {
+      const raw = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : plan.tasks
+      tasks = Array.isArray(raw) ? raw : []
+    } catch {
+      // ignore parse errors
+    }
+
+    // 1. Try LAST task's workspace first (preferred for workflow-to-chat)
+    if (tasks.length > 0) {
+      const lastTask = tasks[tasks.length - 1]
+      if (lastTask.workspace && fs.existsSync(lastTask.workspace)) {
+        workspacePath = lastTask.workspace
+        resolvedFromLastTask = true
       }
     }
 
-    // If still not resolved or path doesn't exist, try environment's default_team
+    // 2. Fall back to plan.team_id
+    if (!workspacePath || !fs.existsSync(workspacePath)) {
+      workspacePath = plan.team_id || ''
+    }
+
+    // 3. If still not resolved or path doesn't exist, try environment's default_team
     if (!workspacePath || !fs.existsSync(workspacePath)) {
       if (plan.project_id) {
         const env = db.prepare(
@@ -1779,15 +1795,33 @@ router.post('/:id/convert-to-chat', authenticateToken, (req: Request, res: Respo
       })
     }
 
-    // Resolve environment_id from the workspace_path
+    // Resolve environment_id from the workspace_path.
+    // When resolved from last task, also try matching via agent_environments table
+    // (teams can be linked to environments without being the default_team).
     let environmentId: string | null = null
-    const envMatch = db.prepare(
-      'SELECT e.id FROM environments e WHERE e.default_team = ? LIMIT 1'
-    ).get(workspacePath) as any
-    if (envMatch) environmentId = envMatch.id
+
+    if (resolvedFromLastTask) {
+      // First, try to find the environment linked to this workspace via agent_environments
+      const agentEnv = db.prepare(
+        `SELECT ae.environment_id
+         FROM agent_environments ae
+         WHERE ae.workspace_path = ?
+         LIMIT 1`
+      ).get(workspacePath) as any
+      if (agentEnv) {
+        environmentId = agentEnv.environment_id
+      }
+    }
+
+    // Fallback: reverse lookup from environments.default_team
+    if (!environmentId) {
+      const envMatch = db.prepare(
+        'SELECT e.id FROM environments e WHERE e.default_team = ? LIMIT 1'
+      ).get(workspacePath) as any
+      if (envMatch) environmentId = envMatch.id
+    }
 
     // Build a summary of the workflow to seed as the first assistant message
-    const tasks = typeof plan.tasks === 'string' ? JSON.parse(plan.tasks) : (plan.tasks || [])
     const taskNames = Array.isArray(tasks)
       ? tasks.map((t: any, i: number) => `${i + 1}. ${t.name || t.prompt?.slice(0, 60) || 'Task'}`).join('\n')
       : ''

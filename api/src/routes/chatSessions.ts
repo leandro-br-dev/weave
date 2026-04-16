@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { authenticateToken } from '../middleware/auth.js'
 import { v4 as uuidv4 } from 'uuid'
 import { db } from '../db/index.js'
+import fs from 'fs'
 
 const router = Router()
 
@@ -216,15 +217,10 @@ router.get('/:id', authenticateToken, (req, res) => {
   return res.json({ data: { ...session as any, messages: enrichedMessages }, error: null })
 })
 
-// PATCH /api/sessions/:id — atualizar nome da sessão
-router.patch('/:id', authenticateToken, (req, res) => {
+// PATCH /api/sessions/:id — atualizar nome, environment_id ou workspace_path da sessão
+router.patch('/:id', authenticateToken, (req: any, res: any) => {
   const { id } = req.params
-  const { name } = req.body
-
-  // Validar que o nome não está vazio
-  if (!name?.trim()) {
-    return res.status(400).json({ data: null, error: 'Name cannot be empty' })
-  }
+  const { name, workspace_path, environment_id } = req.body
 
   // Verificar que a sessão existe
   const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id) as any
@@ -232,14 +228,66 @@ router.patch('/:id', authenticateToken, (req, res) => {
     return res.status(404).json({ data: null, error: 'Session not found' })
   }
 
-  // Atualizar o nome e o timestamp
-  db.prepare(
-    "UPDATE chat_sessions SET name = ?, updated_at = datetime('now') WHERE id = ?"
-  ).run(name.trim(), id)
+  // Cannot update a running session's environment/team (would conflict with active SDK)
+  if (session.status === 'running') {
+    return res.status(409).json({
+      data: null,
+      error: 'Cannot change environment/team while session is running. Wait for it to complete.',
+    })
+  }
 
-  // Buscar a sessão atualizada para retornar
+  // Build dynamic UPDATE statement based on provided fields
+  const updates: string[] = []
+  const values: any[] = []
+
+  if (name !== undefined) {
+    if (!name?.trim()) {
+      return res.status(400).json({ data: null, error: 'Name cannot be empty' })
+    }
+    updates.push('name = ?')
+    values.push(name.trim())
+  }
+
+  if (workspace_path !== undefined) {
+    if (!workspace_path) {
+      return res.status(400).json({ data: null, error: 'workspace_path cannot be empty' })
+    }
+    if (!fs.existsSync(workspace_path)) {
+      return res.status(400).json({ data: null, error: 'Workspace path does not exist on disk' })
+    }
+    updates.push('workspace_path = ?')
+    values.push(workspace_path)
+  }
+
+  if (environment_id !== undefined) {
+    updates.push('environment_id = ?')
+    values.push(environment_id || null)
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ data: null, error: 'No fields to update' })
+  }
+
+  // When environment or workspace changes, reset sdk_session_id so the daemon
+  // starts a fresh SDK session with the new context (the old session was
+  // created under a different cwd and would not find the right settings).
+  if (workspace_path !== undefined || environment_id !== undefined) {
+    updates.push("sdk_session_id = NULL")
+  }
+
+  updates.push("updated_at = datetime('now')")
+  values.push(id)
+
+  db.prepare(
+    `UPDATE chat_sessions SET ${updates.join(', ')} WHERE id = ?`
+  ).run(...values)
+
+  // Buscar a sessão atualizada para retornar (including env_project_path)
   const updatedSession = db.prepare(
-    'SELECT id, name, updated_at FROM chat_sessions WHERE id = ?'
+    "SELECT s.*, e.project_path as env_project_path " +
+    "FROM chat_sessions s " +
+    "LEFT JOIN environments e ON e.id = s.environment_id " +
+    "WHERE s.id = ?"
   ).get(id)
 
   return res.json({ data: updatedSession, error: null })
@@ -300,6 +348,57 @@ router.post('/:id/cancel', authenticateToken, (req, res) => {
   ).run(id)
 
   return res.json({ data: { cancelled: true, id }, error: null })
+})
+
+// POST /api/sessions/:id/switch-environment — switch environment and/or team for a session
+// Resets sdk_session_id so the daemon starts a fresh SDK session with the new context.
+router.post('/:id/switch-environment', authenticateToken, (req: any, res: any) => {
+  const { id } = req.params
+  const { workspace_path, environment_id } = req.body
+
+  // Verify session exists
+  const session = db.prepare('SELECT * FROM chat_sessions WHERE id = ?').get(id) as any
+  if (!session) {
+    return res.status(404).json({ data: null, error: 'Session not found' })
+  }
+
+  // Cannot switch while running
+  if (session.status === 'running') {
+    return res.status(409).json({
+      data: null,
+      error: 'Cannot change environment/team while session is running. Wait for it to complete.',
+    })
+  }
+
+  // At least one field must be provided
+  if (!workspace_path && !environment_id) {
+    return res.status(400).json({ data: null, error: 'Provide workspace_path and/or environment_id' })
+  }
+
+  // Validate workspace_path if provided
+  const newWorkspace = workspace_path || session.workspace_path
+  if (workspace_path && !fs.existsSync(workspace_path)) {
+    return res.status(400).json({ data: null, error: 'Workspace path does not exist on disk' })
+  }
+
+  const newEnvId = environment_id !== undefined ? (environment_id || null) : session.environment_id
+
+  // Update session — reset sdk_session_id so daemon creates a fresh session
+  db.prepare(
+    `UPDATE chat_sessions
+     SET workspace_path = ?, environment_id = ?, sdk_session_id = NULL, updated_at = datetime('now')
+     WHERE id = ?`
+  ).run(newWorkspace, newEnvId, id)
+
+  // Return updated session with env_project_path
+  const updatedSession = db.prepare(
+    "SELECT s.*, e.project_path as env_project_path " +
+    "FROM chat_sessions s " +
+    "LEFT JOIN environments e ON e.id = s.environment_id " +
+    "WHERE s.id = ?"
+  ).get(id)
+
+  return res.json({ data: updatedSession, error: null })
 })
 
 // POST /api/sessions/:id/message — enviar mensagem (inicia execução no daemon)
