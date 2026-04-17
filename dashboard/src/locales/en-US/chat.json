@@ -108,5 +108,10 @@
   "currentEnvironment": "Current environment",
   "newTeam": "Switch to team",
   "newEnvironment": "Switch to environment",
-  "close": "Close"
+  "close": "Close",
+  "panel": {
+    "recentConversations": "Recent Conversations",
+    "allConversations": "All Conversations",
+    "noResults": "No conversations found"
+  }
 }

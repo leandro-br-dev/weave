@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
-import { Plus, Bot, Send, Zap, Trash2, MessageSquare, ChevronRight, RotateCcw, Edit2, FileText, Square, ArrowLeftRight } from 'lucide-react'
+import { Bot, Send, Zap, Trash2, ChevronRight, RotateCcw, Edit2, FileText, Square, ArrowLeftRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   Button, EmptyState, ConfirmDialog, Select, Input, ProjectSelectDropdown, FileAttachmentInput
@@ -208,67 +208,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-full flex flex-col sm:flex-row">
-      {/* Sessions sidebar - collapsible on mobile */}
-      <div className="w-full sm:w-64 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-800 max-h-[30vh] sm:max-h-full overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-800">
-          <Button variant="primary" size="sm" onClick={() => setShowNew(true)} className="w-full text-xs sm:text-sm">
-            <Plus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t('pages.chat.newChat')}</span><span className="sm:hidden">{t('pages.chat.new')}</span>
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {sessions.length === 0 ? (
-            <div className="p-3 sm:p-4 text-center">
-              <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-400">{t('pages.chat.noConversations')}</p>
-            </div>
-          ) : sessions.map((s: any) => (
-            <div
-              key={s.id}
-              className={`group relative border-b border-gray-100 dark:border-gray-800 ${
-                selectedId === s.id ? 'bg-gray-50 dark:bg-gray-700 border-l-2 border-l-gray-900' : ''
-              }`}
-            >
-              <button
-                onClick={() => setSelectedId(s.id)}
-                className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {s.source_type === 'workflow' && (
-                      <span title={t('pages.chat.fromWorkflow')}><Zap className="h-3 w-3 text-purple-400 flex-shrink-0" /></span>
-                    )}
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{s.name}</span>
-                  </div>
-                  {s.status === 'running' && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  )}
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">
-                  {new Date(s.updated_at).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                  })}
-                </p>
-              </button>
-              <button
-                onClick={() => setShowRename(s.id)}
-                className="absolute right-8 top-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-gray-600 p-1"
-                title={t('pages.chat.renameConversation')}
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => setDeleteConfirm(s.id)}
-                className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-500 p-1"
-                title={t('pages.chat.deleteConversation')}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
+    <div className="h-full flex flex-col">
       {/* Chat area */}
       {!selectedId ? (
         <div className="flex-1 flex items-center justify-center">

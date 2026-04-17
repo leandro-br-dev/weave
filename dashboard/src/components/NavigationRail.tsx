@@ -4,12 +4,12 @@ import { createPortal } from 'react-dom'
 import {
   Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare,
   LayoutGrid, Package, LogOut, UserCircle, Sun, Moon, Monitor, Check,
-  ChevronRight, Clock, X, MessageCircle, FolderGit2, Globe,
-  Bot, ShieldCheck, Store, ChevronLeft, Palette
+  ChevronRight, X, MessageCircle, FolderGit2, Globe, Search,
+  Bot, ShieldCheck, Store, ChevronLeft, Palette, Plus
 } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetProjects } from '@/api/projects'
-import { useGetSessions, useGetUnreadCount } from '@/api/sessions'
+import { useGetSessions, useGetUnreadCount, useCreateSession } from '@/api/sessions'
 import { useGetWorkspaces } from '@/api/teams'
 import { useGetPlans } from '@/api/plans'
 import { useAuth } from '@/contexts/AuthContext'
@@ -247,11 +247,10 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
           <SidebarButton
             icon={<MessageSquare size={20} />}
             label={t('common.navigation.chat')}
-            isActive={location.pathname === '/chat'}
-            onClick={() => handleNavClick('/chat')}
-            onInfoClick={() => handleInfoClick('chat')}
-            badge={(unreadData?.count ?? 0) > 0 ? unreadData?.count : undefined}
+            isActive={location.pathname.startsWith('/chat') || activePanel === 'chat'}
+            onClick={() => handleInfoClick('chat')}
             collapsed={collapsed}
+            badge={(unreadData?.count ?? 0) > 0 ? unreadData?.count : undefined}
           />
           <SidebarButton
             icon={<AlertCircle size={20} />}
@@ -493,9 +492,9 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
           {activePanel === 'chat' && (
             <ChatPanel
               sessions={sessions}
-              onNavigate={() => { setActivePanel(null); navigate('/chat') }}
               onSelectSession={(id) => { setActivePanel(null); navigate(`/chat/${id}`) }}
               onClose={() => setActivePanel(null)}
+              t={t}
             />
           )}
           {activePanel === 'approvals' && (
@@ -905,15 +904,21 @@ function AgentsPanel({
 
 function ChatPanel({
   sessions,
-  onNavigate,
   onSelectSession,
   onClose,
+  t,
 }: {
   sessions: any[]
-  onNavigate: () => void
   onSelectSession: (id: string) => void
   onClose: () => void
+  t: (key: string, opts?: any) => string
 }) {
+  const navigate = useNavigate()
+  const { data: workspaces = [] } = useGetWorkspaces()
+  const createSession = useCreateSession()
+  const [showAllConversations, setShowAllConversations] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
     const now = new Date()
@@ -929,38 +934,98 @@ function ChatPanel({
     return date.toLocaleDateString()
   }
 
+  const handleNewChat = async () => {
+    if (isCreating) return
+    setIsCreating(true)
+    try {
+      // Use the first available workspace as default
+      const defaultWs = workspaces[0]
+      if (!defaultWs) {
+        // No workspace available, navigate to chat page to show the full new chat modal
+        navigate('/chat')
+        return
+      }
+      const result = await createSession.mutateAsync({
+        name: t('pages.chat.chatWithName', { name: defaultWs.name }),
+        workspace_path: defaultWs.path,
+      })
+      const sessionId = (result as any).id
+      onClose()
+      navigate(`/chat/${sessionId}`)
+    } catch {
+      // On error, navigate to chat page so user can select manually
+      navigate('/chat')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const recentSessions = sessions.slice(0, 10)
+
   return (
     <>
       <PanelHeader
         icon={<MessageSquare size={18} className="text-orange-400" />}
-        title="Chat"
+        title={t('common.navigation.chat')}
         onClose={onClose}
       />
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Recent Conversations</p>
-        {sessions.length === 0 ? (
+
+      {/* New Chat button - highlighted */}
+      <div className="px-4 pt-3 pb-2 flex-shrink-0">
+        <button
+          onClick={handleNewChat}
+          disabled={isCreating}
+          className={`
+            w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+            text-xs font-medium transition-colors cursor-pointer
+            bg-gradient-to-b from-amber-500 to-orange-600 text-white
+            hover:from-amber-600 hover:to-orange-700
+            shadow-md disabled:opacity-50 disabled:cursor-not-allowed
+          `}
+        >
+          {isCreating ? (
+            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Plus size={14} />
+          )}
+          {t('pages.chat.newChat')}
+        </button>
+      </div>
+
+      {/* Recent conversations list */}
+      <div className="flex-1 overflow-y-auto px-4 py-2">
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+          {t('pages.chat.panel.recentConversations')}
+        </p>
+        {recentSessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-gray-500">
             <MessageCircle size={32} strokeWidth={1} />
-            <p className="text-xs mt-2">No conversations yet</p>
+            <p className="text-xs mt-2">{t('pages.chat.noConversations')}</p>
           </div>
         ) : (
           <div className="space-y-1">
-            {sessions.slice(0, 10).map((session: any) => (
+            {recentSessions.map((session: any) => (
               <button
                 key={session.id}
                 onClick={() => onSelectSession(session.id)}
                 className="w-full text-left flex items-start gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               >
-                <Clock size={12} className="text-gray-500 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-200 truncate">
-                    {session.name || `Session ${session.id.slice(0, 8)}`}
-                  </p>
-                  <p className="text-[10px] text-gray-500">
-                    {session.created_at ? formatTime(session.created_at) : ''}
-                    {session.workspace_path && (
-                      <span className="ml-1 truncate">· {session.workspace_path.split('/').pop()}</span>
+                  <div className="flex items-center gap-1.5">
+                    {session.source_type === 'workflow' && (
+                      <span title={t('pages.chat.fromWorkflow')}>
+                        <Zap className="h-3 w-3 text-purple-400 flex-shrink-0" />
+                      </span>
                     )}
+                    <p className="text-xs text-gray-200 truncate">
+                      {session.name || `Session ${session.id.slice(0, 8)}`}
+                    </p>
+                    {session.status === 'running' && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    {session.updated_at ? formatTime(session.updated_at) : ''}
                   </p>
                 </div>
               </button>
@@ -968,7 +1033,153 @@ function ChatPanel({
           </div>
         )}
       </div>
-      <PanelFooter label="Open Chat" onClick={onNavigate} />
+
+      {/* All Conversations button - bottom */}
+      {sessions.length > 10 && (
+        <div className="px-4 py-3 border-t border-gray-800 dark:border-gray-700 flex-shrink-0">
+          <button
+            onClick={() => setShowAllConversations(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-400 hover:text-orange-400 bg-gray-800 dark:bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+          >
+            <Search size={14} />
+            {t('pages.chat.panel.allConversations')}
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* All Conversations Modal */}
+      {showAllConversations && (
+        <AllConversationsModal
+          sessions={sessions}
+          onSelectSession={(id) => {
+            onSelectSession(id)
+            setShowAllConversations(false)
+          }}
+          onClose={() => setShowAllConversations(false)}
+          t={t}
+        />
+      )}
+    </>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ALL CONVERSATIONS MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function AllConversationsModal({
+  sessions,
+  onSelectSession,
+  onClose,
+  t,
+}: {
+  sessions: any[]
+  onSelectSession: (id: string) => void
+  onClose: () => void
+  t: (key: string, opts?: any) => string
+}) {
+  const [search, setSearch] = useState('')
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const filtered = search.trim()
+    ? sessions.filter((s: any) =>
+        (s.name || '').toLowerCase().includes(search.toLowerCase())
+      )
+    : sessions
+
+  return (
+    <>
+      {createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+          <div className="relative bg-gray-900 dark:bg-gray-800 rounded-lg border border-gray-700 dark:border-gray-600 w-full max-w-lg mx-4 flex flex-col max-h-[70vh] shadow-2xl">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700 dark:border-gray-600 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={18} className="text-orange-400" />
+                <h2 className="text-sm font-semibold text-white">
+                  {t('pages.chat.panel.allConversations')}
+                </h2>
+                <span className="text-xs text-gray-500">({sessions.length})</span>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Search bar */}
+            <div className="px-4 py-3 border-b border-gray-800 dark:border-gray-700 flex-shrink-0">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('pages.chat.searchPlaceholder')}
+                  autoFocus
+                  className="w-full bg-gray-800 dark:bg-gray-900 border border-gray-700 dark:border-gray-600 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            {/* Conversation list */}
+            <div ref={listRef} className="flex-1 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <MessageCircle size={32} strokeWidth={1} />
+                  <p className="text-xs mt-2">
+                    {search.trim() ? t('pages.chat.panel.noResults') : t('pages.chat.noConversations')}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-800 dark:divide-gray-700">
+                  {filtered.map((session: any) => (
+                    <button
+                      key={session.id}
+                      onClick={() => onSelectSession(session.id)}
+                      className="w-full text-left flex items-start gap-2 px-4 py-3 hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          {session.source_type === 'workflow' && (
+                            <span title={t('pages.chat.fromWorkflow')}>
+                              <Zap className="h-3 w-3 text-purple-400 flex-shrink-0" />
+                            </span>
+                          )}
+                          <p className="text-sm text-gray-200 truncate">
+                            {session.name || `Session ${session.id.slice(0, 8)}`}
+                          </p>
+                          {session.status === 'running' && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[10px] text-gray-500">
+                            {new Date(session.updated_at).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}
+                          </p>
+                          {session.workspace_path && (
+                            <p className="text-[10px] text-gray-600 truncate">
+                              · {session.workspace_path.split('/').pop()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-600 flex-shrink-0 mt-1" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }

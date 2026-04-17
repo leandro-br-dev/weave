@@ -294,7 +294,7 @@ async def run_chat_turn(
     new_sdk_session_id = None
     logs_buffer: list[dict] = []
 
-    def add_log(level: str, message: str) -> None:
+    async def add_log(level: str, message: str) -> None:
         """Add a log entry to buffer and optionally send immediately."""
         entry = {
             'level': level,
@@ -312,7 +312,7 @@ async def run_chat_turn(
         logger.info(f"[ChatLog]{prefix} {message[:200]}")
         # Send in batch: every 3 logs or immediately for important ones
         if log_callback and len(logs_buffer) >= 3:
-            _flush_logs()
+            await _flush_logs()
 
     async def _flush_logs() -> None:
         """Flush buffered logs to the API."""
@@ -411,45 +411,45 @@ async def run_chat_turn(
                         if text:  # Only append non-empty text
                             captured_texts.append(text)
                             # Stream text as 'info' level logs for real-time display
-                            add_log('info', text)
+                            await add_log('info', text)
 
                     # Capture tool use blocks — stream tool usage for transparency
                     elif isinstance(block, ToolUseBlock):
                         tool_name = getattr(block, 'name', 'unknown')
                         tool_input = getattr(block, 'input', {})
-                        add_log('tool', f"Using {tool_name}")
+                        await add_log('tool', f"Using {tool_name}")
                         # Log relevant details for key tools
                         if tool_name == 'Read':
                             fp = tool_input.get('file_path', '')
                             if fp:
-                                add_log('debug', f"Reading {fp}")
+                                await add_log('debug', f"Reading {fp}")
                         elif tool_name == 'Write':
                             fp = tool_input.get('file_path', '')
                             if fp:
-                                add_log('debug', f"Writing {fp}")
+                                await add_log('debug', f"Writing {fp}")
                         elif tool_name == 'Edit':
                             fp = tool_input.get('file_path', '')
                             if fp:
-                                add_log('debug', f"Editing {fp}")
+                                await add_log('debug', f"Editing {fp}")
                         elif tool_name == 'Bash':
                             cmd = tool_input.get('command', '')
                             if cmd:
                                 # Show first 150 chars of the command
-                                add_log('debug', f"$ {cmd[:150]}{'...' if len(cmd) > 150 else ''}")
+                                await add_log('debug', f"$ {cmd[:150]}{'...' if len(cmd) > 150 else ''}")
                         elif tool_name == 'Grep':
                             pattern = tool_input.get('pattern', '')
-                            add_log('debug', f"Searching: {pattern[:100]}")
+                            await add_log('debug', f"Searching: {pattern[:100]}")
                         elif tool_name == 'Glob':
                             pattern = tool_input.get('pattern', '')
-                            add_log('debug', f"Finding files: {pattern[:100]}")
+                            await add_log('debug', f"Finding files: {pattern[:100]}")
                         elif tool_name == 'Agent':
                             desc = tool_input.get('prompt', '')[:80]
-                            add_log('tool', f"Spawning agent: {desc}")
+                            await add_log('tool', f"Spawning agent: {desc}")
 
             elif isinstance(message_obj, TaskStartedMessage):
                 type_label = f" ({message_obj.task_type})" if getattr(message_obj, 'task_type', None) else ""
                 logger.subagent_start("chat", message_obj.task_id, message_obj.description, task_type=getattr(message_obj, 'task_type', None))
-                add_log('tool', f"Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}")
+                await add_log('tool', f"Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}")
                 await _flush_logs()  # Flush immediately so the log is visible
 
             elif isinstance(message_obj, TaskProgressMessage):
@@ -462,7 +462,7 @@ async def run_chat_turn(
                 logger.subagent_done("chat", message_obj.task_id, status, summary)
                 symbol = '✔' if status == 'completed' else ('⏹' if status == 'stopped' else '✘')
                 level = 'info' if status == 'completed' else ('warning' if status == 'stopped' else 'error')
-                add_log(level, f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}")
+                await add_log(level, f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}")
                 await _flush_logs()  # Flush immediately
 
             elif msg_type in ('result', 'ResultMessage') or isinstance(message_obj, ResultMessage):
@@ -472,7 +472,7 @@ async def run_chat_turn(
                     getattr(message_obj, 'session_id', None) or
                     getattr(message_obj, 'sessionId', None)
                 )
-                add_log('info', f"✔ Completed — {getattr(final_result, 'stop_reason', 'end_turn')}")
+                await add_log('info', f"✔ Completed — {getattr(final_result, 'stop_reason', 'end_turn')}")
                 await _flush_logs()  # Flush remaining logs
 
     except ProcessError as e:
@@ -515,7 +515,7 @@ async def run_chat_turn(
                 pass  # Ignore errors when trying to provide helpful context
 
         logger.error(f'Chat turn ProcessError: {error_details}')
-        add_log('error', f'Process error: {str(e)[:200]}')
+        await add_log('error', f'Process error: {str(e)[:200]}')
         await _flush_logs()
         if on_response:
             await on_response(f'❌ {error_details}', None)
@@ -537,7 +537,7 @@ async def run_chat_turn(
             error_details += f"\nStderr: {e.stderr}"
 
         logger.error(f'Chat turn error: {error_details}')
-        add_log('error', f'Error: {str(e)[:200]}')
+        await add_log('error', f'Error: {str(e)[:200]}')
         await _flush_logs()
         if on_response:
             await on_response(f'❌ {error_details}', None)

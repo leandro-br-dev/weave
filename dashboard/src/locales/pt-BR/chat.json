@@ -108,5 +108,10 @@
   "currentEnvironment": "Ambiente atual",
   "newTeam": "Trocar para equipe",
   "newEnvironment": "Trocar para ambiente",
-  "close": "Fechar"
+  "close": "Fechar",
+  "panel": {
+    "recentConversations": "Conversas Recentes",
+    "allConversations": "Todas as Conversas",
+    "noResults": "Nenhuma conversa encontrada"
+  }
 }
