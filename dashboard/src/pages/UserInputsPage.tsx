@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageCircleQuestion, CheckCircle, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, Send, ChevronDown, ChevronUp } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useGetPendingUserInputs, useRespondUserInput, type UserInput } from '@/api/user_inputs'
 import { PageHeader, Button, EmptyState } from '@/components'
