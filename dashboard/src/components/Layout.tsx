@@ -1,7 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
-import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp, Palette, Globe, Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp, Palette, Globe, Sun, Moon, Monitor, Check, MessageCircleQuestion } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
+import { useGetPendingUserInputs } from '@/api/user_inputs'
 import { QuickActionModal } from '@/components/QuickActionModal'
 import NavigationRail from '@/components/NavigationRail'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,6 +23,7 @@ export default function Layout() {
   const { t, i18n } = useTranslation()
   const location = useLocation()
   const { data: pendingApprovals = [] } = useGetPendingApprovals()
+  const { data: pendingUserInputs = [] } = useGetPendingUserInputs()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [showQuickAction, setShowQuickAction] = useState(false)
@@ -119,6 +121,13 @@ export default function Layout() {
             href="/approvals"
             isActive={location.pathname === '/approvals'}
             badge={pendingApprovals.length > 0 ? pendingApprovals.length : undefined}
+          />
+          <NavItem
+            icon={<MessageCircleQuestion size={20} />}
+            label={t('common.navigation.userInputs')}
+            href="/user-inputs"
+            isActive={location.pathname === '/user-inputs'}
+            badge={pendingUserInputs.length > 0 ? pendingUserInputs.length : undefined}
           />
           <NavItem icon={<Package size={20} />} label={t('common.navigation.marketplace')} href="/marketplace" isActive={location.pathname === '/marketplace'} />
         </nav>

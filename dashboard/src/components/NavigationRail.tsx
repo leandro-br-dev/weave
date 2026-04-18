@@ -5,9 +5,10 @@ import {
   Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare,
   LayoutGrid, Package, LogOut, UserCircle, Sun, Moon, Monitor, Check,
   ChevronRight, X, MessageCircle, FolderGit2, Globe, Search,
-  Bot, ShieldCheck, Store, ChevronLeft, Palette, Plus
+  Bot, ShieldCheck, Store, ChevronLeft, Palette, Plus, MessageCircleQuestion
 } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
+import { useGetPendingUserInputs } from '@/api/user_inputs'
 import { useGetProjects } from '@/api/projects'
 import { useGetSessions, useGetUnreadCount, useCreateSession } from '@/api/sessions'
 import { useGetWorkspaces } from '@/api/teams'
@@ -37,6 +38,7 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
   const location = useLocation()
   const navigate = useNavigate()
   const { data: pendingApprovals = [] } = useGetPendingApprovals()
+  const { data: pendingUserInputs = [] } = useGetPendingUserInputs()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
@@ -259,6 +261,14 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             onClick={() => handleNavClick('/approvals')}
             onInfoClick={() => handleInfoClick('approvals')}
             badge={pendingBadge}
+            collapsed={collapsed}
+          />
+          <SidebarButton
+            icon={<MessageCircleQuestion size={20} />}
+            label={t('common.navigation.userInputs')}
+            isActive={location.pathname === '/user-inputs'}
+            onClick={() => handleNavClick('/user-inputs')}
+            badge={pendingUserInputs.length > 0 ? pendingUserInputs.length : undefined}
             collapsed={collapsed}
           />
           <SidebarButton

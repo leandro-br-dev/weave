@@ -29,6 +29,7 @@ import environmentVariablesRouter from './routes/environmentVariables.js'
 import cloudflareRouter from './routes/cloudflare.js'
 import backupRouter from './routes/backup.js'
 import uploadsRouter from './routes/uploads.js'
+import userInputsRouter from './routes/user_inputs.js'
 import validateRouter from './routes/internal/validate.routes.js'
 import { requireLocalhost } from './middleware/auth.js'
 import { db } from './db/index.js'
@@ -111,6 +112,9 @@ app.use('/api/teams', teamsRouter)
 
 // Approvals routes
 app.use('/api/approvals', approvalsRouter)
+
+// User inputs routes
+app.use('/api/user-inputs', userInputsRouter)
 
 // Daemon routes
 app.use('/api/daemon', daemonRouter)
@@ -203,6 +207,19 @@ setInterval(() => {
     console.log(`[approvals] Timed out ${result.changes} pending approval(s)`)
   }
 }, 60_000)
+
+// Run user-input timeout check every 5 minutes
+setInterval(() => {
+  const timeoutMinutes = Number(process.env.USER_INPUT_TIMEOUT_MINUTES ?? 60)
+  const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString()
+  const result = db.prepare(`
+    UPDATE user_inputs SET status = 'timeout', responded_at = datetime('now')
+    WHERE status = 'pending' AND created_at < ?
+  `).run(cutoff)
+  if (result.changes > 0) {
+    console.log(`[user-inputs] Timed out ${result.changes} pending user input(s)`)
+  }
+}, 5 * 60_000)
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {

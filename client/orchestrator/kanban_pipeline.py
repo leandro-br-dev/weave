@@ -196,6 +196,32 @@ def normalize_plan_tasks(plan_data: dict, planning_context: dict = None) -> dict
             fallback_cwd,
         )
 
+        # Safety: detect and correct subdirectory cwds.
+        # The planner may incorrectly set cwd to a subdirectory of project_path
+        # (e.g., /root/projects/myapp/dev/backend instead of /root/projects/myapp/dev).
+        # This causes auth failures because .claude/settings.local.json lives at project root.
+        if cwd and fallback_cwd:
+            # Check if cwd is a subdirectory of any environment's project_path
+            cwd_is_subdir = False
+            if planning_context:
+                for env in planning_context.get('environments', []):
+                    env_path = env.get('project_path', '')
+                    if env_path and cwd.startswith(env_path.rstrip('/') + '/'):
+                        cwd_is_subdir = True
+                        corrected_cwd = env_path
+                        task_name = task.get('name') or task.get('title') or f'task-{i+1}'
+                        logger.warning(
+                            f'[KanbanPipeline] Task "{task_name[:40]}": cwd "{cwd}" is a subdirectory '
+                            f'of environment project_path — correcting to "{corrected_cwd}"'
+                        )
+                        cwd = corrected_cwd
+                        break
+
+        # Final fallback: if cwd is still empty, use the first environment's project_path
+        if not cwd and fallback_cwd:
+            logger.info(f'[KanbanPipeline] Task cwd was empty, using fallback: {fallback_cwd}')
+            cwd = fallback_cwd
+
         # workspace pode vir em task.workspace ou task.agent.workspace
         workspace = _extract_path(task.get('workspace'))
         if not workspace and isinstance(task.get('agent'), dict):
@@ -318,11 +344,17 @@ Description:
 
 For coder teams: set cwd = the target environment's project_path, workspace = team workspace_path
 For reviewer/tester teams: same pattern
+
+**⚠️ WARNING: NEVER use subdirectories of project_path as cwd.** Always use the exact
+project_path provided above (e.g., `/root/projects/myapp/dev`, NOT `/root/projects/myapp/dev/backend`).
+The workspace (team folder) is where API keys and configuration live; the CLI will fail with
+authentication errors if cwd is a subdirectory. If a task needs to work in a specific subdirectory,
+indicate that in the task's `prompt` text — do NOT change the `cwd`.
 """
     if target_env:
         cwd_instruction += f"""
 **CRITICAL**: This task targets the environment "{target_env.get('name')}".
-- Use `{target_env.get('project_path')}` as the `cwd` for ALL tasks.
+- Use EXACTLY `{target_env.get('project_path')}` as the `cwd` for ALL tasks — no subdirectories.
 - Use the team's workspace_path as the `workspace` for each task.
 """
 

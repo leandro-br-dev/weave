@@ -12,6 +12,7 @@ import AgentsPage from './pages/AgentsPage'
 import ProjectsPage from './pages/ProjectsPage'
 import SettingsPage from './pages/SettingsPage'
 import ApprovalsPage from './pages/ApprovalsPage'
+import UserInputsPage from './pages/UserInputsPage'
 import UsersPage from './pages/UsersPage'
 import ChatPage from './pages/ChatPage'
 import KanbanPage from './pages/KanbanPage'
@@ -134,6 +135,10 @@ export const router = [
       {
         path: 'approvals',
         element: <ApprovalsPage />,
+      },
+      {
+        path: 'user-inputs',
+        element: <UserInputsPage />,
       },
       {
         path: 'users',

@@ -1,0 +1,22 @@
+{
+  "title": "User Inputs",
+  "description": "Respond to agent input requests",
+  "pendingInput": "{{count}} pending input",
+  "pendingInputs": "{{count}} pending inputs",
+  "noPending": "No pending inputs",
+  "noPendingDesc": "There are no pending input requests at this time. The agent will request input when needed.",
+  "pendingCount": "{{count}} pending",
+  "loading": "Loading input requests...",
+  "ago": "ago",
+  "plan": "Plan",
+  "task": "Task",
+  "submit": "Send Response",
+  "submitting": "Sending...",
+  "submitted": "Response sent!",
+  "placeholder": "Type your response here...",
+  "context": "Context",
+  "question": "Question",
+  "response": "Response",
+  "history": "Recent Responses",
+  "noHistory": "No recent responses"
+}

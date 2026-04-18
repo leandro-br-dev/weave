@@ -10,6 +10,7 @@ import enUSAgents from '../locales/en-US/agents.json';
 import enUSSettings from '../locales/en-US/settings.json';
 import enUSChat from '../locales/en-US/chat.json';
 import enUSApprovals from '../locales/en-US/approvals.json';
+import enUSUserInputs from '../locales/en-US/userInputs.json';
 import enUSMarketplace from '../locales/en-US/marketplace.json';
 import enUSKanban from '../locales/en-US/kanban.json';
 import enUSDashboard from '../locales/en-US/dashboard.json';
@@ -28,6 +29,7 @@ import ptBRAgents from '../locales/pt-BR/agents.json';
 import ptBRSettings from '../locales/pt-BR/settings.json';
 import ptBRChat from '../locales/pt-BR/chat.json';
 import ptBRApprovals from '../locales/pt-BR/approvals.json';
+import ptBRUserInputs from '../locales/pt-BR/userInputs.json';
 import ptBRMarketplace from '../locales/pt-BR/marketplace.json';
 import ptBRKanban from '../locales/pt-BR/kanban.json';
 import ptBRDashboard from '../locales/pt-BR/dashboard.json';
@@ -50,6 +52,7 @@ const enUS = {
     settings: enUSSettings,
     chat: enUSChat,
     approvals: enUSApprovals,
+    userInputs: enUSUserInputs,
     marketplace: enUSMarketplace,
     kanban: enUSKanban,
   },
@@ -72,6 +75,7 @@ const ptBR = {
     settings: ptBRSettings,
     chat: ptBRChat,
     approvals: ptBRApprovals,
+    userInputs: ptBRUserInputs,
     marketplace: ptBRMarketplace,
     kanban: ptBRKanban,
   },

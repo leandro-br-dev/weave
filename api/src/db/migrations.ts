@@ -627,4 +627,23 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_kanban_tasks_environment_id ON kanban_tasks(environment_id)`,
     ],
   },
+  {
+    version: 46,
+    description: 'User inputs table — agent-requested textual input from users during plan execution',
+    up: [
+      `CREATE TABLE IF NOT EXISTS user_inputs (
+        id TEXT PRIMARY KEY,
+        plan_id TEXT NOT NULL,
+        task_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        context TEXT,
+        response TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        responded_at TEXT,
+        FOREIGN KEY (plan_id) REFERENCES plans(id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_user_inputs_plan_status ON user_inputs(plan_id, status)`,
+    ],
+  },
 ];

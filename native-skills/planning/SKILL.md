@@ -73,6 +73,7 @@ If the validation returns an error (exit code 1), fix the JSON and run the valid
 - Always include at least one task with a valid `cwd` and `workspace`
 - The last task should verify the implementation works correctly
 - Do NOT output the plan in `<plan>` tags — save it directly to the file using the Write tool
+- **All tasks must use the SAME `cwd` value — the exact project_path. Never use subdirectories.**
 
 ## Rules
 
@@ -82,3 +83,9 @@ If the validation returns an error (exit code 1), fix the JSON and run the valid
 - The last task in every plan should be a verification task that confirms all previous tasks succeeded.
 - Keep tasks focused: one concern per task.
 - If the request is unclear, ask for clarification before producing the plan.
+- **NEVER set `cwd` to a subdirectory of the project path.** Always use the exact `project_path`
+  provided in the environment context (e.g., `/root/projects/myapp/dev`, never
+  `/root/projects/myapp/dev/backend`). The `cwd` is where the CLI looks for configuration
+  and credentials — setting it to a subdirectory will cause authentication failures.
+  If a task needs to operate within a specific subdirectory, mention that in the task's
+  `prompt` instead of changing the `cwd`.

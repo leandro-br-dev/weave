@@ -658,6 +658,30 @@ def generate_and_cache_context(project_path: str) -> str:
     return _workflow_context_cache[project_path]
 
 
+def _build_user_input_instruction() -> str:
+    """
+    Build the system prompt instruction for the __ask_user__ mechanism.
+
+    Returns:
+        Instruction string to append to the system prompt
+    """
+    return """
+
+## Requesting User Input
+
+When you need information from the user that was not provided in the task (e.g., API keys, credentials, configuration values, deployment URLs, preferences), you can request it by running:
+
+__ask_user__ {"question": "What is the Vercel deployment token?", "context": {"key": "VERCEL_TOKEN", "description": "Needed for deploy step"}}
+
+The execution will PAUSE until the user responds. The user's response will appear as command output prefixed with USER_RESPONSE:.
+
+IMPORTANT:
+- Use this ONLY when you genuinely cannot proceed without user input. Do NOT use it for decisions you can make autonomously.
+- Do NOT invent or guess values for credentials, tokens, or configuration — always ask the user.
+- The `context` field is optional but recommended when asking for specific configuration values.
+"""
+
+
 def build_system_prompt(task: Task, plan_id: str | None = None, workflow_path: str | None = None) -> str | None:
     """
     Build the system prompt for a task.
@@ -723,9 +747,9 @@ Your documentation directory for this workflow:
 - Create README.md, REPORT.md, SUMMARY.md, TEST_*.md unless explicitly requested
 - Write documentation outside this directory
 """
-        return base_prompt + docs_section
+        return base_prompt + docs_section + _build_user_input_instruction()
 
-    return base_prompt
+    return base_prompt + _build_user_input_instruction()
 
 
 def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None, workflow_path: str | None = None) -> str:
@@ -1140,6 +1164,84 @@ async def run_task(
                     elif isinstance(block, ToolUseBlock):
                         logger.task_tool(task.id, block.name)
                         add_log("debug", f"⚙ {block.name}")
+
+                        # ── __ask_user__ interception ──────────────────────────
+                        # When the agent needs user input (API keys, credentials, etc.),
+                        # it runs: __ask_user__ {"question": "...", "context": {...}}
+                        # We intercept this before the deny-rules check and trigger
+                        # the user-input request → poll → inject response flow.
+                        if client and plan_id and block.name == 'Bash':
+                            cmd = block.input.get('command', '') if isinstance(block.input, dict) else ''
+                            if isinstance(cmd, str) and cmd.strip().startswith('__ask_user__'):
+                                # Extract the JSON payload after __ask_user__
+                                parts = cmd.strip().split('__ask_user__', 1)
+                                question_part = parts[1].strip() if len(parts) > 1 else ''
+
+                                # Parse question and optional context from JSON
+                                context_data = None
+                                question = ''
+                                if question_part:
+                                    try:
+                                        parsed = json.loads(question_part)
+                                        if isinstance(parsed, dict):
+                                            question = parsed.get('question', str(parsed))
+                                            context_data = parsed.get('context')
+                                        else:
+                                            question = str(parsed)
+                                    except (json.JSONDecodeError, ValueError):
+                                        question = question_part
+                                else:
+                                    question = 'The agent needs your input to continue.'
+
+                                logger.info(f"[{task.id}] User input requested: {question[:100]}")
+                                add_log("info", f"\u2753 Requesting user input: {question[:200]}")
+
+                                try:
+                                    # Request user input via API
+                                    input_resp = client.request_user_input(
+                                        plan_id=plan_id,
+                                        task_id=task.id,
+                                        question=question,
+                                        context=context_data,
+                                    )
+
+                                    if input_resp.error:
+                                        error_msg = f"Failed to request user input: {input_resp.error}"
+                                        logger.task_error(task.id, error_msg)
+                                        add_log("error", error_msg)
+                                    elif input_resp.data:
+                                        input_id = input_resp.data.get("id")
+                                        add_log("info", f"\u23f3 Waiting for user input (ID: {input_id})...")
+
+                                        # Wait for user response
+                                        response = client.wait_for_user_input(input_id)
+
+                                        if response.error:
+                                            error_msg = f"User input polling error: {response.error}"
+                                            logger.task_error(task.id, error_msg)
+                                            add_log("error", error_msg)
+                                        elif response.data:
+                                            if response.data == "timeout":
+                                                error_msg = "User input request timed out after 60 minutes. Task execution stopped."
+                                                logger.task_error(task.id, error_msg)
+                                                add_log("error", f"\u23f1 {error_msg}")
+                                                return TaskResult(
+                                                    task_id=task.id,
+                                                    success=False,
+                                                    error=error_msg,
+                                                )
+                                            else:
+                                                # Inject the user's response back into the conversation
+                                                user_response = str(response.data)
+                                                logger.info(f"[{task.id}] User responded: {user_response[:100]}")
+                                                add_log("info", f"\ud83d\udcac User response: {user_response[:500]}")
+
+                                                # Replace the command with echo so the agent gets the response
+                                                block.input['command'] = f'echo "USER_RESPONSE: {user_response}"'
+                                except Exception as e:
+                                    error_msg = f"Error during user input flow: {e}"
+                                    logger.task_error(task.id, error_msg)
+                                    add_log("error", error_msg)
 
                         # Check if this tool requires approval
                         # When permission_mode is 'acceptEdits', the user has opted

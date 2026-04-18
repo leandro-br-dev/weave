@@ -770,6 +770,111 @@ class DaemonClient:
         # Timeout reached
         return PlanResponse(data="timeout")
 
+    def request_user_input(
+        self,
+        plan_id: str,
+        task_id: str,
+        question: str,
+        context: dict[str, Any] | None = None,
+    ) -> PlanResponse:
+        """
+        Request user input during task execution.
+
+        Creates a user_input record and returns the ID for polling.
+
+        POST /api/user-inputs
+        Body: {plan_id, task_id, question, context}
+
+        Args:
+            plan_id: Plan ID
+            task_id: Task ID requesting input
+            question: The question to ask the user
+            context: Optional dict with additional context (format hints, etc.)
+
+        Returns:
+            PlanResponse with data={id: str} on success, or error
+        """
+        try:
+            import json
+
+            payload: dict[str, Any] = {
+                "plan_id": plan_id,
+                "task_id": task_id,
+                "question": question,
+            }
+            if context is not None:
+                payload["context"] = context
+
+            logger.info(
+                f'[DaemonClient] Requesting user input for plan {plan_id[:8]}, '
+                f'task {task_id[:8]}: {question[:80]}...'
+            )
+
+            response = self._client.post("/user-inputs", json=payload)
+            return self._handle_response(response)
+        except httpx.HTTPError as e:
+            return PlanResponse(data=None, error=f"HTTP error: {e}")
+        except Exception as e:
+            return PlanResponse(data=None, error=f"Request failed: {e}")
+
+    def wait_for_user_input(
+        self,
+        input_id: str,
+        timeout_seconds: int = 3600,
+        poll_interval: float = 3.0,
+    ) -> PlanResponse:
+        """
+        Wait for user to respond to a user_input request.
+
+        Polls GET /api/user-inputs/:id until status is no longer 'pending'.
+        Default timeout is 60 minutes (3600 seconds).
+
+        Args:
+            input_id: The user_input ID to poll
+            timeout_seconds: Max seconds to wait (default: 3600 = 60 min)
+            poll_interval: Seconds between polls (default: 3.0)
+
+        Returns:
+            PlanResponse with data=response string on success ('answered'),
+            or data='timeout' if timed out
+        """
+        deadline = time.time() + timeout_seconds
+
+        logger.info(
+            f'[DaemonClient] Waiting for user input {input_id[:8]} '
+            f'(timeout={timeout_seconds}s, poll={poll_interval}s)'
+        )
+
+        while time.time() < deadline:
+            try:
+                response = self._client.get(f"/user-inputs/{input_id}")
+                handled = self._handle_response(response)
+
+                if handled.error:
+                    return PlanResponse(data=None, error=handled.error)
+
+                if handled.data:
+                    status = handled.data.get("status")
+                    if status == "answered":
+                        user_response = handled.data.get("response", "")
+                        logger.info(f'[DaemonClient] User input {input_id[:8]} answered')
+                        return PlanResponse(data=user_response)
+                    if status == "timeout":
+                        logger.warning(f'[DaemonClient] User input {input_id[:8]} timed out server-side')
+                        return PlanResponse(data="timeout")
+
+                # Still pending, wait before next poll
+                time.sleep(poll_interval)
+
+            except httpx.HTTPError as e:
+                return PlanResponse(data=None, error=f"HTTP error: {e}")
+            except Exception as e:
+                return PlanResponse(data=None, error=f"Polling failed: {e}")
+
+        # Client-side timeout reached
+        logger.warning(f'[DaemonClient] User input {input_id[:8]} timed out client-side after {timeout_seconds}s')
+        return PlanResponse(data="timeout")
+
     async def save_structured_output(self, plan_id: str, output: dict[str, Any]) -> PlanResponse:
         """
         Save structured output (plan/review/diagnosis) from a quick action.

@@ -1,0 +1,22 @@
+{
+  "title": "Entradas do Usuário",
+  "description": "Responda às solicitações de entrada do agente",
+  "pendingInput": "{{count}} entrada pendente",
+  "pendingInputs": "{{count}} entradas pendentes",
+  "noPending": "Nenhuma entrada pendente",
+  "noPendingDesc": "Não há solicitações de entrada pendentes neste momento. O agente solicitará entrada quando necessário.",
+  "pendingCount": "{{count}} pendente(s)",
+  "loading": "Carregando solicitações de entrada...",
+  "ago": "atrás",
+  "plan": "Plano",
+  "task": "Tarefa",
+  "submit": "Enviar Resposta",
+  "submitting": "Enviando...",
+  "submitted": "Resposta enviada!",
+  "placeholder": "Digite sua resposta aqui...",
+  "context": "Contexto",
+  "question": "Pergunta",
+  "response": "Resposta",
+  "history": "Respostas Recentes",
+  "noHistory": "Nenhuma resposta recente"
+}
