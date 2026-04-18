@@ -116,6 +116,10 @@ export const router = [
         element: <ChatPage />,
       },
       {
+        path: 'chat/:id',
+        element: <ChatPage />,
+      },
+      {
         path: 'projects',
         element: <ProjectsPage />,
       },

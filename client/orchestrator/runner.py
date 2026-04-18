@@ -21,6 +21,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
+from io import StringIO
 from pathlib import Path
 
 import anyio
@@ -41,6 +42,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
     query,
 )
+from claude_agent_sdk._errors import ProcessError
 
 from orchestrator import logger
 from orchestrator.attachments import build_prompt_with_attachments
@@ -1038,6 +1040,16 @@ async def run_task(
     # permission requests that would otherwise hang in daemon mode.
     can_use_tool = _make_can_use_tool_callback(task.permission_mode)
 
+    # Capture stderr to get real error messages from the Claude Code CLI subprocess.
+    # Without this, when the CLI exits with a non-zero code the error output is lost
+    # and we only see "Check stderr output for details" — which is useless for diagnosis.
+    stderr_buffer = StringIO()
+
+    def stderr_callback(line: str) -> None:
+        """Capture stderr lines for better error diagnostics."""
+        logger.debug(f"[{task.id}] Claude CLI stderr: {line}")
+        stderr_buffer.write(line + "\n")
+
     # Build SDK options
     options_kwargs: dict = {
         "cwd": task.cwd,
@@ -1049,6 +1061,8 @@ async def run_task(
         # from the cwd. Without this, all project-level features are silently ignored.
         "setting_sources": ["project"],
         "can_use_tool": can_use_tool,
+        "stderr": stderr_callback,
+        "extra_args": {"debug-to-stderr": True},
     }
 
     # Unset CLAUDECODE to prevent nested session detection
@@ -1283,6 +1297,21 @@ async def run_task(
 
     except Exception as e:
         error_msg = str(e)
+
+        # Attach captured stderr for better diagnostics
+        real_stderr = stderr_buffer.getvalue()
+        if real_stderr:
+            # Truncate stderr if very large to avoid bloating the error message
+            stderr_display = real_stderr[-3000:] if len(real_stderr) > 3000 else real_stderr
+            error_msg += f"\n\nStderr output:\n{stderr_display}"
+
+        # Also extract info from ProcessError attributes when available
+        if isinstance(e, ProcessError):
+            if e.exit_code:
+                error_msg += f"\nExit code: {e.exit_code}"
+            if e.stderr and e.stderr != "Check stderr output for details":
+                error_msg += f"\nStderr: {e.stderr}"
+
         # Enhance error message for authentication failures
         if '401' in error_msg or 'OAuth' in error_msg or 'authentication' in error_msg.lower():
             friendly_msg = (

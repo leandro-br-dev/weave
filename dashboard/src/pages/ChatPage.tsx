@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { Bot, Send, Zap, Trash2, ChevronRight, RotateCcw, Edit2, FileText, Square, ArrowLeftRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -82,6 +82,7 @@ function extractPlansFromMessage(content: string): PlanData[] {
 
 export default function ChatPage() {
   const { t } = useTranslation()
+  const { id: urlSessionId } = useParams<{ id: string }>()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [input, setInput] = useState('')
@@ -96,9 +97,12 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
 
+  // Use session ID from URL params when available
+  const activeSessionId = urlSessionId || selectedId
+
   const { data: sessions = [] } = useGetSessions()
-  const { data: session } = useGetSession(selectedId ?? '')
-  const sendMessage = useSendMessage(selectedId ?? '')
+  const { data: session } = useGetSession(activeSessionId ?? '')
+  const sendMessage = useSendMessage(activeSessionId ?? '')
   const deleteSession = useDeleteSession()
   const uploadFiles = useUploadFiles()
   const deleteMessage = useDeleteMessage()
@@ -116,30 +120,30 @@ export default function ChatPage() {
 
   // Mark messages as read when user opens a chat session
   useEffect(() => {
-    if (selectedId) {
+    if (activeSessionId) {
       markRead.mutate()
     }
-  }, [selectedId])
+  }, [activeSessionId])
 
   // Auto-open session when navigated from PlanDetail (workflow-to-chat conversion)
   useEffect(() => {
     const openSessionId = (location.state as any)?.openSessionId
-    if (openSessionId && !selectedId) {
+    if (openSessionId && !activeSessionId) {
       setSelectedId(openSessionId)
       // Clear the state to prevent re-triggering on subsequent navigations
       window.history.replaceState({}, '')
     }
-  }, [location.state, selectedId])
+  }, [location.state, activeSessionId])
 
   // SSE for real-time updates
   useEffect(() => {
-    if (!selectedId) return
+    if (!activeSessionId) return
     const evtSource = new EventSource(
-      `${getApiUrl()}/api/sessions/${selectedId}/stream?token=${getActiveToken()}`
+      `${getApiUrl()}/api/sessions/${activeSessionId}/stream?token=${getActiveToken()}`
     )
     evtSource.onmessage = () => {} // refresh is handled by polling for now
     return () => evtSource.close()
-  }, [selectedId])
+  }, [activeSessionId])
 
   // Auto-scroll (deferred — depends on chatLogs declared below)
   // See auto-scroll effect after useChatLogStream hook
@@ -159,7 +163,7 @@ export default function ChatPage() {
   }, [session?.messages, pendingPlan])
 
   const handleSend = async () => {
-    if ((!input.trim() && attachments.length === 0) || !selectedId || session?.status === 'running') return
+    if ((!input.trim() && attachments.length === 0) || !activeSessionId || session?.status === 'running') return
     const text = input.trim()
     setInput('')
     setPendingPlan(null)
@@ -185,7 +189,7 @@ export default function ChatPage() {
   const isSending = sendMessage.isPending || uploadFiles.isPending
 
   // Real-time chat log stream for thinking bubble
-  const { logs: chatLogs, streamStatus: logStreamStatus, hasLogs, clearLogs } = useChatLogStream(selectedId ?? '', isRunning)
+  const { logs: chatLogs, streamStatus: logStreamStatus, hasLogs, clearLogs } = useChatLogStream(activeSessionId ?? '', isRunning)
 
   // Auto-scroll
   useEffect(() => {
@@ -202,15 +206,15 @@ export default function ChatPage() {
   }, [isRunning])
 
   const handleCancel = () => {
-    if (selectedId) {
-      cancelSession.mutate(selectedId)
+    if (activeSessionId) {
+      cancelSession.mutate(activeSessionId)
     }
   }
 
   return (
     <div className="h-full flex flex-col">
       {/* Chat area */}
-      {!selectedId ? (
+      {!activeSessionId ? (
         <div className="flex-1 flex items-center justify-center">
           <EmptyState
             icon={<Bot className="h-10 w-10 sm:h-12 sm:w-12" />}
@@ -226,7 +230,7 @@ export default function ChatPage() {
               <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
               <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{session?.name}</span>
               <button
-                onClick={() => setShowRename(selectedId)}
+                onClick={() => setShowRename(activeSessionId)}
                 className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                 title={t('pages.chat.renameConversation')}
               >
@@ -269,7 +273,7 @@ export default function ChatPage() {
                 <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </button>
               <button
-                onClick={() => setDeleteConfirm(selectedId)}
+                onClick={() => setDeleteConfirm(activeSessionId)}
                 className="text-gray-400 hover:text-red-500"
                 title={t('pages.chat.deleteConversation')}
               >
@@ -307,7 +311,7 @@ export default function ChatPage() {
                   >
                     {/* Delete button - visible on hover */}
                     <button
-                      onClick={() => deleteMessage.mutate({ sessionId: selectedId!, messageId: msg.id })}
+                      onClick={() => deleteMessage.mutate({ sessionId: activeSessionId!, messageId: msg.id })}
                       className="opacity-0 group-hover:opacity-100 transition-opacity self-center mx-2 text-gray-300 hover:text-red-400"
                       title={t('pages.chat.deleteMessage')}
                     >
@@ -504,9 +508,9 @@ export default function ChatPage() {
       )}
 
       {/* Switch environment/team modal */}
-      {showSwitchEnv && selectedId && (
+      {showSwitchEnv && activeSessionId && (
         <SwitchEnvironmentModal
-          sessionId={selectedId}
+          sessionId={activeSessionId}
           currentWorkspacePath={session?.workspace_path || ''}
           currentEnvironmentId={session?.environment_id || null}
           projectId={session?.project_id || ''}
@@ -526,7 +530,7 @@ export default function ChatPage() {
         onConfirm={() => {
           if (deleteConfirm) {
             deleteSession.mutate(deleteConfirm)
-            if (selectedId === deleteConfirm) setSelectedId(null)
+            if (activeSessionId === deleteConfirm) setSelectedId(null)
           }
           setDeleteConfirm(null)
         }}
@@ -540,7 +544,7 @@ export default function ChatPage() {
         confirmLabel={t('pages.chat.clearHistory')}
         variant="danger"
         onConfirm={() => {
-          clearHistory.mutate(selectedId!)
+          clearHistory.mutate(activeSessionId!)
           setConfirmClear(false)
         }}
         onCancel={() => setConfirmClear(false)}
