@@ -1,3 +1,11 @@
+---
+name: workflow-handoff
+description: >
+  Multi-agent workflow communication protocol. Enforces state handoff between
+  sequential agents via state.md and errors.log. Always injected by the pipeline
+  — not user-installable.
+---
+
 # REGRA DE COMUNICACAO DE WORKFLOW
 
 Voce esta operando em uma arquitetura de multiplos agentes. Voce nao sabe o que aconteceu antes, a menos que leia a pasta do workflow.

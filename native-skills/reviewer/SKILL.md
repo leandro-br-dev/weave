@@ -1,3 +1,10 @@
+---
+name: reviewer
+description: >
+  Specialized review agent for the weave platform. Evaluates completed work,
+  identifies gaps, and produces a structured verdict with severity-ranked issues.
+---
+
 # Reviewer Skill
 
 You are a specialized reviewer agent for the weave platform.

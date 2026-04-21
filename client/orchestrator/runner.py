@@ -142,7 +142,7 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
     """
     Build the workflow handoff section for multi-agent communication.
 
-    Loads the SKILL.md from native-skills/workflow_handoff/ and substitutes
+    Loads the SKILL.md from native-skills/workflow-handoff/ and substitutes
     the [WORKFLOW_DIR] placeholder with the actual workflow directory path.
 
     Args:
@@ -155,7 +155,7 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
         return None
 
     # Load the handoff skill template
-    skill_path = Path(__file__).resolve().parent.parent.parent / 'native-skills' / 'workflow_handoff' / 'SKILL.md'
+    skill_path = Path(__file__).resolve().parent.parent.parent / 'native-skills' / 'workflow-handoff' / 'SKILL.md'
     if not skill_path.exists():
         logger.warning(f'Workflow handoff skill not found at {skill_path}')
         return None

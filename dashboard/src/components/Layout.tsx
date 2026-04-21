@@ -1,8 +1,10 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
-import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronUp, Palette, Globe, Sun, Moon, Monitor, Check, MessageCircleQuestion } from 'lucide-react'
+import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronRight, Palette, Globe, Sun, Moon, Monitor, Check, MessageCircleQuestion, Plus, MessageCircle, Search } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetPendingUserInputs } from '@/api/user_inputs'
+import { useGetSessions, useGetUnreadCount, useCreateSession } from '@/api/sessions'
+import { useGetWorkspaces } from '@/api/teams'
 import { QuickActionModal } from '@/components/QuickActionModal'
 import NavigationRail from '@/components/NavigationRail'
 import { useAuth } from '@/contexts/AuthContext'
@@ -22,8 +24,13 @@ import {
 export default function Layout() {
   const { t, i18n } = useTranslation()
   const location = useLocation()
+  const navigate = useNavigate()
   const { data: pendingApprovals = [] } = useGetPendingApprovals()
   const { data: pendingUserInputs = [] } = useGetPendingUserInputs()
+  const { data: unreadData } = useGetUnreadCount()
+  const { data: sessions = [] } = useGetSessions()
+  const { data: workspaces = [] } = useGetWorkspaces()
+  const createSession = useCreateSession()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [showQuickAction, setShowQuickAction] = useState(false)
@@ -32,6 +39,7 @@ export default function Layout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileChatPanel, setMobileChatPanel] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const themeMenuRef = useRef<HTMLDivElement>(null)
   const languageMenuRef = useRef<HTMLDivElement>(null)
@@ -46,6 +54,11 @@ export default function Layout() {
     { code: 'en-US', flag: '🇺🇸', nativeName: 'English' },
     { code: 'pt-BR', flag: '🇧🇷', nativeName: 'Português' },
   ]
+
+  const handleMobileNavClick = (href: string) => {
+    navigate(href)
+    setMobileMenuOpen(false)
+  }
 
   // Expose close function globally for NavItem
   if (typeof window !== 'undefined') {
@@ -87,53 +100,85 @@ export default function Layout() {
       {/* Sidebar / Navigation Rail - Desktop only */}
       <NavigationRail onQuickAction={() => setShowQuickAction(true)} onCollapsedChange={setSidebarCollapsed} />
 
-      {/* Sidebar - Mobile only (hidden on desktop, rail replaces it) */}
+      {/* Sidebar - Mobile only: compact icon-only rail (w-16) */}
       <aside className={`
         fixed inset-y-0 left-0 z-40
-        w-64 text-white
+        w-16 text-white
+        flex flex-col
         transform transition-transform duration-300 ease-in-out
         lg:hidden
         ${withDarkMode(sidebarColors.bg, darkModeSidebarColors.bg)}
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="p-6 flex items-center gap-3">
+        {/* Logo */}
+        <div className="flex items-center justify-center py-4 flex-shrink-0">
           <img src={weaveLogo} alt="Weave" className="h-8 w-8" />
-          <h1 className="text-xl font-bold">{t('common.app.title')}</h1>
         </div>
-        <nav className="mt-6">
-          {/* Quick Action - First item with special highlight */}
-          <button
-            onClick={() => setShowQuickAction(true)}
-            className={`w-full flex items-center gap-3 px-6 py-3 text-white bg-gradient-to-r ${accentColors.gradientFrom} ${accentColors.gradientTo} ${darkModeAccentColors.gradientFrom} ${darkModeAccentColors.gradientTo} hover:from-amber-600 hover:to-orange-700 transition-all border-l-4 border-amber-300 shadow-md`}
-          >
-            <Zap className="h-5 w-5" fill="currentColor" />
-            <span className="font-semibold">{t('common.navigation.quickAction')}</span>
-          </button>
 
-          <NavItem icon={<Workflow size={20} />} label={t('common.navigation.workflows')} href="/" isActive={location.pathname === '/' || location.pathname === '/workflows'} />
-          <NavItem icon={<FolderOpen size={20} />} label={t('common.navigation.projects')} href="/projects" isActive={location.pathname === '/projects'} />
-          <NavItem icon={<LayoutGrid size={20} />} label={t('common.navigation.kanban')} href="/kanban" isActive={location.pathname === '/kanban'} />
-          <NavItem icon={<Users size={20} />} label={t('common.navigation.agents')} href="/agents" isActive={location.pathname === '/agents'} />
-          <NavItem icon={<MessageSquare size={20} />} label={t('common.navigation.chat')} href="/chat" isActive={location.pathname === '/chat'} />
-          <NavItem
+        {/* Navigation items — icon only */}
+        <nav className="flex-1 flex flex-col items-center gap-1 mt-2 overflow-y-auto hide-scrollbar">
+          {/* Quick Action */}
+          <MobileRailButton
+            icon={<Zap size={20} fill="currentColor" />}
+            isActive={false}
+            isQuickAction
+            onClick={() => { setShowQuickAction(true); setMobileMenuOpen(false) }}
+          />
+          <MobileRailButton
+            icon={<Workflow size={20} />}
+            label={t('common.navigation.workflows')}
+            isActive={location.pathname === '/' || location.pathname === '/workflows'}
+            onClick={() => handleMobileNavClick('/workflows')}
+          />
+          <MobileRailButton
+            icon={<FolderOpen size={20} />}
+            label={t('common.navigation.projects')}
+            isActive={location.pathname === '/projects'}
+            onClick={() => handleMobileNavClick('/projects')}
+          />
+          <MobileRailButton
+            icon={<LayoutGrid size={20} />}
+            label={t('common.navigation.kanban')}
+            isActive={location.pathname === '/kanban'}
+            onClick={() => handleMobileNavClick('/kanban')}
+          />
+          <MobileRailButton
+            icon={<Users size={20} />}
+            label={t('common.navigation.agents')}
+            isActive={location.pathname === '/agents'}
+            onClick={() => handleMobileNavClick('/agents')}
+          />
+          <MobileRailButton
+            icon={<MessageSquare size={20} />}
+            label={t('common.navigation.chat')}
+            isActive={location.pathname.startsWith('/chat') || mobileChatPanel}
+            onClick={() => setMobileChatPanel(!mobileChatPanel)}
+            badge={(unreadData?.count ?? 0) > 0 ? unreadData?.count : undefined}
+          />
+          <MobileRailButton
             icon={<AlertCircle size={20} />}
             label={t('common.navigation.approvals')}
-            href="/approvals"
             isActive={location.pathname === '/approvals'}
+            onClick={() => handleMobileNavClick('/approvals')}
             badge={pendingApprovals.length > 0 ? pendingApprovals.length : undefined}
           />
-          <NavItem
+          <MobileRailButton
             icon={<MessageCircleQuestion size={20} />}
             label={t('common.navigation.userInputs')}
-            href="/user-inputs"
             isActive={location.pathname === '/user-inputs'}
+            onClick={() => handleMobileNavClick('/user-inputs')}
             badge={pendingUserInputs.length > 0 ? pendingUserInputs.length : undefined}
           />
-          <NavItem icon={<Package size={20} />} label={t('common.navigation.marketplace')} href="/marketplace" isActive={location.pathname === '/marketplace'} />
+          <MobileRailButton
+            icon={<Package size={20} />}
+            label={t('common.navigation.marketplace')}
+            isActive={location.pathname === '/marketplace'}
+            onClick={() => handleMobileNavClick('/marketplace')}
+          />
         </nav>
 
-        {/* Bottom section: User menu (theme, language, settings) */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 pb-3" ref={userMenuRef}>
+        {/* Bottom: User avatar button */}
+        <div className={`border-t ${withDarkMode(sidebarColors.divider, darkModeSidebarColors.divider)} p-2 flex-shrink-0`} ref={userMenuRef}>
           <div className="relative">
             <button
               onClick={() => {
@@ -141,21 +186,18 @@ export default function Layout() {
                 setThemeMenuOpen(false)
                 setLanguageMenuOpen(false)
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)} transition-colors`}
+              className={`w-12 h-12 mx-auto rounded-lg flex items-center justify-center transition-colors cursor-pointer ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)}`}
+              aria-label={user?.username || 'User'}
             >
-              <div className={`w-8 h-8 rounded-full ${withDarkMode(accentColors.solid, accentColors.solid)} flex items-center justify-center flex-shrink-0`}>
+              <div className={`w-8 h-8 rounded-full ${withDarkMode(accentColors.solid, accentColors.solid)} flex items-center justify-center`}>
                 <span className="text-xs font-bold text-white">
                   {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
-              <span className="text-sm font-medium truncate flex-1 text-left">
-                {user?.username || 'User'}
-              </span>
-              <ChevronUp size={14} className={`transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {userMenuOpen && (
-              <div className={`absolute bottom-full left-0 right-0 mb-1 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50`}>
+              <div className="absolute bottom-full left-full mb-2 ml-2 bg-gray-800 dark:bg-gray-900 rounded-lg border border-gray-700 dark:border-gray-800 py-1 shadow-lg z-50 min-w-[180px]">
                 {/* Theme sub-menu */}
                 <div className="relative" ref={themeMenuRef}>
                   <button
@@ -274,16 +316,57 @@ export default function Layout() {
             )}
           </div>
         </div>
-
-        {/* Mobile close button */}
-        <button
-          onClick={() => setMobileMenuOpen(false)}
-          className={`lg:hidden absolute bottom-4 right-4 p-2 ${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} hover:text-white transition-colors`}
-          aria-label={t('common.app.closeMenu')}
-        >
-          <X size={20} />
-        </button>
       </aside>
+
+      {/* Mobile Chat Panel — slide-out from rail */}
+      {mobileChatPanel && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setMobileChatPanel(false)}
+          />
+          <div className={`
+            lg:hidden fixed top-0 bottom-0 z-50
+            w-72
+            ${withDarkMode(sidebarColors.bg, darkModeSidebarColors.bg)}
+            shadow-2xl flex-col animate-slide-in
+          `}
+          style={{ left: '4rem' }}
+          >
+            <MobileChatPanel
+              sessions={sessions}
+              workspaces={workspaces}
+              onSelectSession={(id) => { setMobileChatPanel(false); setMobileMenuOpen(false); navigate(`/chat/${id}`) }}
+              onClose={() => setMobileChatPanel(false)}
+              onNewChat={async () => {
+                const defaultWs = workspaces[0]
+                if (!defaultWs) {
+                  setMobileChatPanel(false)
+                  setMobileMenuOpen(false)
+                  navigate('/chat')
+                  return
+                }
+                try {
+                  const result = await createSession.mutateAsync({
+                    name: t('pages.chat.chatWithName', { name: defaultWs.name }),
+                    workspace_path: defaultWs.path,
+                  })
+                  setMobileChatPanel(false)
+                  setMobileMenuOpen(false)
+                  navigate(`/chat/${(result as any).id}`)
+                } catch {
+                  setMobileChatPanel(false)
+                  setMobileMenuOpen(false)
+                  navigate('/chat')
+                }
+              }}
+              onAllConversations={() => { setMobileChatPanel(false); setMobileMenuOpen(false); navigate('/chat') }}
+              isCreating={createSession.isPending}
+              t={t}
+            />
+          </div>
+        </>
+      )}
 
       {/* Overlay for mobile */}
       {mobileMenuOpen && (
@@ -311,44 +394,195 @@ export default function Layout() {
   )
 }
 
-function NavItem({
+function MobileRailButton({
   icon,
   label,
-  href,
   isActive,
-  badge
+  onClick,
+  badge,
+  isQuickAction,
 }: {
   icon: React.ReactNode
-  label: string
-  href: string
+  label?: string
   isActive?: boolean
+  onClick: () => void
   badge?: number
+  isQuickAction?: boolean
 }) {
   return (
-    <Link
-      to={href}
-      onClick={() => {
-        // Close mobile menu after navigation
-        const sidebar = document.querySelector('aside')
-        if (sidebar && window.innerWidth < 1024) {
-          (window as any).closeMobileMenu?.()
-        }
-      }}
-      className={`flex items-center justify-between gap-3 px-6 py-3 transition-colors ${
-        isActive
-          ? `${withDarkMode(sidebarColors.activeItem, darkModeSidebarColors.activeItem)} border-l-4 ${withDarkMode(accentColors.border, darkModeAccentColors.border)}`
-          : `${withDarkMode(sidebarColors.text, darkModeSidebarColors.text)} border-l-4 border-transparent ${withDarkMode(sidebarColors.hoverItem, darkModeSidebarColors.hoverItem)} hover:text-white dark:hover:text-gray-200`
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="text-sm sm:text-base">{label}</span>
-      </div>
-      {badge !== undefined && badge > 0 && (
-        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[24px] text-center font-semibold">
-          {badge}
+    <div className="group relative">
+      <button
+        onClick={onClick}
+        className={`
+          w-12 h-12 mx-auto rounded-lg flex items-center justify-center
+          transition-colors cursor-pointer flex-shrink-0
+          ${isQuickAction
+            ? `bg-gradient-to-b ${withDarkMode(accentColors.gradientFrom, darkModeAccentColors.gradientFrom)} ${withDarkMode(accentColors.gradientTo, darkModeAccentColors.gradientTo)} text-white hover:from-amber-600 hover:to-orange-700 shadow-md`
+            : isActive
+              ? `${withDarkMode(sidebarColors.activeItem ?? 'bg-gray-800 text-white', darkModeSidebarColors.activeItem ?? 'dark:bg-gray-800 dark:text-white')}`
+              : `${withDarkMode(sidebarColors.text ?? 'text-gray-300', darkModeSidebarColors.text ?? 'dark:text-gray-300')} ${withDarkMode(sidebarColors.hoverItem ?? 'hover:bg-gray-800', darkModeSidebarColors.hoverItem ?? 'dark:hover:bg-gray-800')} hover:text-white`
+          }
+        `}
+        aria-label={label}
+      >
+        <span className="relative flex items-center justify-center">
+          {icon}
+          {badge !== undefined && badge > 0 && (
+            <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 leading-none">
+              {badge > 9 ? '9+' : badge}
+            </span>
+          )}
         </span>
+      </button>
+
+      {/* Tooltip — shows label on long press / hover */}
+      {label && (
+        <div
+          className="
+            pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2
+            bg-gray-900 dark:bg-gray-700
+            text-white
+            text-xs rounded-md px-2 py-1 whitespace-nowrap shadow-lg
+            opacity-0 group-hover:opacity-100 transition-opacity z-50
+          "
+        >
+          {label}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900 dark:border-r-gray-700" />
+        </div>
       )}
-    </Link>
+    </div>
+  )
+}
+
+function MobileChatPanel({
+  sessions,
+  workspaces: _workspaces,
+  onSelectSession,
+  onClose,
+  onNewChat,
+  onAllConversations,
+  isCreating,
+  t,
+}: {
+  sessions: any[]
+  workspaces: any[]
+  onSelectSession: (id: string) => void
+  onClose: () => void
+  onNewChat: () => void
+  onAllConversations: () => void
+  isCreating: boolean
+  t: (key: string, opts?: any) => string
+}) {
+  const recentSessions = sessions.slice(0, 10)
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString()
+  }
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800 dark:border-gray-700 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={18} className="text-orange-400" />
+          <h2 className="text-sm font-semibold text-white">{t('common.navigation.chat')}</h2>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors cursor-pointer"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* New Chat button */}
+      <div className="px-4 pt-3 pb-2 flex-shrink-0">
+        <button
+          onClick={onNewChat}
+          disabled={isCreating}
+          className="
+            w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+            text-xs font-medium transition-colors cursor-pointer
+            bg-gradient-to-b from-amber-500 to-orange-600 text-white
+            hover:from-amber-600 hover:to-orange-700
+            shadow-md disabled:opacity-50 disabled:cursor-not-allowed
+          "
+        >
+          {isCreating ? (
+            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Plus size={14} />
+          )}
+          {t('pages.chat.newChat')}
+        </button>
+      </div>
+
+      {/* Recent conversations list */}
+      <div className="flex-1 overflow-y-auto px-4 py-2">
+        <p className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+          {t('pages.chat.panel.recentConversations')}
+        </p>
+        {recentSessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+            <MessageCircle size={32} strokeWidth={1} />
+            <p className="text-xs mt-2">{t('pages.chat.noConversations')}</p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {recentSessions.map((session: any) => (
+              <button
+                key={session.id}
+                onClick={() => onSelectSession(session.id)}
+                className="w-full text-left flex items-start gap-2 px-3 py-2 rounded-md hover:bg-gray-800 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    {session.source_type === 'workflow' && (
+                      <span title={t('pages.chat.fromWorkflow')}>
+                        <Zap className="h-3 w-3 text-purple-400 flex-shrink-0" />
+                      </span>
+                    )}
+                    <p className="text-xs text-gray-200 truncate">
+                      {session.name || `Session ${session.id.slice(0, 8)}`}
+                    </p>
+                    {session.status === 'running' && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    {session.updated_at ? formatTime(session.updated_at) : ''}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* All Conversations button */}
+      {sessions.length > 10 && (
+        <div className="px-4 py-3 border-t border-gray-800 dark:border-gray-700 flex-shrink-0">
+          <button
+            onClick={onAllConversations}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-400 hover:text-orange-400 bg-gray-800 dark:bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+          >
+            <Search size={14} />
+            {t('pages.chat.panel.allConversations')}
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </>
   )
 }
