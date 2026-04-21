@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation, useParams } from 'react-router'
+import { useLocation, useParams, useSearchParams } from 'react-router'
 import { Bot, Send, Zap, Trash2, ChevronRight, RotateCcw, Edit2, FileText, Square, ArrowLeftRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -96,9 +96,19 @@ export default function ChatPage() {
   const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // Use session ID from URL params when available
   const activeSessionId = urlSessionId || selectedId
+
+  // Open NewChatModal when navigated with ?new=true (e.g. from sidebar)
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setShowNew(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const { data: sessions = [] } = useGetSessions()
   const { data: session } = useGetSession(activeSessionId ?? '')
@@ -484,7 +494,7 @@ export default function ChatPage() {
       {showNew && (
         <NewChatModal
           onClose={() => setShowNew(false)}
-          onCreate={id => { setSelectedId(id); setShowNew(false) }}
+          onCreate={id => { setShowNew(false); navigate(`/chat/${id}`) }}
         />
       )}
 

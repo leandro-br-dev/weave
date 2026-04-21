@@ -631,6 +631,9 @@ async def process_kanban_task(task: dict, client) -> None:
             TaskProgressMessage,
             TaskNotificationMessage,
         )
+        from claude_agent_sdk import ToolUseBlock
+
+        subagent_names: dict[str, str] = {}  # tool_use_id / task_id -> short name
 
         async for event in query(prompt=_string_to_async_iterable(prompt), options=opts):
             event_type = type(event).__name__
@@ -638,17 +641,28 @@ async def process_kanban_task(task: dict, client) -> None:
                 for block in getattr(event, "content", []):
                     if hasattr(block, "text"):
                         full_response += block.text
+                    # Track Agent/Task tool calls for human-readable names
+                    elif isinstance(block, ToolUseBlock) and block.name in ('Agent', 'Task') and block.id:
+                        _input = block.input if isinstance(block.input, dict) else {}
+                        short_name = _input.get('description') or _input.get('name') or _input.get('prompt', '')[:60]
+                        if short_name:
+                            subagent_names[block.id] = short_name
             elif event_type == "TaskStartedMessage":
+                _tool_use_id = getattr(event, 'tool_use_id', None)
+                _display_id = subagent_names.get(_tool_use_id, event.task_id) if _tool_use_id else event.task_id
+                subagent_names[event.task_id] = _display_id
                 type_label = f" ({event.task_type})" if getattr(event, 'task_type', None) else ""
-                logger.subagent_start("planner", event.task_id, event.description, task_type=getattr(event, 'task_type', None))
-                logger.info(f'[KanbanPipeline] Subagent spawned: {event.task_id}{type_label} — {event.description[:120]}')
+                logger.subagent_start("planner", _display_id, event.description, task_type=getattr(event, 'task_type', None))
+                logger.info(f'[KanbanPipeline] Subagent spawned: {_display_id}{type_label} — {event.description[:120]}')
             elif event_type == "TaskProgressMessage":
-                logger.subagent_progress("planner", event.task_id, event.description, tokens=(getattr(event, 'usage', None) or {}).get('total_tokens', 0))
+                _display_id = subagent_names.get(event.task_id, event.task_id)
+                logger.subagent_progress("planner", _display_id, event.description, tokens=(getattr(event, 'usage', None) or {}).get('total_tokens', 0))
             elif event_type == "TaskNotificationMessage":
                 status = getattr(event, 'status', 'unknown')
                 summary = getattr(event, 'summary', '')
-                logger.subagent_done("planner", event.task_id, status, summary)
-                logger.info(f'[KanbanPipeline] Subagent {event.task_id} {status} — {summary[:100] if summary else ""}')
+                _display_id = subagent_names.get(event.task_id, event.task_id)
+                logger.subagent_done("planner", _display_id, status, summary)
+                logger.info(f'[KanbanPipeline] Subagent {_display_id} {status} — {summary[:100] if summary else ""}')
             elif event_type == "ResultMessage":
                 result_text = getattr(event, "result", "") or ""
                 if result_text:

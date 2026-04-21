@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare, LayoutGrid, Package, X, Menu, LogOut, UserCircle, ChevronRight, Palette, Globe, Sun, Moon, Monitor, Check, MessageCircleQuestion, Plus, MessageCircle, Search } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetPendingUserInputs } from '@/api/user_inputs'
-import { useGetSessions, useGetUnreadCount, useCreateSession } from '@/api/sessions'
+import { useGetSessions, useGetUnreadCount } from '@/api/sessions'
 import { useGetWorkspaces } from '@/api/teams'
 import { QuickActionModal } from '@/components/QuickActionModal'
 import NavigationRail from '@/components/NavigationRail'
@@ -30,7 +30,6 @@ export default function Layout() {
   const { data: unreadData } = useGetUnreadCount()
   const { data: sessions = [] } = useGetSessions()
   const { data: workspaces = [] } = useGetWorkspaces()
-  const createSession = useCreateSession()
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [showQuickAction, setShowQuickAction] = useState(false)
@@ -338,30 +337,12 @@ export default function Layout() {
               workspaces={workspaces}
               onSelectSession={(id) => { setMobileChatPanel(false); setMobileMenuOpen(false); navigate(`/chat/${id}`) }}
               onClose={() => setMobileChatPanel(false)}
-              onNewChat={async () => {
-                const defaultWs = workspaces[0]
-                if (!defaultWs) {
-                  setMobileChatPanel(false)
-                  setMobileMenuOpen(false)
-                  navigate('/chat')
-                  return
-                }
-                try {
-                  const result = await createSession.mutateAsync({
-                    name: t('pages.chat.chatWithName', { name: defaultWs.name }),
-                    workspace_path: defaultWs.path,
-                  })
-                  setMobileChatPanel(false)
-                  setMobileMenuOpen(false)
-                  navigate(`/chat/${(result as any).id}`)
-                } catch {
-                  setMobileChatPanel(false)
-                  setMobileMenuOpen(false)
-                  navigate('/chat')
-                }
+              onNewChat={() => {
+                setMobileChatPanel(false)
+                setMobileMenuOpen(false)
+                navigate('/chat?new=true')
               }}
               onAllConversations={() => { setMobileChatPanel(false); setMobileMenuOpen(false); navigate('/chat') }}
-              isCreating={createSession.isPending}
               t={t}
             />
           </div>
@@ -461,7 +442,6 @@ function MobileChatPanel({
   onClose,
   onNewChat,
   onAllConversations,
-  isCreating,
   t,
 }: {
   sessions: any[]
@@ -470,7 +450,6 @@ function MobileChatPanel({
   onClose: () => void
   onNewChat: () => void
   onAllConversations: () => void
-  isCreating: boolean
   t: (key: string, opts?: any) => string
 }) {
   const recentSessions = sessions.slice(0, 10)
@@ -510,20 +489,15 @@ function MobileChatPanel({
       <div className="px-4 pt-3 pb-2 flex-shrink-0">
         <button
           onClick={onNewChat}
-          disabled={isCreating}
           className="
             w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
             text-xs font-medium transition-colors cursor-pointer
             bg-gradient-to-b from-amber-500 to-orange-600 text-white
             hover:from-amber-600 hover:to-orange-700
-            shadow-md disabled:opacity-50 disabled:cursor-not-allowed
+            shadow-md
           "
         >
-          {isCreating ? (
-            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Plus size={14} />
-          )}
+          <Plus size={14} />
           {t('pages.chat.newChat')}
         </button>
       </div>

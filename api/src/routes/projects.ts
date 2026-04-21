@@ -1224,12 +1224,17 @@ router.post('/:id/generate-agent', authenticateToken, async (req, res) => {
       depends_on: [],
     }])
 
+    // Generate a human-readable plan name with datetime
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const datetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+
     db.prepare(`
       INSERT INTO plans (id, name, tasks, status, type, project_id)
       VALUES (?, ?, ?, 'pending', 'quick_action', ?)
     `).run(
       planId,
-      'Generate agent: ' + agentSlug,
+      `Quick Action - ${project.name} - ${datetime} — Generate ${role} agent: ${agentSlug}`,
       tasks,
       req.params.id
     )

@@ -198,10 +198,18 @@ router.post('/', authenticateToken, (req, res) => {
   // Build attachments JSON if attachment_ids were provided
   const attachmentsJson = JSON.stringify(attachment_ids ?? [])
 
+  // Generate a human-readable plan name with datetime
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const datetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+  const planName = name
+    ? `Quick Action - ${projectName} - ${datetime}`
+    : `Quick Action - ${projectName} - ${datetime} — ${message.slice(0, 60)}`
+
   db.prepare(`
     INSERT INTO plans (id, name, tasks, status, project_id, type, attachments, workflow_path)
     VALUES (?, ?, ?, 'pending', ?, 'quick_action', ?, ?)
-  `).run(planId, name ?? `Quick: ${message.slice(0, 60)}`, JSON.stringify([task]), project_id ?? null, attachmentsJson, workflowPath)
+  `).run(planId, planName, JSON.stringify([task]), project_id ?? null, attachmentsJson, workflowPath)
 
   return res.status(201).json({
     data: { id: planId, task_id: taskId },

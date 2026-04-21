@@ -293,6 +293,7 @@ async def run_chat_turn(
     final_result = None
     new_sdk_session_id = None
     logs_buffer: list[dict] = []
+    subagent_names: dict[str, str] = {}  # tool_use_id / task_id -> short name for subagent logging
 
     async def add_log(level: str, message: str) -> None:
         """Add a log entry to buffer and optionally send immediately."""
@@ -418,6 +419,16 @@ async def run_chat_turn(
                         tool_name = getattr(block, 'name', 'unknown')
                         tool_input = getattr(block, 'input', {})
                         await add_log('tool', f"Using {tool_name}")
+
+                        # Track Agent/Task tool calls so we can resolve
+                        # a human-readable name in TaskStartedMessage logs.
+                        if tool_name in ('Agent', 'Task') and block.id:
+                            short_name = (
+                                tool_input.get('description') or tool_input.get('name')
+                                or tool_input.get('prompt', '')[:60]
+                            )
+                            if short_name:
+                                subagent_names[block.id] = short_name
                         # Log relevant details for key tools
                         if tool_name == 'Read':
                             fp = tool_input.get('file_path', '')
@@ -447,22 +458,27 @@ async def run_chat_turn(
                             await add_log('tool', f"Spawning agent: {desc}")
 
             elif isinstance(message_obj, TaskStartedMessage):
+                _tool_use_id = getattr(message_obj, 'tool_use_id', None)
+                _display_id = subagent_names.get(_tool_use_id, message_obj.task_id) if _tool_use_id else message_obj.task_id
+                subagent_names[message_obj.task_id] = _display_id  # cache for progress/done
                 type_label = f" ({message_obj.task_type})" if getattr(message_obj, 'task_type', None) else ""
-                logger.subagent_start("chat", message_obj.task_id, message_obj.description, task_type=getattr(message_obj, 'task_type', None))
-                await add_log('tool', f"Subagent spawned: {message_obj.task_id}{type_label} — {message_obj.description[:120]}")
+                logger.subagent_start("chat", _display_id, message_obj.description, task_type=getattr(message_obj, 'task_type', None))
+                await add_log('tool', f"Subagent spawned: {_display_id}{type_label} — {message_obj.description[:120]}")
                 await _flush_logs()  # Flush immediately so the log is visible
 
             elif isinstance(message_obj, TaskProgressMessage):
                 usage = getattr(message_obj, 'usage', None) or {}
-                logger.subagent_progress("chat", message_obj.task_id, message_obj.description, tokens=usage.get('total_tokens', 0))
+                _display_id = subagent_names.get(message_obj.task_id, message_obj.task_id)
+                logger.subagent_progress("chat", _display_id, message_obj.description, tokens=usage.get('total_tokens', 0))
 
             elif isinstance(message_obj, TaskNotificationMessage):
                 status = getattr(message_obj, 'status', 'unknown')
                 summary = getattr(message_obj, 'summary', '')
-                logger.subagent_done("chat", message_obj.task_id, status, summary)
+                _display_id = subagent_names.get(message_obj.task_id, message_obj.task_id)
+                logger.subagent_done("chat", _display_id, status, summary)
                 symbol = '✔' if status == 'completed' else ('⏹' if status == 'stopped' else '✘')
                 level = 'info' if status == 'completed' else ('warning' if status == 'stopped' else 'error')
-                await add_log(level, f"{symbol} Subagent {message_obj.task_id} {status} — {summary[:100] if summary else ''}")
+                await add_log(level, f"{symbol} Subagent {_display_id} {status} — {summary[:100] if summary else ''}")
                 await _flush_logs()  # Flush immediately
 
             elif msg_type in ('result', 'ResultMessage') or isinstance(message_obj, ResultMessage):

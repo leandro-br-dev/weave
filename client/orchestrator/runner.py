@@ -1122,6 +1122,7 @@ async def run_task(
     task_sdk_session_id: str | None = None
     logs_buffer: list[dict] = []
     captured_texts: list[str] = []  # Capture all output text for structured output detection
+    subagent_names: dict[str, str] = {}  # tool_use_id -> short name for subagent logging
 
     def send_logs_if_needed() -> None:
         """Send buffered logs if callback is available and buffer has content."""
@@ -1164,6 +1165,19 @@ async def run_task(
                     elif isinstance(block, ToolUseBlock):
                         logger.task_tool(task.id, block.name)
                         add_log("debug", f"⚙ {block.name}")
+
+                        # ── Subagent name tracking ─────────────────────────
+                        # When an Agent/Task tool is called, store its short
+                        # name keyed by tool_use_id so we can show it in
+                        # TaskStartedMessage logs instead of the raw UUID.
+                        if block.name in ('Agent', 'Task') and block.id:
+                            sub_input = block.input if isinstance(block.input, dict) else {}
+                            short_name = (
+                                sub_input.get('description') or sub_input.get('name')
+                                or sub_input.get('prompt', '')[:60]
+                            )
+                            if short_name:
+                                subagent_names[block.id] = short_name
 
                         # ── __ask_user__ interception ──────────────────────────
                         # When the agent needs user input (API keys, credentials, etc.),
@@ -1351,23 +1365,32 @@ async def run_task(
 
             # Handle subagent lifecycle messages (Agent tool / Task tool spawning)
             elif isinstance(message, TaskStartedMessage):
+                # Resolve a human-readable name from the preceding Agent/Task
+                # tool call (matched via tool_use_id). Falls back to the UUID.
+                _display_id = message.task_id
+                _tool_use_id = getattr(message, 'tool_use_id', None)
+                if _tool_use_id and _tool_use_id in subagent_names:
+                    _display_id = subagent_names[_tool_use_id]
+                # Cache task_id -> display name for later progress/done messages
+                subagent_names[message.task_id] = _display_id
                 logger.subagent_start(
                     task.id,
-                    message.task_id,
+                    _display_id,
                     message.description,
                     task_type=getattr(message, 'task_type', None),
                 )
                 type_label = f" ({message.task_type})" if getattr(message, 'task_type', None) else ""
-                add_log("info", f"🔄 Subagent spawned: {message.task_id}{type_label} — {message.description[:120]}")
+                add_log("info", f"🔄 Subagent spawned: {_display_id}{type_label} — {message.description[:120]}")
                 send_logs_if_needed()  # Flush immediately so the log is visible
 
             elif isinstance(message, TaskProgressMessage):
                 usage = getattr(message, 'usage', None) or {}
                 tokens = usage.get('total_tokens', 0)
                 last_tool = getattr(message, 'last_tool_name', None)
+                _display_id = subagent_names.get(message.task_id, message.task_id)
                 logger.subagent_progress(
                     task.id,
-                    message.task_id,
+                    _display_id,
                     message.description,
                     tokens=tokens,
                     last_tool=last_tool,
@@ -1379,10 +1402,11 @@ async def run_task(
                 status = getattr(message, 'status', 'unknown')
                 summary = getattr(message, 'summary', '')
                 usage = getattr(message, 'usage', None) or {}
-                logger.subagent_done(task.id, message.task_id, status, summary)
+                _display_id = subagent_names.get(message.task_id, message.task_id)
+                logger.subagent_done(task.id, _display_id, status, summary)
                 summary_text = f" — {summary[:100]}" if summary else ""
                 level = "info" if status == "completed" else ("warning" if status == "stopped" else "error")
-                add_log(level, f"{'✔' if status == 'completed' else '⏹' if status == 'stopped' else '✘'} Subagent {message.task_id} {status}{summary_text}")
+                add_log(level, f"{'✔' if status == 'completed' else '⏹' if status == 'stopped' else '✘'} Subagent {_display_id} {status}{summary_text}")
                 send_logs_if_needed()  # Flush immediately so the log is visible
 
             elif isinstance(message, ResultMessage):

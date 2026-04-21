@@ -1386,12 +1386,25 @@ IMPORTANT: Use the context above to understand what was previously attempted and
     const newId = randomUUID()
     const now = new Date().toISOString()
 
+    // Resolve project name for human-readable plan name
+    let projectName = 'unknown'
+    if (sourcePlan.project_id) {
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(sourcePlan.project_id) as any
+      if (project) projectName = project.name
+    }
+
+    // Override plan name with human-readable format for quick_action type
+    const readableDate = now.replace('T', ' ').substring(0, 16)
+    const finalPlanName = planType === 'quick_action'
+      ? `Quick Action - ${projectName} - ${readableDate} — ${rework_prompt.substring(0, 60)}`
+      : planName
+
     db.prepare(`
       INSERT INTO plans (id, name, tasks, status, type, project_id, team_id, parent_plan_id, rework_prompt, rework_mode, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       newId,
-      planName,
+      finalPlanName,
       JSON.stringify(newTasks),
       'pending',
       planType,

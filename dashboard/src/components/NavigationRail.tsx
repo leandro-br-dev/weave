@@ -10,7 +10,7 @@ import {
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetPendingUserInputs } from '@/api/user_inputs'
 import { useGetProjects } from '@/api/projects'
-import { useGetSessions, useGetUnreadCount, useCreateSession } from '@/api/sessions'
+import { useGetSessions, useGetUnreadCount } from '@/api/sessions'
 import { useGetWorkspaces } from '@/api/teams'
 import { useGetPlans } from '@/api/plans'
 import { useAuth } from '@/contexts/AuthContext'
@@ -924,10 +924,7 @@ function ChatPanel({
   t: (key: string, opts?: any) => string
 }) {
   const navigate = useNavigate()
-  const { data: workspaces = [] } = useGetWorkspaces()
-  const createSession = useCreateSession()
   const [showAllConversations, setShowAllConversations] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -944,30 +941,9 @@ function ChatPanel({
     return date.toLocaleDateString()
   }
 
-  const handleNewChat = async () => {
-    if (isCreating) return
-    setIsCreating(true)
-    try {
-      // Use the first available workspace as default
-      const defaultWs = workspaces[0]
-      if (!defaultWs) {
-        // No workspace available, navigate to chat page to show the full new chat modal
-        navigate('/chat')
-        return
-      }
-      const result = await createSession.mutateAsync({
-        name: t('pages.chat.chatWithName', { name: defaultWs.name }),
-        workspace_path: defaultWs.path,
-      })
-      const sessionId = (result as any).id
-      onClose()
-      navigate(`/chat/${sessionId}`)
-    } catch {
-      // On error, navigate to chat page so user can select manually
-      navigate('/chat')
-    } finally {
-      setIsCreating(false)
-    }
+  const handleNewChat = () => {
+    onClose()
+    navigate('/chat?new=true')
   }
 
   const recentSessions = sessions.slice(0, 10)
@@ -984,20 +960,15 @@ function ChatPanel({
       <div className="px-4 pt-3 pb-2 flex-shrink-0">
         <button
           onClick={handleNewChat}
-          disabled={isCreating}
           className={`
             w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
             text-xs font-medium transition-colors cursor-pointer
             bg-gradient-to-b from-amber-500 to-orange-600 text-white
             hover:from-amber-600 hover:to-orange-700
-            shadow-md disabled:opacity-50 disabled:cursor-not-allowed
+            shadow-md
           `}
         >
-          {isCreating ? (
-            <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Plus size={14} />
-          )}
+          <Plus size={14} />
           {t('pages.chat.newChat')}
         </button>
       </div>
