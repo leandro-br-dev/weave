@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React from 'react'
 import { X, Clock, CheckCircle2, XCircle, AlertCircle, ChevronRight, History, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './Button'
@@ -45,10 +45,9 @@ const statusLabels: Record<string, string> = {
 export function WorkspaceBuilderHistoryModal({
   isOpen,
   entries,
-  teamId,
   onSelect,
   onClose,
-}: WorkspaceBuilderHistoryModalProps) {
+}: Omit<WorkspaceBuilderHistoryModalProps, 'teamId'>) {
   const { t } = useTranslation('agents')
 
   if (!isOpen) return null

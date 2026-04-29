@@ -1,5 +1,5 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, useGetWorkspaceBuilderHistory, useGetWorkspaceBuilderPlan, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, useGetWorkspaceBuilderHistory, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { apiClient } from '../api/client'
@@ -729,7 +729,7 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
 
   // Workspace Builder History
   const [showBuilderHistory, setShowBuilderHistory] = useState(false)
-  const [historyLoadingPlanId, setHistoryLoadingPlanId] = useState<string | null>(null)
+  const [_historyLoadingPlanId, setHistoryLoadingPlanId] = useState<string | null>(null)
   const { data: builderHistoryEntries } = useGetWorkspaceBuilderHistory(teamId, showBuilderHistory)
 
   // Update newName when workspace loads
@@ -1073,7 +1073,6 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
     <WorkspaceBuilderHistoryModal
       isOpen={showBuilderHistory}
       entries={builderHistoryEntries || []}
-      teamId={teamId}
       onSelect={handleHistorySelect}
       onClose={() => setShowBuilderHistory(false)}
     />
