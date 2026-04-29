@@ -166,3 +166,29 @@ export const agentUpdateSchema = z.object({
   { message: "Pelo menos um dos campos 'model' ou 'role' deve ser fornecido." },
 )
 
+// ───────────────────────────────────────────────────────────
+// Workspace Builder (batch agent/skill operations)
+// ───────────────────────────────────────────────────────────
+
+export const workspaceBuilderOperationSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['create_agent', 'update_agent', 'delete_agent', 'create_skill', 'update_skill', 'delete_skill', 'update_claude_md']),
+  name: z.string().min(1).optional(),
+  content: z.string().optional(),
+  previousContent: z.string().optional(),
+  reason: z.string().min(1, "Each operation must have a 'reason' field explaining the change."),
+}).refine(
+  (op) => {
+    if (op.type.startsWith('create')) return !!op.name && !!op.content
+    if (op.type.startsWith('delete')) return !!op.name
+    if (op.type.startsWith('update')) return !!op.content
+    return true
+  },
+  { message: "Operation missing required fields for its type." }
+)
+
+export const workspaceBuilderSchema = z.object({
+  summary: z.string().min(1, "Campo 'summary': deve conter um resumo das alterações propostas."),
+  operations: z.array(workspaceBuilderOperationSchema).min(0),
+})
+

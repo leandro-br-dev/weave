@@ -435,6 +435,56 @@ export function useImproveSkill() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Workspace Builder hooks
+// ---------------------------------------------------------------------------
+
+export function useBuildWorkspace() {
+  return useMutation({
+    mutationFn: ({ teamId, userInstructions, attachmentIds }: { teamId: string; userInstructions: string; attachmentIds?: string[] }) =>
+      apiClient.post<{ planId: string; taskId: string }>(
+        `/api/teams/${teamId}/build-workspace`,
+        { userInstructions, attachmentIds }
+      ),
+  })
+}
+
+export function useGetWorkspaceBuilderPlan(teamId: string | null, planId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['workspace-builder-plan', teamId, planId],
+    queryFn: () => apiClient.get<{ summary: string; operations: Array<{
+      id: string
+      type: string
+      name?: string
+      content?: string
+      previousContent?: string
+      reason: string
+    }> }>(`/api/teams/${teamId}/workspace-builder-plan/${planId}`),
+    enabled: enabled && !!teamId && !!planId,
+    retry: false,
+    staleTime: Infinity,
+  })
+}
+
+export function useApplyWorkspaceBuilder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ teamId, planId, approvedOperations, editedContents }: {
+      teamId: string
+      planId: string
+      approvedOperations: string[]
+      editedContents?: Record<string, string>
+    }) =>
+      apiClient.post<{ results: Record<string, { success: boolean; error?: string }> }>(
+        `/api/teams/${teamId}/apply-workspace-builder`,
+        { planId, approvedOperations, editedContents }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] })
+    },
+  })
+}
+
 export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'error' | 'cancelled'
 
 export type Plan = {

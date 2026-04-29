@@ -1,10 +1,11 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, type Workspace, type WorkspaceRole, type AgentModel } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
+import { apiClient } from '../api/client'
 import { useState, useRef, useMemo, useEffect } from 'react'
-import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, SkillImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, type EnvironmentVariableValue } from '@/components'
+import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown, Hammer } from 'lucide-react'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, SkillImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, WorkspaceBuilderModal, type EnvironmentVariableValue } from '@/components'
 import { getActiveToken, getApiUrl } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -710,9 +711,139 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
   const renameAgent = useRenameAgent()
   const deleteWorkspace = useDeleteWorkspace()
 
+  // Workspace Builder state
+  const { showToast } = useToast()
+  const [showBuilderInstructions, setShowBuilderInstructions] = useState(false)
+  const [builderPlanId, setBuilderPlanId] = useState<string | null>(null)
+  const [showBuilderModal, setShowBuilderModal] = useState(false)
+  const [builderSummary, setBuilderSummary] = useState('')
+  const [builderOperations, setBuilderOperations] = useState<any[]>([])
+  const [builderError, setBuilderError] = useState<string | null>(null)
+  const [isApplyingBuilder, setIsApplyingBuilder] = useState(false)
+  const [showedBuilderStartToast, setShowedBuilderStartToast] = useState(false)
+  const hasShownBuilderModalRef = useRef(false)
+  const builderPlanIdRef = useRef<string | null>(null)
+
+  const buildWorkspace = useBuildWorkspace()
+  const applyWorkspaceBuilder = useApplyWorkspaceBuilder()
+
   // Update newName when workspace loads
   if (workspace && newName !== workspace.name) {
     setNewName(workspace.name)
+  }
+
+  // Poll for builder plan completion
+  useEffect(() => {
+    if (!builderPlanId) return
+
+    let cancelled = false
+    let pollCount = 0
+    const MAX_POLLS = 300
+    const POLL_INTERVAL = 2000
+
+    builderPlanIdRef.current = builderPlanId
+
+    const poll = async () => {
+      while (!cancelled && pollCount < MAX_POLLS) {
+        pollCount++
+        try {
+          const plan = await apiClient.get<Plan>(`/api/plans/${builderPlanId}`)
+          if (cancelled) return
+
+          if (plan.status === 'success') {
+            if (!hasShownBuilderModalRef.current) {
+              hasShownBuilderModalRef.current = true
+              try {
+                const planData = await apiClient.get<{ summary: string; operations: Array<{ id: string; type: string; name?: string; content?: string; previousContent?: string; reason: string }> }>(`/api/teams/${teamId}/workspace-builder-plan/${builderPlanId}`)
+                setBuilderSummary(planData.summary || '')
+                setBuilderOperations(planData.operations || [])
+                setShowBuilderModal(true)
+              } catch {
+                setBuilderError(t('pages.agents.workspaceBuilder.error'))
+              }
+              setBuilderPlanId(null)
+              setShowedBuilderStartToast(false)
+            }
+            return
+          }
+
+          if (plan.status === 'error' || plan.status === 'failed' || plan.status === 'cancelled') {
+            if (!cancelled) {
+              setBuilderError(plan.error || t('pages.agents.workspaceBuilder.error'))
+              setBuilderPlanId(null)
+              setShowedBuilderStartToast(false)
+            }
+            return
+          }
+        } catch {
+          if (cancelled) return
+        }
+        await new Promise(r => setTimeout(r, POLL_INTERVAL))
+      }
+    }
+
+    poll()
+    return () => { cancelled = true }
+  }, [builderPlanId, teamId, t])
+
+  // Show toast when builder starts
+  useEffect(() => {
+    if (builderPlanId && !showedBuilderStartToast && !hasShownBuilderModalRef.current) {
+      setShowedBuilderStartToast(true)
+      showToast('info', t('pages.agents.workspaceBuilder.started'), t('pages.agents.workspaceBuilder.startedDesc'))
+    }
+  }, [builderPlanId, showedBuilderStartToast, showToast, t])
+
+  const handleOpenBuilder = () => {
+    setShowBuilderInstructions(true)
+  }
+
+  const handleBuilderConfirm = async (instructions: string) => {
+    setShowBuilderInstructions(false)
+    setBuilderError(null)
+    hasShownBuilderModalRef.current = false
+    setShowedBuilderStartToast(false)
+    try {
+      const result = await buildWorkspace.mutateAsync({
+        teamId,
+        userInstructions: instructions,
+      })
+      if (result?.planId) {
+        setBuilderPlanId(result.planId)
+      }
+    } catch (err) {
+      setBuilderError(t('pages.agents.workspaceBuilder.error'))
+      setBuilderPlanId(null)
+    }
+  }
+
+  const handleApplyBuilder = async (approvedIds: string[], editedContents: Record<string, string>) => {
+    setIsApplyingBuilder(true)
+    try {
+      await applyWorkspaceBuilder.mutateAsync({
+        teamId,
+        planId: builderPlanIdRef.current || '',
+        approvedOperations: approvedIds,
+        editedContents,
+      })
+      setShowBuilderModal(false)
+      setBuilderOperations([])
+      setBuilderSummary('')
+      builderPlanIdRef.current = null
+      showToast('success', t('pages.agents.workspaceBuilder.success'), '')
+    } catch (err) {
+      showToast('error', t('pages.agents.workspaceBuilder.error'), '')
+    } finally {
+      setIsApplyingBuilder(false)
+    }
+  }
+
+  const handleDiscardBuilder = () => {
+    setShowBuilderModal(false)
+    setBuilderOperations([])
+    setBuilderSummary('')
+    setBuilderPlanId(null)
+    builderPlanIdRef.current = null
   }
 
   const handleDelete = () => {
@@ -805,6 +936,39 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
         </div>
       </div>
 
+      {/* Workspace Builder section */}
+      <div className={`flex items-center justify-between mt-4 mb-2 border-b ${borderColors.default} pb-4`}>
+        <div className="flex items-center gap-2">
+          {builderPlanId && (
+            <div className={`flex items-center gap-2 text-sm ${textColors.secondary}`}>
+              <Loader2 size={14} className="animate-spin" />
+              <span>{t('pages.agents.workspaceBuilder.inProgress')}</span>
+              <span className={`text-xs ${textColors.muted}`}>{t('pages.agents.workspaceBuilder.wait')}</span>
+            </div>
+          )}
+          {builderError && (
+            <div className="text-sm text-red-500">{builderError}</div>
+          )}
+        </div>
+        <Button
+          onClick={handleOpenBuilder}
+          disabled={!!builderPlanId}
+          size="sm"
+        >
+          {builderPlanId ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              <span>{t('pages.agents.workspaceBuilder.starting')}</span>
+            </>
+          ) : (
+            <>
+              <Hammer size={14} />
+              <span>{t('pages.agents.workspaceBuilder.button')}</span>
+            </>
+          )}
+        </Button>
+      </div>
+
       <div className={`border-b ${borderColors.default} mb-6`}>
         <nav className="flex gap-4">
           <TabButton active={activeTab === 'claude'} onClick={() => setActiveTab('claude')}>
@@ -846,6 +1010,26 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
       onConfirm={handleDelete}
       onCancel={() => setShowDeleteConfirm(false)}
       loading={isDeleting}
+    />
+
+    {/* Workspace Builder Instructions Dialog */}
+    <ImprovementInstructionsDialog
+      open={showBuilderInstructions}
+      title={t('pages.agents.workspaceBuilder.instructionsTitle')}
+      description={t('pages.agents.workspaceBuilder.instructionsDescription')}
+      placeholder={t('pages.agents.workspaceBuilder.instructionsPlaceholder')}
+      onConfirm={handleBuilderConfirm}
+      onCancel={() => setShowBuilderInstructions(false)}
+    />
+
+    {/* Workspace Builder Review Modal */}
+    <WorkspaceBuilderModal
+      isOpen={showBuilderModal}
+      summary={builderSummary}
+      operations={builderOperations}
+      onApply={handleApplyBuilder}
+      onDiscard={handleDiscardBuilder}
+      isLoading={isApplyingBuilder}
     />
     </>
   )

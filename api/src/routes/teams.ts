@@ -2137,4 +2137,473 @@ Guidelines for improvement:
   }
 })
 
+// ───────────────────────────────────────────────────────────
+// POST /api/workspaces/:id/build-workspace
+// ───────────────────────────────────────────────────────────
+
+router.post('/:id/build-workspace', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  const { userInstructions, attachmentIds } = req.body
+
+  if (!userInstructions || typeof userInstructions !== 'string') {
+    return res.status(400).json({ data: null, error: 'userInstructions is required' })
+  }
+
+  try {
+    const targetWorkspace = workspace.path
+
+    // Read CLAUDE.md
+    const claudeMdPath = path.join(workspace.path, 'CLAUDE.md')
+    let currentClaudeMdContent = ''
+    if (fs.existsSync(claudeMdPath)) {
+      currentClaudeMdContent = fs.readFileSync(claudeMdPath, 'utf-8')
+    }
+
+    // Scan .claude/agents/ — read full content of each agent file
+    const agentsDir = path.join(workspace.path, '.claude', 'agents')
+    let agentsSection = ''
+    let agentCount = 0
+    if (fs.existsSync(agentsDir)) {
+      const agentFiles = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md')).sort()
+      agentCount = agentFiles.length
+      for (const af of agentFiles) {
+        try {
+          const content = fs.readFileSync(path.join(agentsDir, af), 'utf-8')
+          agentsSection += `\n### Agent: ${af}\n\`\`\`markdown\n${content}\n\`\`\`\n\n`
+        } catch {
+          agentsSection += `\n### Agent: ${af}\n\`\`\`markdown\n(could not read file)\n\`\`\`\n\n`
+        }
+      }
+    }
+
+    // Scan .claude/skills/ — read full SKILL.md content of each skill
+    const skillsDir = path.join(workspace.path, '.claude', 'skills')
+    let skillsSection = ''
+    let skillCount = 0
+    if (fs.existsSync(skillsDir)) {
+      const skillDirs = fs.readdirSync(skillsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .sort()
+      skillCount = skillDirs.length
+      for (const sd of skillDirs) {
+        const skillMd = path.join(skillsDir, sd.name, 'SKILL.md')
+        if (fs.existsSync(skillMd)) {
+          try {
+            const content = fs.readFileSync(skillMd, 'utf-8')
+            skillsSection += `\n### Skill: ${sd.name}\n\`\`\`markdown\n${content}\n\`\`\`\n\n`
+          } catch {
+            skillsSection += `\n### Skill: ${sd.name}\n\`\`\`markdown\n(could not read file)\n\`\`\`\n\n`
+          }
+        }
+      }
+    }
+
+    // If attachments provided, fetch and inline content
+    let attachmentsSection = ''
+    if (attachmentIds && Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+      attachmentsSection = '\n## Attached Documentation Files\n\n'
+      for (const attachId of attachmentIds) {
+        try {
+          const upload = db.prepare('SELECT * FROM uploads WHERE id = ?').get(attachId) as any
+          if (upload && upload.file_path) {
+            const absPath = upload.file_path
+            if (fs.existsSync(absPath)) {
+              const content = fs.readFileSync(absPath, 'utf-8')
+              attachmentsSection += `### File: ${upload.original_name || upload.file_name || attachId}\n\`\`\`\n${content}\n\`\`\`\n\n`
+            }
+          }
+        } catch (attachErr) {
+          console.warn(`[build-workspace] Failed to read attachment ${attachId}:`, attachErr)
+        }
+      }
+      if (attachmentsSection === '\n## Attached Documentation Files\n\n') {
+        attachmentsSection = ''
+      }
+    }
+
+    // Create plan + workflow directory
+    const planId = uuidv4()
+    const taskId = uuidv4()
+
+    let projectName = 'unknown'
+    if (workspace.project_id) {
+      const project = db.prepare('SELECT name FROM projects WHERE id = ?').get(workspace.project_id) as any
+      if (project) projectName = project.name
+    }
+
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(projectName, planId)
+      console.log(`[teams] Workflow directory created for workspace builder: ${workflowPath}`)
+    } catch (dirError) {
+      console.error(`[teams] Failed to create workflow directory for workspace builder plan ${planId}:`, dirError)
+    }
+
+    const prompt = `You are an expert AI team architect. Analyze the current team workspace and propose changes based on the user's instructions.
+
+## Team Context
+- Team name: ${workspace.name}
+- Team role: ${workspace.role || 'generic'}
+- Team path: ${workspace.path}
+
+## Current CLAUDE.md
+${currentClaudeMdContent || '(no CLAUDE.md found)'}
+
+## Current Agents (${agentCount})
+${agentsSection || '(no agents found)'}
+
+## Current Skills (${skillCount})
+${skillsSection || '(no skills found)'}
+${attachmentsSection}
+## User Instructions
+${userInstructions}
+
+## Your Task
+Based on the user instructions and the current team context, propose a set of operations to improve this team. You can:
+- **create_agent**: Create a new agent (.md file in .claude/agents/)
+- **update_agent**: Update an existing agent's content
+- **delete_agent**: Remove an agent (only if truly unnecessary)
+- **create_skill**: Create a new skill (SKILL.md in .claude/skills/{name}/)
+- **update_skill**: Update an existing skill's content
+- **delete_skill**: Remove a skill (only if truly unnecessary)
+- **update_claude_md**: Update the team's CLAUDE.md
+
+## Important Rules
+1. Agent files must include YAML frontmatter with name, description, model, tools, color fields
+2. Skill files must include YAML frontmatter with name, description fields
+3. Agent names should be short, descriptive slugs (e.g., "code-reviewer", "api-tester")
+4. Only propose deletions if explicitly requested or if there's a clear duplication
+5. When updating, include the full new content, not just a diff
+6. For update operations, include the previousContent field with the CURRENT content
+7. Each operation must have a clear reason explaining why it's needed
+
+## Output Format
+Write a JSON file to: ${workflowPath}/workspace-builder-plan.json
+
+The JSON must follow this schema:
+{
+  "summary": "Brief description of all proposed changes",
+  "operations": [
+    {
+      "id": "op-1",
+      "type": "create_agent",
+      "name": "agent-slug",
+      "content": "---\\nname: Agent Name\\ndescription: ...\\nmodel: haiku\\ntools: Read, Bash\\n---\\n\\n# Agent instructions...",
+      "reason": "Why this agent is needed"
+    },
+    {
+      "id": "op-2",
+      "type": "update_agent",
+      "name": "existing-agent",
+      "previousContent": "current content here...",
+      "content": "updated content here...",
+      "reason": "What's being improved and why"
+    }
+  ]
+}
+
+## Validation
+After writing the JSON file, validate it by running:
+weave-validate workspace-builder ${workflowPath}/workspace-builder-plan.json
+
+If validation fails, read the error output and fix the JSON file. Do NOT finish until validation passes.`
+
+    // Resolve the actual project source directory
+    let projectCwd: string | undefined
+
+    const defaultEnvRow = db.prepare(`
+      SELECT e.project_path FROM environments e
+      WHERE e.project_id = ?
+      AND e.project_path IS NOT NULL AND e.project_path != ''
+      ORDER BY
+        CASE WHEN e.env_type = 'dev' THEN 0
+             WHEN e.env_type = 'plan' THEN 1
+             WHEN e.env_type = 'staging' THEN 2
+             ELSE 3 END
+      LIMIT 1
+    `).get(workspace.project_id) as any
+
+    if (defaultEnvRow?.project_path) {
+      projectCwd = defaultEnvRow.project_path
+    }
+
+    if (!projectCwd) {
+      const projectEnvRow = db.prepare(`
+        SELECT e.project_path FROM agent_environments ae
+        JOIN environments e ON e.id = ae.environment_id
+        WHERE ae.workspace_path = ?
+        AND e.project_path IS NOT NULL AND e.project_path != ''
+        LIMIT 1
+      `).get(workspace.path) as any
+      if (projectEnvRow?.project_path) {
+        projectCwd = projectEnvRow.project_path
+      }
+    }
+
+    if (!projectCwd) {
+      return res.status(400).json({
+        data: null,
+        error: 'This project does not have any environment with a valid project path. AI improvements require access to the project source code. Please set up at least one environment (dev, plan, or staging) with a project path.'
+      })
+    }
+
+    const tasks = [{
+      id: taskId,
+      name: `Build workspace for ${workspace.name}`,
+      prompt,
+      cwd: projectCwd,
+      workspace: targetWorkspace,
+      tools: ['Read', 'Write', 'Glob', 'Grep', 'Bash'],
+      permission_mode: 'acceptEdits',
+      depends_on: [],
+    }]
+
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, type, team_id, workflow_path)
+      VALUES (?, ?, ?, 'pending', ?, 'workspace_builder', ?, ?)
+    `).run(planId, `Build workspace for ${workspace.name}`, JSON.stringify(tasks), workspace.project_id, id, workflowPath)
+
+    return res.status(201).json({
+      data: {
+        planId,
+        taskId,
+      },
+      error: null,
+    })
+  } catch (error) {
+    console.error('Error creating workspace builder plan:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to create workspace builder task',
+    })
+  }
+})
+
+// ───────────────────────────────────────────────────────────
+// GET /api/workspaces/:id/workspace-builder-plan/:planId
+// ───────────────────────────────────────────────────────────
+
+router.get('/:id/workspace-builder-plan/:planId', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  try {
+    const plan = db.prepare('SELECT workflow_path FROM plans WHERE id = ?').get(req.params.planId) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    const planFilePath = path.join(plan.workflow_path, 'workspace-builder-plan.json')
+
+    if (!fs.existsSync(planFilePath)) {
+      return res.status(404).json({ data: null, error: 'Workspace builder plan file not found yet. The AI may still be working on it.' })
+    }
+
+    const content = JSON.parse(fs.readFileSync(planFilePath, 'utf-8'))
+
+    return res.json({
+      data: {
+        summary: content.summary,
+        operations: content.operations,
+      },
+      error: null,
+    })
+  } catch (error) {
+    console.error('Error reading workspace builder plan:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to read workspace builder plan',
+    })
+  }
+})
+
+// ───────────────────────────────────────────────────────────
+// POST /api/workspaces/:id/apply-workspace-builder
+// ───────────────────────────────────────────────────────────
+
+router.post('/:id/apply-workspace-builder', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  const { planId, approvedOperations, editedContents } = req.body
+
+  if (!planId || !Array.isArray(approvedOperations)) {
+    return res.status(400).json({ data: null, error: 'planId and approvedOperations are required' })
+  }
+
+  try {
+    const plan = db.prepare('SELECT workflow_path FROM plans WHERE id = ?').get(planId) as any
+
+    if (!plan) {
+      return res.status(404).json({ data: null, error: 'Plan not found' })
+    }
+
+    const planFilePath = path.join(plan.workflow_path, 'workspace-builder-plan.json')
+
+    if (!fs.existsSync(planFilePath)) {
+      return res.status(404).json({ data: null, error: 'Workspace builder plan file not found' })
+    }
+
+    const planContent = JSON.parse(fs.readFileSync(planFilePath, 'utf-8'))
+    const allOperations = planContent.operations as Array<{
+      id: string
+      type: string
+      name?: string
+      content?: string
+      previousContent?: string
+      reason?: string
+    }>
+
+    const approvedSet = new Set(approvedOperations as string[])
+    const operations = allOperations.filter(op => approvedSet.has(op.id))
+
+    const results: Record<string, { success: boolean; error?: string }> = {}
+    const agentsDir = path.join(workspace.path, '.claude', 'agents')
+    const skillsDir = path.join(workspace.path, '.claude', 'skills')
+
+    for (const op of operations) {
+      try {
+        const effectiveContent = (editedContents && editedContents[op.id]) || op.content
+
+        switch (op.type) {
+          case 'create_agent': {
+            if (!op.name || !effectiveContent) {
+              results[op.id] = { success: false, error: 'create_agent requires name and content' }
+              break
+            }
+            const agentFileName = op.name.endsWith('.md') ? op.name : `${op.name}.md`
+            if (!fs.existsSync(agentsDir)) {
+              fs.mkdirSync(agentsDir, { recursive: true })
+            }
+            fs.writeFileSync(path.join(agentsDir, agentFileName), effectiveContent, 'utf-8')
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'update_agent': {
+            if (!op.name || !effectiveContent) {
+              results[op.id] = { success: false, error: 'update_agent requires name and content' }
+              break
+            }
+            const agentFileName = op.name.endsWith('.md') ? op.name : `${op.name}.md`
+            const agentFilePath = path.join(agentsDir, agentFileName)
+            if (!fs.existsSync(agentFilePath)) {
+              results[op.id] = { success: false, error: `Agent file not found: ${agentFileName}` }
+              break
+            }
+            fs.writeFileSync(agentFilePath, effectiveContent, 'utf-8')
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'delete_agent': {
+            if (!op.name) {
+              results[op.id] = { success: false, error: 'delete_agent requires name' }
+              break
+            }
+            const agentFileName = op.name.endsWith('.md') ? op.name : `${op.name}.md`
+            const agentFilePath = path.join(agentsDir, agentFileName)
+
+            if (fs.existsSync(agentFilePath)) {
+              fs.unlinkSync(agentFilePath)
+            }
+
+            // Cleanup DB references
+            const agentSlug = agentFileName.replace('.md', '')
+            db.prepare('DELETE FROM team_native_agents WHERE team_workspace_path = ? AND slug = ?')
+              .run(workspace.path, agentSlug)
+            db.prepare('DELETE FROM team_models WHERE workspace_path = ?')
+              .run(`${workspace.path}::${agentSlug}`)
+
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'create_skill': {
+            if (!op.name || !effectiveContent) {
+              results[op.id] = { success: false, error: 'create_skill requires name and content' }
+              break
+            }
+            const skillPath = path.join(skillsDir, op.name)
+            if (!fs.existsSync(skillPath)) {
+              fs.mkdirSync(skillPath, { recursive: true })
+            }
+            fs.writeFileSync(path.join(skillPath, 'SKILL.md'), effectiveContent, 'utf-8')
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'update_skill': {
+            if (!op.name || !effectiveContent) {
+              results[op.id] = { success: false, error: 'update_skill requires name and content' }
+              break
+            }
+            const skillMdPath = path.join(skillsDir, op.name, 'SKILL.md')
+            if (!fs.existsSync(skillMdPath)) {
+              results[op.id] = { success: false, error: `Skill directory or SKILL.md not found: ${op.name}` }
+              break
+            }
+            fs.writeFileSync(skillMdPath, effectiveContent, 'utf-8')
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'delete_skill': {
+            if (!op.name) {
+              results[op.id] = { success: false, error: 'delete_skill requires name' }
+              break
+            }
+            const skillPath = path.join(skillsDir, op.name)
+            if (fs.existsSync(skillPath)) {
+              fs.rmSync(skillPath, { recursive: true, force: true })
+            }
+            results[op.id] = { success: true }
+            break
+          }
+
+          case 'update_claude_md': {
+            if (!effectiveContent) {
+              results[op.id] = { success: false, error: 'update_claude_md requires content' }
+              break
+            }
+            fs.writeFileSync(path.join(workspace.path, 'CLAUDE.md'), effectiveContent, 'utf-8')
+            results[op.id] = { success: true }
+            break
+          }
+
+          default: {
+            results[op.id] = { success: false, error: `Unknown operation type: ${op.type}` }
+          }
+        }
+      } catch (opErr) {
+        console.error(`[apply-workspace-builder] Error applying operation ${op.id}:`, opErr)
+        results[op.id] = { success: false, error: opErr instanceof Error ? opErr.message : String(opErr) }
+      }
+    }
+
+    return res.json({ data: { results }, error: null })
+  } catch (error) {
+    console.error('Error applying workspace builder plan:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to apply workspace builder plan',
+    })
+  }
+})
+
 export default router

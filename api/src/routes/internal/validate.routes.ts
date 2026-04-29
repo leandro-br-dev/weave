@@ -9,6 +9,7 @@ import {
   agentSettingsSchema,
   agentUpdateSchema,
   agentImprovementSchema,
+  workspaceBuilderSchema,
 } from './validation.schemas.js'
 import { requireLocalhost } from '../../middleware/auth.js'
 
@@ -156,6 +157,28 @@ router.post('/team-improvement', (req: Request, res: Response) => {
     return res.status(200).json({ status: 'ok' })
   } catch (err) {
     console.error('[internal/validate/team-improvement] Unexpected error:', err)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ───────────────────────────────────────────────────────────
+// POST /internal/validate/workspace-builder
+// ───────────────────────────────────────────────────────────
+
+router.post('/workspace-builder', (req: Request, res: Response) => {
+  try {
+    const result = workspaceBuilderSchema.safeParse(req.body)
+
+    if (!result.success) {
+      return res
+        .status(400)
+        .type('text/plain; charset=utf-8')
+        .send(formatZodErrors(result.error))
+    }
+
+    return res.status(200).json({ status: 'ok' })
+  } catch (err) {
+    console.error('[internal/validate/workspace-builder] Unexpected error:', err)
     return res.status(500).json({ error: 'Internal server error' })
   }
 })

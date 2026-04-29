@@ -404,3 +404,188 @@ describe('Error format', () => {
     expect(res.text).toMatch(/\d+\.\s*Campo/)
   })
 })
+
+describe('POST /internal/validate/workspace-builder', () => {
+  let app: Express
+
+  beforeAll(() => {
+    app = express()
+    app.use(express.json())
+    app.use('/internal/validate', validateRouter)
+  })
+
+  it('returns 200 for valid workspace builder with create_agent operation', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Add a code reviewer agent',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'create_agent',
+            name: 'code-reviewer',
+            content: '---\nname: Code Reviewer\n---\n\n# Instructions',
+            reason: 'Need a dedicated reviewer',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+
+  it('returns 200 for valid workspace builder with update operations', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Update CLAUDE.md and an agent',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'update_claude_md',
+            content: '# Updated CLAUDE.md',
+            reason: 'Refresh team instructions',
+          },
+          {
+            id: 'op-2',
+            type: 'update_agent',
+            name: 'existing-agent',
+            previousContent: 'old content',
+            content: 'new content',
+            reason: 'Improve agent prompt',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+
+  it('returns 200 for valid workspace builder with delete operation', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Remove unused skill',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'delete_skill',
+            name: 'obsolete-skill',
+            reason: 'No longer needed',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+
+  it('returns 200 for empty operations array', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'No changes needed',
+        operations: [],
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ status: 'ok' })
+  })
+
+  it('returns 400 when summary is missing', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        operations: [],
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.text).toContain("Campo 'summary'")
+  })
+
+  it('returns 400 when create operation is missing name', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Bad create',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'create_agent',
+            content: 'some content',
+            reason: 'needs a name',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.text).toContain('missing required fields')
+  })
+
+  it('returns 400 when create operation is missing content', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Bad create 2',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'create_skill',
+            name: 'my-skill',
+            reason: 'needs content',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.text).toContain('missing required fields')
+  })
+
+  it('returns 400 when operation is missing reason', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'No reason',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'delete_agent',
+            name: 'bad-agent',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+    expect(res.text).toContain('reason')
+  })
+
+  it('returns 400 when operation type is invalid', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Bad type',
+        operations: [
+          {
+            id: 'op-1',
+            type: 'create_project',
+            name: 'test',
+            content: 'content',
+            reason: 'bad type',
+          },
+        ],
+      })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when operations is not an array', async () => {
+    const res = await request(app)
+      .post('/internal/validate/workspace-builder')
+      .send({
+        summary: 'Bad ops',
+        operations: 'not-an-array',
+      })
+
+    expect(res.status).toBe(400)
+  })
+})
