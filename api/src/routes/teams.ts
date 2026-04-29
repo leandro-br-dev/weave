@@ -2606,4 +2606,73 @@ router.post('/:id/apply-workspace-builder', authenticateToken, async (req, res) 
   }
 })
 
+// ───────────────────────────────────────────────────────────
+// GET /api/workspaces/:id/workspace-builder-history
+// ───────────────────────────────────────────────────────────
+
+router.get('/:id/workspace-builder-history', authenticateToken, async (req, res) => {
+  const id = getIdParam(req.params)
+  const workspace = listAllWorkspaces().find(ws => ws.id === id)
+
+  if (!workspace) {
+    return res.status(404).json({ data: null, error: 'Workspace not found' })
+  }
+
+  try {
+    const rows = db.prepare(`
+      SELECT p.id, p.name, p.status, p.created_at, p.completed_at, p.workflow_path
+      FROM plans p
+      WHERE p.type = 'workspace_builder' AND p.team_id = ?
+      ORDER BY p.created_at DESC
+      LIMIT 20
+    `).all(id) as Array<{
+      id: string
+      name: string
+      status: string
+      created_at: string
+      completed_at: string | null
+      workflow_path: string | null
+    }>
+
+    const plans = rows.map(row => {
+      let hasPlanFile = false
+      let operationCount = 0
+      let summary = ''
+
+      if (row.workflow_path) {
+        const planFilePath = path.join(row.workflow_path, 'workspace-builder-plan.json')
+        if (fs.existsSync(planFilePath)) {
+          try {
+            hasPlanFile = true
+            const content = JSON.parse(fs.readFileSync(planFilePath, 'utf-8'))
+            operationCount = content.operations?.length || 0
+            summary = content.summary || ''
+          } catch {
+            hasPlanFile = false
+          }
+        }
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        status: row.status,
+        created_at: row.created_at,
+        completed_at: row.completed_at,
+        hasPlanFile,
+        operationCount,
+        summary,
+      }
+    })
+
+    return res.json({ data: plans, error: null })
+  } catch (error) {
+    console.error('Error fetching workspace builder history:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to fetch workspace builder history',
+    })
+  }
+})
+
 export default router

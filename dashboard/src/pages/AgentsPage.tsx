@@ -1,11 +1,11 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, useGetWorkspaceBuilderHistory, useGetWorkspaceBuilderPlan, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { apiClient } from '../api/client'
 import { useState, useRef, useMemo, useEffect } from 'react'
-import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown, Hammer } from 'lucide-react'
-import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, SkillImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, WorkspaceBuilderModal, type EnvironmentVariableValue } from '@/components'
+import { Trash2, Plus, FileText, Settings as SettingsIcon, Code, Users, Edit3, Pencil, Link2, X, Upload, Wand2, Loader2, Search, ClipboardList, ShieldCheck, Package, ChevronDown, Hammer, History } from 'lucide-react'
+import { PageHeader, Button, Card, Input, Select, ConfirmDialog, EmptyState, ClaudeMdImprovementModal, AgentImprovementModal, SkillImprovementModal, EnvironmentVariablesForm, ProjectIcon, ProjectSelectDropdown, ImprovementInstructionsDialog, WorkspaceBuilderModal, WorkspaceBuilderHistoryModal, type EnvironmentVariableValue } from '@/components'
 import { getActiveToken, getApiUrl } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/contexts/ToastContext'
@@ -727,6 +727,11 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
   const buildWorkspace = useBuildWorkspace()
   const applyWorkspaceBuilder = useApplyWorkspaceBuilder()
 
+  // Workspace Builder History
+  const [showBuilderHistory, setShowBuilderHistory] = useState(false)
+  const [historyLoadingPlanId, setHistoryLoadingPlanId] = useState<string | null>(null)
+  const { data: builderHistoryEntries } = useGetWorkspaceBuilderHistory(teamId, showBuilderHistory)
+
   // Update newName when workspace loads
   if (workspace && newName !== workspace.name) {
     setNewName(workspace.name)
@@ -846,6 +851,26 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
     builderPlanIdRef.current = null
   }
 
+  const handleHistorySelect = async (planId: string) => {
+    setShowBuilderHistory(false)
+    setHistoryLoadingPlanId(planId)
+    setBuilderError(null)
+    try {
+      const planData = await apiClient.get<{ summary: string; operations: any[] }>(
+        `/api/teams/${teamId}/workspace-builder-plan/${planId}`
+      )
+      setBuilderSummary(planData.summary || '')
+      setBuilderOperations(planData.operations || [])
+      builderPlanIdRef.current = planId // Set for apply
+      setShowBuilderModal(true)
+    } catch {
+      showToast('error', t('pages.agents.workspaceBuilder.error', { defaultValue: 'Failed to load plan' }), '')
+      setBuilderError(t('pages.agents.workspaceBuilder.error', { defaultValue: 'Failed to load workspace builder plan' }))
+    } finally {
+      setHistoryLoadingPlanId(null)
+    }
+  }
+
   const handleDelete = () => {
     setIsDeleting(true)
     deleteWorkspace.mutate(teamId, {
@@ -950,23 +975,35 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
             <div className="text-sm text-red-500">{builderError}</div>
           )}
         </div>
-        <Button
-          onClick={handleOpenBuilder}
-          disabled={!!builderPlanId}
-          size="sm"
-        >
-          {builderPlanId ? (
-            <>
-              <Loader2 size={14} className="animate-spin" />
-              <span>{t('pages.agents.workspaceBuilder.starting')}</span>
-            </>
-          ) : (
-            <>
-              <Hammer size={14} />
-              <span>{t('pages.agents.workspaceBuilder.button')}</span>
-            </>
+        <div className="flex items-center gap-2">
+          {!builderPlanId && (
+            <Button
+              onClick={() => setShowBuilderHistory(true)}
+              variant="secondary"
+              size="sm"
+              title={t('pages.agents.workspaceBuilder.historyButton', { defaultValue: 'View previous plans' })}
+            >
+              <History size={14} />
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={handleOpenBuilder}
+            disabled={!!builderPlanId}
+            size="sm"
+          >
+            {builderPlanId ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>{t('pages.agents.workspaceBuilder.starting')}</span>
+              </>
+            ) : (
+              <>
+                <Hammer size={14} />
+                <span>{t('pages.agents.workspaceBuilder.button')}</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className={`border-b ${borderColors.default} mb-6`}>
@@ -1030,6 +1067,15 @@ function WorkspaceDetail({ teamId, onClose }: { teamId: string; onClose: () => v
       onApply={handleApplyBuilder}
       onDiscard={handleDiscardBuilder}
       isLoading={isApplyingBuilder}
+    />
+
+    {/* Workspace Builder History Modal */}
+    <WorkspaceBuilderHistoryModal
+      isOpen={showBuilderHistory}
+      entries={builderHistoryEntries || []}
+      teamId={teamId}
+      onSelect={handleHistorySelect}
+      onClose={() => setShowBuilderHistory(false)}
     />
     </>
   )

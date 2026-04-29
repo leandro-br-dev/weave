@@ -485,6 +485,32 @@ export function useApplyWorkspaceBuilder() {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Workspace Builder History
+// ---------------------------------------------------------------------------
+
+export type WorkspaceBuilderHistoryEntry = {
+  id: string
+  name: string
+  status: string
+  created_at: string
+  completed_at: string | null
+  hasPlanFile: boolean
+  operationCount: number
+  summary: string
+}
+
+export function useGetWorkspaceBuilderHistory(teamId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['workspace-builder-history', teamId] as const,
+    queryFn: () => apiClient.get<WorkspaceBuilderHistoryEntry[]>(
+      `/api/teams/${teamId}/workspace-builder-history`
+    ),
+    enabled: enabled && !!teamId,
+    staleTime: 30_000, // 30 seconds
+  })
+}
+
 export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'error' | 'cancelled'
 
 export type Plan = {
