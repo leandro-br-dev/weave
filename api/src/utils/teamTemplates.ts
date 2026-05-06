@@ -57,7 +57,7 @@ export const PLAN_TEAM: TeamTemplate = {
   ],
   permissions: {
     allow: ['Read', 'Glob', 'Grep', 'Bash', 'Skill', 'Write'],
-    deny: ['Edit'],
+    deny: ['Edit', 'ToolSearchTool'],
   },
   claudeMd: `# {TEAM_NAME} — Plan Team
 
@@ -155,7 +155,7 @@ export const DEV_TEAM: TeamTemplate = {
   ],
   permissions: {
     allow: ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep'],
-    deny: [],
+    deny: ['ToolSearchTool'],
   },
   claudeMd: `# {TEAM_NAME} — Dev Team
 
@@ -234,7 +234,7 @@ export const STAGING_TEAM: TeamTemplate = {
   ],
   permissions: {
     allow: ['Read', 'Glob', 'Grep', 'Bash(npm run *)', 'Bash(npx *)', 'Bash(git log*)', 'Bash(git diff*)', 'Bash(git status*)', 'Bash(git merge*)', 'Bash(git commit*)', 'Bash(git checkout*)'],
-    deny: ['Edit', 'Write', 'Bash(sudo:*)', 'Bash(git push --force)', 'Bash(rm -rf*)', 'Bash(rm -r /)*'],
+    deny: ['Edit', 'Write', 'ToolSearchTool', 'Bash(sudo:*)', 'Bash(git push --force)', 'Bash(rm -rf*)', 'Bash(rm -r /)*'],
   },
   claudeMd: `# {TEAM_NAME} — Staging Team (Quality Gatekeeper)
 
