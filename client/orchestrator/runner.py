@@ -1087,6 +1087,10 @@ async def run_task(
         "can_use_tool": can_use_tool,
         "stderr": stderr_callback,
         "extra_args": {"debug-to-stderr": True},
+        # Disable fast mode — it requires the native Bun binary and is unavailable
+        # in the Agent SDK (https://github.com/anthropics/claude-agent-sdk-typescript/issues/216).
+        # Without this, the CLI emits repeated DEBUG warnings on every execution.
+        "env": {"CLAUDE_CODE_DISABLE_FAST_MODE": "1"},
     }
 
     # Unset CLAUDECODE to prevent nested session detection

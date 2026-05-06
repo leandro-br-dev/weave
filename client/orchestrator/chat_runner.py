@@ -241,6 +241,9 @@ async def run_chat_turn(
         "permission_mode": "acceptEdits",
         "setting_sources": sdk_setting_sources,
         "allowed_tools": CHAT_STANDARD_TOOLS,
+        # Disable fast mode — unavailable in the Agent SDK
+        # (https://github.com/anthropics/claude-agent-sdk-typescript/issues/216)
+        "env": {"CLAUDE_CODE_DISABLE_FAST_MODE": "1"},
     }
 
     # Unset CLAUDECODE to prevent nested session detection

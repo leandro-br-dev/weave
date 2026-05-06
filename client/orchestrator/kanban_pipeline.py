@@ -611,6 +611,9 @@ async def process_kanban_task(task: dict, client) -> None:
             "permission_mode": "acceptEdits",
             "setting_sources": ["project", "local"],
             "can_use_tool": _kanban_can_use_tool,
+            # Disable fast mode — unavailable in the Agent SDK
+            # (https://github.com/anthropics/claude-agent-sdk-typescript/issues/216)
+            "env": {"CLAUDE_CODE_DISABLE_FAST_MODE": "1"},
         }
         # Filtra apenas campos válidos
         opts_kwargs = {k: v for k, v in opts_kwargs.items() if k in valid_fields}
