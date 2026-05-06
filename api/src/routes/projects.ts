@@ -1462,6 +1462,10 @@ You are a team workspace for the **${project.name}** project.
           env: {
             ANTHROPIC_BASE_URL: 'http://localhost:8083',
             API_TIMEOUT_MS: '3000000',
+            // Bypass OAuth when using proxy with non-Anthropic models
+            ...(defaultEnv.ANTHROPIC_API_KEY
+              ? { ANTHROPIC_AUTH_TOKEN: defaultEnv.ANTHROPIC_API_KEY }
+              : {}),
             ...defaultEnv
           },
           permissions: {

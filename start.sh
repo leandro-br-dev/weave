@@ -108,6 +108,105 @@ if command -v claude >/dev/null 2>&1; then
   else
     echo "  ✓ Claude CLI found ($CLAUDE_AUTH)"
   fi
+
+  # ─── Auto-fix Claude Code auth for proxy setups ──────────────
+  # When using a local proxy (ANTHROPIC_BASE_URL) with third-party
+  # models, Claude Code's OAuth token refresh against platform.claude.com
+  # fails (400) because the API key is not an Anthropic OAuth credential.
+  # This function patches global Claude Code config to bypass OAuth.
+  _fix_claude_proxy_auth() {
+    local settings_file="$HOME/.claude/settings.json"
+    local creds_file="$HOME/.claude/.credentials.json"
+    local needs_fix=false
+
+    # Check if proxy is configured (ANTHROPIC_BASE_URL in settings or env)
+    local base_url=""
+    if [ -f "$settings_file" ]; then
+      base_url=$(python3 -c "
+import json, sys
+try:
+    s = json.load(open('$settings_file'))
+    print(s.get('env', {}).get('ANTHROPIC_BASE_URL', ''))
+except: pass
+" 2>/dev/null)
+    fi
+
+    # Only apply fix if using a non-Anthropic proxy endpoint
+    if [ -n "$base_url" ] && echo "$base_url" | grep -qE 'localhost|127\.0\.0\.1|0\.0\.0\.0'; then
+      # Check if ANTROPIC_AUTH_TOKEN is missing (needed to bypass OAuth)
+      if ! python3 -c "
+import json, sys
+try:
+    s = json.load(open('$settings_file'))
+    env = s.get('env', {})
+    has_auth_token = bool(env.get('ANTHROPIC_AUTH_TOKEN'))
+    print('yes' if has_auth_token else 'no')
+except: print('no')
+" 2>/dev/null | grep -q 'yes'; then
+        needs_fix=true
+      fi
+
+      # Check if stale OAuth credentials exist
+      if [ -f "$creds_file" ]; then
+        if python3 -c "
+import json, sys
+try:
+    c = json.load(open('$creds_file'))
+    has_oauth = bool(c.get('claudeAiOauth'))
+    print('yes' if has_oauth else 'no')
+except: print('no')
+" 2>/dev/null | grep -q 'yes'; then
+          needs_fix=true
+        fi
+      fi
+
+      if [ "$needs_fix" = true ]; then
+        echo '  ⚙ Detected proxy setup — patching Claude Code auth to bypass OAuth...'
+        python3 -c "
+import json, os
+
+settings_path = os.path.expanduser('~/.claude/settings.json')
+creds_path = os.path.expanduser('~/.claude/.credentials.json')
+
+# Patch settings.json: add ANTROPIC_AUTH_TOKEN
+try:
+    with open(settings_path) as f:
+        settings = json.load(f)
+    env = settings.setdefault('env', {})
+    if 'ANTHROPIC_AUTH_TOKEN' not in env and 'ANTHROPIC_API_KEY' in env:
+        env['ANTHROPIC_AUTH_TOKEN'] = env['ANTHROPIC_API_KEY']
+        with open(settings_path, 'w') as f:
+            json.dump(settings, f, indent=2)
+            f.write('\n')
+        print('  ✓ Added ANTROPIC_AUTH_TOKEN to ~/.claude/settings.json')
+except Exception as e:
+    print(f'  ⚠ Could not patch settings.json: {e}')
+
+# Clear stale OAuth credentials that trigger failing refresh
+try:
+    with open(creds_path) as f:
+        creds = json.load(f)
+    if creds.get('claudeAiOauth'):
+        # Backup first
+        bak_path = creds_path + '.bak'
+        if not os.path.exists(bak_path):
+            import shutil
+            shutil.copy2(creds_path, bak_path)
+        # Clear OAuth creds but keep other data
+        creds.pop('claudeAiOauth', None)
+        with open(creds_path, 'w') as f:
+            json.dump(creds, f, indent=2)
+            f.write('\n')
+        print('  ✓ Cleared stale OAuth credentials (backup at .credentials.json.bak)')
+except FileNotFoundError:
+    pass
+except Exception as e:
+    print(f'  ⚠ Could not patch credentials: {e}')
+" 2>/dev/null
+      fi
+    fi
+  }
+  _fix_claude_proxy_auth
 else
   echo '  ⚠ claude CLI not found in PATH'
 fi

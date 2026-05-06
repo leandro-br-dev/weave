@@ -201,6 +201,13 @@ export function bootstrapTeamForEnvironment(
         env: {
           ANTHROPIC_BASE_URL: 'http://localhost:8083',
           API_TIMEOUT_MS: '3000000',
+          // When using a proxy with non-Anthropic models, OAuth token
+          // validation against platform.claude.com fails (400).
+          // Setting ANTROPIC_AUTH_TOKEN tells the Claude Code SDK to
+          // skip the OAuth flow entirely and use the API key directly.
+          ...(defaultEnv.ANTHROPIC_API_KEY
+            ? { ANTHROPIC_AUTH_TOKEN: defaultEnv.ANTHROPIC_API_KEY }
+            : {}),
           ...defaultEnv,
         },
         permissions: {
