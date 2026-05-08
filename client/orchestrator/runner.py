@@ -455,6 +455,7 @@ class TaskResult:
     output: str = ""          # Captured ResultMessage.result — passed as context to dependents
     error: str | None = None
     sdk_session_id: str | None = None  # Claude Code SDK session ID from this task
+    auto_approve: bool = False  # If true, workflow should auto-proceed after corrections
 
 
 def _init_context_dir(plan_name: str) -> Path:
@@ -669,16 +670,66 @@ def _build_user_input_instruction() -> str:
 
 ## Requesting User Input
 
-When you need information from the user that was not provided in the task (e.g., API keys, credentials, configuration values, deployment URLs, preferences), you can request it by running:
+When you need information from the user that was not provided in the task, you can ask by running:
 
-__ask_user__ {"question": "What is the Vercel deployment token?", "context": {"key": "VERCEL_TOKEN", "description": "Needed for deploy step"}}
+__ask_user__ {"question": "Your question here", "context": {"key": "OPTIONAL_KEY", "description": "Why you need this"}}
 
 The execution will PAUSE until the user responds. The user's response will appear as command output prefixed with USER_RESPONSE:.
+
+Common use cases:
+- Credentials, tokens, API keys, or secrets you should never guess
+- Configuration values (deployment URLs, environment names, feature flags)
+- Clarifications on ambiguous requirements
+- Decisions that only the user can make (e.g., choosing between approaches)
+- Confirmations before destructive or irreversible actions
 
 IMPORTANT:
 - Use this ONLY when you genuinely cannot proceed without user input. Do NOT use it for decisions you can make autonomously.
 - Do NOT invent or guess values for credentials, tokens, or configuration — always ask the user.
+- For requesting review/validation of your work, use `__review_task__` instead.
 - The `context` field is optional but recommended when asking for specific configuration values.
+"""
+
+
+def _build_review_task_instruction() -> str:
+    """
+    Build the system prompt instruction for the __review_task__ mechanism.
+
+    Returns:
+        Instruction string to append to the system prompt
+    """
+    return """
+
+## Requesting Task Review
+
+When you have completed your implementation work and want the user to review it before proceeding (e.g., before committing, opening a PR, or moving to the next phase), you can request a review by running:
+
+__review_task__ {"summary": "Brief description of what was implemented", "files_changed": ["path/to/file1", "path/to/file2"], "details": "Key changes, decisions made, and what the reviewer should verify"}
+
+The execution will PAUSE until the user responds. There is no timeout — the agent waits indefinitely.
+
+The user can respond in one of two ways:
+
+### REVIEW_APPROVED
+The review is approved. The output will look like:
+```
+REVIEW_APPROVED: <optional notes from reviewer>
+```
+If there are notes, apply any observations or corrections mentioned, then proceed.
+
+### REVIEW_DENIED
+The review is denied. The output will look like:
+```
+REVIEW_DENIED: <denial_reason>. Notes: <optional notes>. Auto-approve: <true/false>
+```
+- Read the denial_reason carefully and fix the described issues.
+- If Auto-approve is true: fix the issues and proceed directly (no need for another review).
+- If Auto-approve is false: fix the issues and request another review via __review_task__.
+
+IMPORTANT:
+- Use this when your work is complete and ready for review — not for questions or credentials (use __ask_user__ for that).
+- Always provide a clear summary and comprehensive list of changed files.
+- Include testing results and any notable decisions in the details field.
 """
 
 
@@ -747,9 +798,9 @@ Your documentation directory for this workflow:
 - Create README.md, REPORT.md, SUMMARY.md, TEST_*.md unless explicitly requested
 - Write documentation outside this directory
 """
-        return base_prompt + docs_section + _build_user_input_instruction()
+        return base_prompt + docs_section + _build_user_input_instruction() + _build_review_task_instruction()
 
-    return base_prompt + _build_user_input_instruction()
+    return base_prompt + _build_user_input_instruction() + _build_review_task_instruction()
 
 
 def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None, workflow_path: str | None = None) -> str:
@@ -854,6 +905,36 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
     parts.append(task_prompt)
 
     return "\n".join(parts)
+
+
+async def _resolve_project_id(client: Any, plan_id: str, task: Task) -> str | None:
+    """
+    Resolve the project_id for a plan by checking task metadata or fetching plan details.
+
+    Args:
+        client: DaemonClient instance
+        plan_id: ID of the plan
+        task: The task being executed
+
+    Returns:
+        project_id string or None if unavailable
+    """
+    try:
+        if hasattr(task, 'project_id') and task.project_id:
+            return task.project_id
+
+        if not hasattr(client, 'get_plan'):
+            return None
+
+        plan_resp = client.get_plan(plan_id)
+        if plan_resp.error or not plan_resp.data:
+            return None
+
+        project_id = plan_resp.data.get('project_id')
+        return project_id if isinstance(project_id, str) and project_id else None
+    except Exception as e:
+        logger.debug(f"Failed to resolve project_id: {e}")
+        return None
 
 
 async def build_agent_context(
@@ -1127,6 +1208,7 @@ async def run_task(
     logs_buffer: list[dict] = []
     captured_texts: list[str] = []  # Capture all output text for structured output detection
     subagent_names: dict[str, str] = {}  # tool_use_id -> short name for subagent logging
+    review_task_auto_approved = False  # Flag: subsequent __review_task__ requests auto-approve
 
     def send_logs_if_needed() -> None:
         """Send buffered logs if callback is available and buffer has content."""
@@ -1261,6 +1343,153 @@ async def run_task(
                                     logger.task_error(task.id, error_msg)
                                     add_log("error", error_msg)
 
+                        # ── __review_task__ interception ──────────────────────
+                        # When the agent wants the user to review their work,
+                        # it runs: __review_task__ {"summary": "...", "files_changed": [...], "details": "..."}
+                        # We intercept this, create an approval record with tool='__review__',
+                        # poll for the user's response, and inject it back.
+                        if client and plan_id and block.name == 'Bash':
+                            cmd = block.input.get('command', '') if isinstance(block.input, dict) else ''
+                            if isinstance(cmd, str) and cmd.strip().startswith('__review_task__'):
+                                # Check if auto-approve was previously set for this task
+                                if review_task_auto_approved:
+                                    logger.info(f"[{task.id}] Review auto-approved (flag set by previous denial)")
+                                    add_log("info", "✅ Review auto-approved (previous denial set auto-approve flag)")
+                                    block.input['command'] = 'echo "REVIEW_APPROVED: Auto-approved after corrections (auto-approve flag was set)"'
+                                else:
+                                    # Extract the JSON payload after __review_task__
+                                    parts = cmd.strip().split('__review_task__', 1)
+                                    payload_str = parts[1].strip() if len(parts) > 1 else ''
+
+                                    # Parse the review payload
+                                    summary = ''
+                                    files_changed = []
+                                    details = ''
+                                    if payload_str:
+                                        try:
+                                            parsed = json.loads(payload_str)
+                                            if isinstance(parsed, dict):
+                                                summary = parsed.get('summary', '')
+                                                files_changed = parsed.get('files_changed', [])
+                                                details = parsed.get('details', '')
+                                            else:
+                                                summary = str(parsed)
+                                        except (json.JSONDecodeError, ValueError):
+                                            summary = payload_str
+                                    else:
+                                        summary = 'Task review requested by agent'
+
+                                    logger.info(f"[{task.id}] Review requested: {summary[:100]}")
+                                    add_log("info", f"📋 Requesting task review: {summary[:200]}")
+
+                                    try:
+                                        # Request approval via API with special __review__ tool type
+                                        review_resp = client.request_approval(
+                                            plan_id=plan_id,
+                                            task_id=task.id,
+                                            tool='__review__',
+                                            input_data={
+                                                'summary': summary,
+                                                'files_changed': files_changed,
+                                                'details': details,
+                                            },
+                                            reason='Task review requested by agent',
+                                        )
+
+                                        if review_resp.error:
+                                            error_msg = f"Failed to request review: {review_resp.error}"
+                                            logger.task_error(task.id, error_msg)
+                                            add_log("error", error_msg)
+                                        elif review_resp.data:
+                                            review_id = review_resp.data.get("id")
+                                            logger.info(
+                                                f"[{task.id}] Review pending "
+                                                f"(ID: {review_id}), waiting for response..."
+                                            )
+                                            add_log("info", f"⏳ Waiting for review (ID: {review_id})...")
+
+                                            # Move kanban task to 'validation' column and link the review
+                                            _kanban_project_id = await _resolve_project_id(client, plan_id, task)
+                                            if _kanban_project_id:
+                                                await client.update_kanban_pipeline(
+                                                    _kanban_project_id, task.id,
+                                                    column='validation', review_approval_id=review_id,
+                                                )
+                                                logger.info(f"[{task.id}] Moved kanban task to validation (review: {review_id})")
+                                                add_log("info", "📋 Task moved to validation column")
+
+                                            # Wait for review response — 24h timeout since reviews can take a while
+                                            decision_resp = client.wait_for_approval(
+                                                review_id,
+                                                timeout_seconds=86400,  # 24 hours
+                                            )
+
+                                            if decision_resp.error:
+                                                error_msg = f"Review polling error: {decision_resp.error}"
+                                                logger.task_error(task.id, error_msg)
+                                                add_log("error", error_msg)
+                                            elif decision_resp.data:
+                                                approval_data = decision_resp.data
+                                                if isinstance(approval_data, str):
+                                                    # Timeout case
+                                                    decision = approval_data
+                                                else:
+                                                    decision = approval_data.get("status", "unknown")
+
+                                                if decision == "approved":
+                                                    # Review approved — inject response back
+                                                    notes = approval_data.get("notes", "") if isinstance(approval_data, dict) else ""
+                                                    notes_part = f": {notes}" if notes else ""
+                                                    response_text = f"REVIEW_APPROVED{notes_part}"
+                                                    logger.info(f"[{task.id}] Review approved{notes_part}")
+                                                    add_log("info", f"✅ Review approved{notes_part}")
+                                                    block.input['command'] = f'echo "{response_text}"'
+                                                    # Task stays in 'validation' — will auto-advance to 'done' per Rule 4
+
+                                                elif decision == "denied":
+                                                    # Review denied — extract reason and notes
+                                                    denial_reason = approval_data.get("denial_reason", "") if isinstance(approval_data, dict) else ""
+                                                    notes = approval_data.get("notes", "") if isinstance(approval_data, dict) else ""
+                                                    auto_approve_flag = approval_data.get("auto_approve", 0) if isinstance(approval_data, dict) else 0
+
+                                                    response_parts = [f"REVIEW_DENIED: {denial_reason}"]
+                                                    if notes:
+                                                        response_parts.append(f"Notes: {notes}")
+                                                    response_parts.append(f"Auto-approve: {bool(auto_approve_flag)}")
+
+                                                    response_text = ". ".join(response_parts)
+                                                    logger.info(f"[{task.id}] Review denied: {denial_reason[:100]}")
+                                                    add_log("info", f"❌ Review denied: {denial_reason[:200]}")
+
+                                                    # Move kanban task back to 'in_dev' so user sees it's being worked on
+                                                    if _kanban_project_id:
+                                                        await client.update_kanban_pipeline(
+                                                            _kanban_project_id, task.id,
+                                                            column='in_dev', review_approval_id=None,
+                                                        )
+                                                        logger.info(f"[{task.id}] Moved kanban task back to in_dev (review denied)")
+                                                        add_log("info", "📋 Task moved back to in_dev column")
+
+                                                    # If auto_approve is set, flag subsequent reviews to auto-approve
+                                                    if auto_approve_flag:
+                                                        review_task_auto_approved = True
+                                                        logger.info(f"[{task.id}] Auto-approve flag set for subsequent reviews")
+                                                        add_log("info", "🔄 Auto-approve flag set — subsequent reviews will be auto-approved")
+
+                                                    block.input['command'] = f'echo "{response_text}"'
+
+                                                elif decision == "timeout":
+                                                    # Timeout shouldn't normally happen with 24h, but handle gracefully
+                                                    response_text = "REVIEW_DENIED: Review request timed out after 24 hours."
+                                                    logger.warning(f"[{task.id}] Review timed out after 24 hours")
+                                                    add_log("warning", "⏱ Review timed out after 24 hours")
+                                                    block.input['command'] = f'echo "{response_text}"'
+
+                                    except Exception as e:
+                                        error_msg = f"Error during review flow: {e}"
+                                        logger.task_error(task.id, error_msg)
+                                        add_log("error", error_msg)
+
                         # Check if this tool requires approval
                         # When permission_mode is 'acceptEdits', the user has opted
                         # into auto-approval, so skip the deny-rules approval flow.
@@ -1329,22 +1558,43 @@ async def run_task(
                                             # Continue execution - fail-safe behavior
 
                                         elif decision_resp.data:
-                                            decision = decision_resp.data
+                                            # wait_for_approval now returns the full approval record
+                                            approval_data = decision_resp.data
+                                            if isinstance(approval_data, str):
+                                                # Legacy: just a status string (e.g. "timeout")
+                                                decision = approval_data
+                                            else:
+                                                decision = approval_data.get("status", "unknown")
+
                                             logger.info(f"[approval] Decision: {decision}")
                                             add_log("info", f"✅ Approval decision: {decision}")
 
                                             if decision == "denied":
-                                                # Tool use was denied - stop execution
-                                                error_msg = (
-                                                    f"Tool '{block.name}' was denied approval. "
-                                                    f"Task execution stopped."
+                                                # Build detailed error from denial_reason and notes
+                                                denial_reason = (
+                                                    approval_data.get("denial_reason", "") if isinstance(approval_data, dict) else ""
                                                 )
+                                                notes = (
+                                                    approval_data.get("notes", "") if isinstance(approval_data, dict) else ""
+                                                )
+                                                auto_approve_flag = (
+                                                    approval_data.get("auto_approve", 0) if isinstance(approval_data, dict) else 0
+                                                )
+
+                                                error_parts = [f"Tool '{block.name}' was denied approval."]
+                                                if denial_reason:
+                                                    error_parts.append(f"Reason: {denial_reason}")
+                                                if notes:
+                                                    error_parts.append(f"Notes: {notes}")
+                                                error_msg = " ".join(error_parts)
+
                                                 logger.task_error(task.id, error_msg)
                                                 add_log("error", f"❌ {error_msg}")
                                                 return TaskResult(
                                                     task_id=task.id,
                                                     success=False,
                                                     error=error_msg,
+                                                    auto_approve=bool(auto_approve_flag),
                                                 )
                                             elif decision == "timeout":
                                                 # Approval timed out

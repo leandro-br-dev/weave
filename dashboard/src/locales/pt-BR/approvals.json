@@ -84,5 +84,17 @@
         "approved": "Aprovados",
         "rejected": "Rejeitados",
         "dateRange": "Período"
-  }
+      },
+      "notesPlaceholder": "Observações ou correções...",
+      "denialReasonPlaceholder": "Explique o que precisa ser corrigido...",
+      "autoApproveLabel": "Aprovar automaticamente após correções",
+      "confirmDeny": "Confirmar Negação",
+      "cancel": "Cancelar",
+      "reviewRequests": "Solicitações de Revisão",
+      "reviewRequestDesc": "O agente está solicitando sua revisão antes de prosseguir",
+      "autoApproveDesc": "Se marcado, o agente prosseguirá automaticamente após aplicar correções",
+      "filesChanged": "Arquivos alterados",
+      "summary": "Resumo",
+      "reviewDetails": "Detalhes da Revisão",
+      "viewInKanban": "Ver no Kanban"
 }

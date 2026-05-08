@@ -741,7 +741,9 @@ class DaemonClient:
             poll_interval: Seconds between polls (default: 2.0)
 
         Returns:
-            PlanResponse with data=status ("approved" | "denied" | "timeout") or error
+            PlanResponse with data=dict (full approval record including status,
+            denial_reason, notes, auto_approve) or data="timeout" or error.
+            The status field is: "approved" | "denied" | "timeout"
         """
         deadline = time.time() + timeout_seconds
 
@@ -756,8 +758,9 @@ class DaemonClient:
                 if handled.data:
                     status = handled.data.get("status")
                     if status != "pending":
-                        # Approval has been decided
-                        return PlanResponse(data=status)
+                        # Return the full approval record so caller can access
+                        # denial_reason, notes, and auto_approve
+                        return PlanResponse(data=handled.data)
 
                 # Still pending, wait before next poll
                 time.sleep(poll_interval)

@@ -148,5 +148,6 @@
         "devToStaging": "Dev → Validation",
         "stagingToDone": "Validation → Done",
         "tooltip": "Enable to automatically advance tasks from {{from}} to {{to}}"
-      }
+      },
+      "awaitingReview": "Awaiting Review"
 }

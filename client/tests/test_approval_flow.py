@@ -115,21 +115,21 @@ class TestDaemonClientApproval:
 
         Verifies that:
         - Polling continues until approval is granted
-        - Approved status is returned
-        - Response data contains correct status
+        - Full approval record is returned (not just status string)
+        - Response data contains correct status and approval fields
 
         Args:
             mock_response_factory: Injected mock response factory
         """
         approval_id = generate_id("approval")
 
-        # Mock first call returns pending, second returns approved
+        # Mock first call returns pending, second returns approved (full record)
         pending_response = mock_response_factory(
             data={"id": approval_id, "status": "pending"},
             error=None,
         )
         approved_response = mock_response_factory(
-            data={"id": approval_id, "status": "approved"},
+            data={"id": approval_id, "status": "approved", "denial_reason": None, "notes": None, "auto_approve": 0},
             error=None,
         )
 
@@ -151,7 +151,8 @@ class TestDaemonClientApproval:
             )
 
         assert result.error is None, f"Expected no error, got: {result.error}"
-        assert result.data == "approved", f"Expected 'approved', got: {result.data}"
+        assert isinstance(result.data, dict), f"Expected dict, got: {type(result.data)}"
+        assert result.data["status"] == "approved", f"Expected status 'approved', got: {result.data}"
 
     @pytest.mark.daemon
     @pytest.mark.approval
@@ -161,7 +162,7 @@ class TestDaemonClientApproval:
 
         Verifies that:
         - Polling stops when denied status is received
-        - Denied status is returned correctly
+        - Full approval record is returned with denial_reason, notes, auto_approve
 
         Args:
             mock_response_factory: Injected mock response factory
@@ -169,7 +170,7 @@ class TestDaemonClientApproval:
         approval_id = generate_id("approval")
 
         mock_response = mock_response_factory(
-            data={"id": approval_id, "status": "denied"},
+            data={"id": approval_id, "status": "denied", "denial_reason": "Test reason", "notes": "Test notes", "auto_approve": 1},
             error=None,
         )
         self.client._client.get = Mock(return_value=mock_response)
@@ -180,7 +181,11 @@ class TestDaemonClientApproval:
         )
 
         assert result.error is None, f"Expected no error, got: {result.error}"
-        assert result.data == "denied", f"Expected 'denied', got: {result.data}"
+        assert isinstance(result.data, dict), f"Expected dict, got: {type(result.data)}"
+        assert result.data["status"] == "denied", f"Expected status 'denied', got: {result.data}"
+        assert result.data["denial_reason"] == "Test reason"
+        assert result.data["notes"] == "Test notes"
+        assert result.data["auto_approve"] == 1
 
     @pytest.mark.daemon
     @pytest.mark.approval

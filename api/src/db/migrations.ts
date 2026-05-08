@@ -646,4 +646,20 @@ export const migrations: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_user_inputs_plan_status ON user_inputs(plan_id, status)`,
     ],
   },
+  {
+    version: 47,
+    description: 'Approvals — add denial_reason, notes, and auto_approve columns for richer user feedback',
+    up: [
+      `ALTER TABLE approvals ADD COLUMN denial_reason TEXT`,
+      `ALTER TABLE approvals ADD COLUMN notes TEXT`,
+      `ALTER TABLE approvals ADD COLUMN auto_approve INTEGER NOT NULL DEFAULT 0`,
+    ],
+  },
+  {
+    version: 48,
+    description: 'Kanban tasks — add review_approval_id column to link tasks with pending reviews',
+    up: [
+      `ALTER TABLE kanban_tasks ADD COLUMN review_approval_id TEXT`,
+    ],
+  },
 ];

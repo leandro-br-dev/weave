@@ -26,6 +26,8 @@ export interface KanbanTask {
   environment_id?: string | null;
   /** Environment name (joined from environments table) */
   environment_name?: string | null;
+  /** ID of the active review approval (links kanban task to pending review) */
+  review_approval_id?: string | null;
   created_at: string;
   updated_at: string;
   /** @deprecated Use KanbanTemplate interface instead - templates are now stored in kanban_templates table */

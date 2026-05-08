@@ -43,7 +43,7 @@ router.get('/:id', requireAuth, (req, res) => {
 
 // POST /api/approvals/:id/respond — dashboard aprova ou nega
 router.post('/:id/respond', requireAuth, (req, res) => {
-  const { decision } = req.body  // 'approved' | 'denied'
+  const { decision, denial_reason, notes, auto_approve } = req.body  // 'approved' | 'denied'
   if (!['approved', 'denied'].includes(decision)) {
     return res.status(400).json({ data: null, error: 'decision must be approved or denied' })
   }
@@ -56,11 +56,27 @@ router.post('/:id/respond', requireAuth, (req, res) => {
 
   db.prepare(`
     UPDATE approvals
-    SET status = ?, responded_at = datetime('now')
+    SET status = ?, responded_at = datetime('now'),
+        denial_reason = ?, notes = ?, auto_approve = ?
     WHERE id = ?
-  `).run(decision, req.params.id)
+  `).run(
+    decision,
+    denial_reason ?? null,
+    notes ?? null,
+    auto_approve ? 1 : 0,
+    req.params.id,
+  )
 
-  return res.json({ data: { id: req.params.id, decision }, error: null })
+  return res.json({
+    data: {
+      id: req.params.id,
+      decision,
+      denial_reason: denial_reason ?? null,
+      notes: notes ?? null,
+      auto_approve: auto_approve ? true : false,
+    },
+    error: null,
+  })
 })
 
 // POST /api/approvals/timeout — chamado pelo cron interno da API

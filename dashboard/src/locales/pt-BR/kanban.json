@@ -148,5 +148,6 @@
         "devToStaging": "Dev → Validação",
         "stagingToDone": "Validação → Concluído",
         "tooltip": "Ative para avançar automaticamente de {{from}} para {{to}}"
-      }
+      },
+      "awaitingReview": "Aguardando Revisão"
 }

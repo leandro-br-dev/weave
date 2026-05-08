@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip, ArrowRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Link2, LayoutGrid, CheckCircle, Zap, Play, Bookmark, BookmarkCheck, RefreshCw, Paperclip, ArrowRight, Eye } from 'lucide-react';
 import { PageHeader, Button, Select, EmptyState, ConfirmDialog, Switch, ProjectIcon, ProjectSelectDropdown, FileAttachmentInput } from '@/components';
 import { type FileAttachment } from '@/components';
 import { useUploadFiles, getAttachmentUrl } from '@/api/uploads';
@@ -1624,6 +1624,19 @@ function TaskCard({
         <p className="text-xs text-red-500 mt-1 truncate" title={task.error_message}>
           {task.error_message}
         </p>
+      )}
+
+      {/* Awaiting Review badge — shown when task is in validation with a pending review */}
+      {task.column === 'validation' && task.review_approval_id && (
+        <div className="mt-2 flex items-center gap-2">
+          <a
+            href="/approvals"
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 transition-colors dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/50"
+          >
+            <Eye className="h-3 w-3" />
+            {t('pages.kanban.awaitingReview')}
+          </a>
+        </div>
       )}
 
       {/* Retry button for failed pipelines */}

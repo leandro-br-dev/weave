@@ -255,7 +255,7 @@ router.patch('/:projectId/:taskId/pipeline', authenticateToken, (req: Request, r
       return res.status(404).json({ data: null, error: 'Project not found' })
     }
 
-    const { pipeline_status, workflow_id, error_message, column, result_status, result_notes } = req.body
+    const { pipeline_status, workflow_id, error_message, column, result_status, result_notes, review_approval_id } = req.body
     db.prepare(`
       UPDATE kanban_tasks SET
         pipeline_status = COALESCE(?, pipeline_status),
@@ -264,10 +264,11 @@ router.patch('/:projectId/:taskId/pipeline', authenticateToken, (req: Request, r
         column = COALESCE(?, column),
         result_status = COALESCE(?, result_status),
         result_notes = COALESCE(?, result_notes),
+        review_approval_id = COALESCE(?, review_approval_id),
         planning_started_at = CASE WHEN ? = 'planning' THEN datetime('now') ELSE planning_started_at END,
         updated_at = datetime('now')
       WHERE id = ? AND project_id = ?
-    `).run(pipeline_status, workflow_id, error_message, column, result_status, result_notes, pipeline_status, req.params.taskId, req.params.projectId)
+    `).run(pipeline_status, workflow_id, error_message, column, result_status, result_notes, review_approval_id, pipeline_status, req.params.taskId, req.params.projectId)
 
     const updated = db.prepare('SELECT * FROM kanban_tasks WHERE id = ?').get(req.params.taskId)
     res.json({ data: updated, error: null })

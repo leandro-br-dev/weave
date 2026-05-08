@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Check, CheckCircle, X, Send, MessageCircleQuestion } from 'lucide-react'
+import { AlertTriangle, Check, CheckCircle, X, Send, MessageCircleQuestion, Eye, ChevronDown, ChevronUp, Columns3 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
@@ -9,6 +9,14 @@ import { useApprovePlan, type Plan } from '@/api/plans'
 import { apiClient } from '@/api/client'
 import { PageHeader, Button, EmptyState } from '@/components'
 import { textColors, darkModeTextColors, bgColors, darkModeBgColors, warningColors, darkModeWarningColors, successColors, infoColors, darkModeInfoColors, codeBlockColors, darkModeCodeBlockColors, withDarkMode } from '@/lib/colors'
+
+type ApprovalDecision = 'approved' | 'denied'
+
+type ReviewInput = {
+  summary?: string
+  files_changed?: string[]
+  details?: string
+}
 
 export default function ApprovalsPage() {
   const { t } = useTranslation()
@@ -31,6 +39,10 @@ export default function ApprovalsPage() {
 
   const totalPending = approvals.length + pendingPlans.length + userInputs.length
 
+  // Split approvals into review requests (tool='__review__') and regular tool approvals
+  const reviewApprovals = approvals.filter(a => a.tool === '__review__')
+  const toolApprovals = approvals.filter(a => a.tool !== '__review__')
+
   const allLoading = isLoading || isLoadingPlans || isLoadingInputs
 
   return (
@@ -42,7 +54,7 @@ export default function ApprovalsPage() {
 
       {allLoading ? (
         <EmptyState title={t('pages.approvals.loading')} />
-      ) : approvals.length === 0 && pendingPlans.length === 0 && userInputs.length === 0 ? (
+      ) : reviewApprovals.length === 0 && toolApprovals.length === 0 && pendingPlans.length === 0 && userInputs.length === 0 ? (
         <EmptyState
           icon={<CheckCircle className={`h-10 w-10 sm:h-12 sm:w-12 ${successColors.text}`} />}
           title={t('pages.approvals.noPending')}
@@ -95,20 +107,43 @@ export default function ApprovalsPage() {
             </div>
           )}
 
-          {/* Tool Use Approvals Section */}
-          {approvals.length > 0 && (
+          {/* Review Requests Section */}
+          {reviewApprovals.length > 0 && (
             <div>
-              {(pendingPlans.length > 0 || userInputs.length > 0) && (
+              <h2 className={`text-xs sm:text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-2 sm:mb-3`}>
+                {t('pages.approvals.reviewRequests', { count: reviewApprovals.length })}
+              </h2>
+              <div className="space-y-3 sm:space-y-4">
+                {reviewApprovals.map(approval => (
+                  <ReviewApprovalCard
+                    key={approval.id}
+                    approval={approval}
+                    onDecision={(decision, denial_reason, notes, auto_approve) =>
+                      respond.mutate({ id: approval.id, decision, denial_reason, notes, auto_approve })
+                    }
+                    isLoading={respond.isPending}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tool Use Approvals Section */}
+          {toolApprovals.length > 0 && (
+            <div>
+              {(pendingPlans.length > 0 || reviewApprovals.length > 0 || userInputs.length > 0) && (
                 <h2 className={`text-xs sm:text-sm font-semibold ${withDarkMode(textColors.primary, darkModeTextColors.primary)} mb-2 sm:mb-3`}>
-                  {t('pages.approvals.toolUseApprovals', { count: approvals.length })}
+                  {t('pages.approvals.toolUseApprovals', { count: toolApprovals.length })}
                 </h2>
               )}
               <div className="space-y-3 sm:space-y-4">
-                {approvals.map(approval => (
+                {toolApprovals.map(approval => (
                   <ApprovalCard
                     key={approval.id}
                     approval={approval}
-                    onDecision={(decision) => respond.mutate({ id: approval.id, decision })}
+                    onDecision={(decision, denial_reason, notes, auto_approve) =>
+                      respond.mutate({ id: approval.id, decision, denial_reason, notes, auto_approve })
+                    }
                     isLoading={respond.isPending}
                   />
                 ))}
@@ -142,7 +177,7 @@ export default function ApprovalsPage() {
 
 function ApprovalCard({ approval, onDecision, isLoading }: {
   approval: Approval
-  onDecision: (d: 'approved' | 'denied') => void
+  onDecision: (d: ApprovalDecision, denial_reason?: string, notes?: string, auto_approve?: boolean) => void
   isLoading: boolean
 }) {
   const { t } = useTranslation()
@@ -151,8 +186,21 @@ function ApprovalCard({ approval, onDecision, isLoading }: {
     catch { return approval.input }
   })()
 
+  const [notes, setNotes] = useState('')
+  const [denialReason, setDenialReason] = useState('')
+  const [autoApprove, setAutoApprove] = useState(false)
+  const [showDenyFields, setShowDenyFields] = useState(false)
+
   const ageSeconds = Math.round((Date.now() - new Date(approval.created_at).getTime()) / 1000)
   const ageLabel = ageSeconds < 60 ? `${ageSeconds}s ${t('pages.approvals.ago')}` : `${Math.round(ageSeconds/60)}m ${t('pages.approvals.ago')}`
+
+  const handleApprove = () => {
+    onDecision('approved', undefined, notes || undefined, undefined)
+  }
+
+  const handleDeny = () => {
+    onDecision('denied', denialReason || undefined, notes || undefined, autoApprove)
+  }
 
   return (
     <div className={`border ${warningColors.border} ${darkModeWarningColors.border} rounded-lg p-5 ${warningColors.bg} ${darkModeWarningColors.bg}`}>
@@ -184,21 +232,262 @@ function ApprovalCard({ approval, onDecision, isLoading }: {
           : String(inputData)}
       </pre>
 
+      {/* Notes textarea — always visible */}
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder={t('pages.approvals.notesPlaceholder')}
+        rows={2}
+        className={`w-full rounded-lg border ${warningColors.border} ${darkModeWarningColors.border} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-gray-400 mb-3`}
+        disabled={isLoading}
+      />
+
+      {/* Denial-specific fields */}
+      {showDenyFields && (
+        <div className="space-y-3 mb-3">
+          <textarea
+            value={denialReason}
+            onChange={(e) => setDenialReason(e.target.value)}
+            placeholder={t('pages.approvals.denialReasonPlaceholder')}
+            rows={2}
+            className={`w-full rounded-lg border ${warningColors.border} ${darkModeWarningColors.border} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder:text-gray-400`}
+            disabled={isLoading}
+          />
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoApprove}
+              onChange={(e) => setAutoApprove(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <span className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
+              {t('pages.approvals.autoApproveLabel')}
+            </span>
+          </label>
+        </div>
+      )}
+
       <div className="flex gap-3">
-        <Button
-          onClick={() => onDecision('approved')}
-          disabled={isLoading}
-          className={`${successColors.text} ${successColors.bg} ${successColors.border} hover:bg-green-700 border-green-600`}
-        >
-          <Check className="h-4 w-4" /> {t('pages.approvals.approve')}
-        </Button>
-        <Button
-          onClick={() => onDecision('denied')}
-          disabled={isLoading}
-          variant="danger"
-        >
-          <X className="h-4 w-4" /> {t('pages.approvals.deny')}
-        </Button>
+        {!showDenyFields ? (
+          <>
+            <Button
+              onClick={handleApprove}
+              disabled={isLoading}
+              className={`${successColors.text} ${successColors.bg} ${successColors.border} hover:bg-green-700 border-green-600`}
+            >
+              <Check className="h-4 w-4" /> {t('pages.approvals.approve')}
+            </Button>
+            <Button
+              onClick={() => setShowDenyFields(true)}
+              disabled={isLoading}
+              variant="danger"
+            >
+              <X className="h-4 w-4" /> {t('pages.approvals.deny')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              onClick={handleDeny}
+              disabled={isLoading}
+              variant="danger"
+            >
+              <X className="h-4 w-4" /> {t('pages.approvals.confirmDeny')}
+            </Button>
+            <Button
+              onClick={() => setShowDenyFields(false)}
+              disabled={isLoading}
+              variant="secondary"
+            >
+              {t('pages.approvals.cancel')}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReviewApprovalCard({ approval, onDecision, isLoading }: {
+  approval: Approval
+  onDecision: (d: ApprovalDecision, denial_reason?: string, notes?: string, auto_approve?: boolean) => void
+  isLoading: boolean
+}) {
+  const { t } = useTranslation()
+  const inputData: ReviewInput = (() => {
+    try { return JSON.parse(approval.input) }
+    catch { return {} }
+  })()
+
+  const [notes, setNotes] = useState('')
+  const [denialReason, setDenialReason] = useState('')
+  const [autoApprove, setAutoApprove] = useState(false)
+  const [showDenyFields, setShowDenyFields] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
+
+  const ageSeconds = Math.round((Date.now() - new Date(approval.created_at).getTime()) / 1000)
+  const ageLabel = ageSeconds < 60
+    ? `${ageSeconds}s ${t('pages.approvals.ago')}`
+    : ageSeconds < 3600
+      ? `${Math.round(ageSeconds / 60)}m ${t('pages.approvals.ago')}`
+      : `${Math.round(ageSeconds / 3600)}h ${t('pages.approvals.ago')}`
+
+  const handleApprove = () => {
+    onDecision('approved', undefined, notes || undefined, undefined)
+  }
+
+  const handleDeny = () => {
+    onDecision('denied', denialReason || undefined, notes || undefined, autoApprove)
+  }
+
+  return (
+    <div className={`border ${infoColors.border} ${darkModeInfoColors.border} rounded-lg p-5 ${infoColors.bg} ${darkModeInfoColors.bg}`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Eye className={`h-4 w-4 flex-shrink-0 ${infoColors.text}`} />
+            <span className={`text-xs font-medium ${infoColors.textAlt} ${darkModeInfoColors.textAlt}`}>
+              {t('pages.approvals.reviewRequestDesc')}
+            </span>
+          </div>
+          {inputData.summary && (
+            <p className={`font-medium text-sm leading-relaxed ${withDarkMode(textColors.primary, darkModeTextColors.primary)}`}>
+              {inputData.summary}
+            </p>
+          )}
+          <span className={`inline-flex items-center gap-1 ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} text-xs mt-2`}>
+            {t('pages.approvals.plan')}{' '}
+            <a href={`/plans/${approval.plan_id}`} className={`underline ${withDarkMode('hover:text-gray-700', 'dark:hover:text-gray-300')}`}>
+              {approval.plan_name ?? approval.plan_id.slice(0, 8)}
+            </a>
+            {' '}/ {t('pages.approvals.task')}{' '}
+            <code className={`${bgColors.tertiary} ${darkModeBgColors.tertiary} px-1 rounded`}>{approval.task_id.slice(0, 8)}</code>
+            {' '}·{' '}
+            <a href={`/kanban?task=${approval.task_id}`} className={`inline-flex items-center gap-1 underline ${withDarkMode('hover:text-gray-700', 'dark:hover:text-gray-300')}`}>
+              <Columns3 className="h-3 w-3" /> {t('pages.approvals.viewInKanban')}
+            </a>
+          </span>
+        </div>
+        <span className={`text-xs ${withDarkMode(textColors.muted, darkModeTextColors.muted)} whitespace-nowrap ml-3 flex-shrink-0`}>{ageLabel}</span>
+      </div>
+
+      {/* Files changed */}
+      {inputData.files_changed && inputData.files_changed.length > 0 && (
+        <div className="mb-3">
+          <p className={`text-xs font-medium ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} mb-1.5`}>
+            {t('pages.approvals.filesChanged')}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {inputData.files_changed.map((file, i) => (
+              <code
+                key={i}
+                className={`${codeBlockColors.bg} ${codeBlockColors.text} ${darkModeCodeBlockColors.bg} ${darkModeCodeBlockColors.text} text-xs px-2 py-0.5 rounded`}
+              >
+                {file}
+              </code>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expandable details */}
+      {inputData.details && (
+        <div className="mb-3">
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className={`flex items-center gap-1 text-xs font-medium ${infoColors.text} hover:underline`}
+          >
+            {showDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {t('pages.approvals.reviewDetails')}
+          </button>
+          {showDetails && (
+            <pre className={`${codeBlockColors.bg} ${codeBlockColors.text} ${darkModeCodeBlockColors.bg} ${darkModeCodeBlockColors.text} rounded p-3 text-xs overflow-x-auto mt-2 max-h-40 whitespace-pre-wrap`}>
+              {inputData.details}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* Notes textarea — always visible */}
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder={t('pages.approvals.notesPlaceholder')}
+        rows={2}
+        className={`w-full rounded-lg border ${infoColors.border} ${darkModeInfoColors.border} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-400 mb-3`}
+        disabled={isLoading}
+      />
+
+      {/* Denial-specific fields */}
+      {showDenyFields && (
+        <div className="space-y-3 mb-3">
+          <textarea
+            value={denialReason}
+            onChange={(e) => setDenialReason(e.target.value)}
+            placeholder={t('pages.approvals.denialReasonPlaceholder')}
+            rows={2}
+            className={`w-full rounded-lg border ${infoColors.border} ${darkModeInfoColors.border} ${withDarkMode(bgColors.primary, darkModeBgColors.primary)} ${withDarkMode(textColors.primary, darkModeTextColors.primary)} px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder:text-gray-400`}
+            disabled={isLoading}
+          />
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoApprove}
+              onChange={(e) => setAutoApprove(e.target.checked)}
+              className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <div>
+              <span className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
+                {t('pages.approvals.autoApproveLabel')}
+              </span>
+              <p className={`text-xs ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)}`}>
+                {t('pages.approvals.autoApproveDesc')}
+              </p>
+            </div>
+          </label>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex gap-3">
+        {!showDenyFields ? (
+          <>
+            <Button
+              onClick={handleApprove}
+              disabled={isLoading}
+              className={`${successColors.text} ${successColors.bg} ${successColors.border} hover:bg-green-700 border-green-600`}
+            >
+              <Check className="h-4 w-4" /> {t('pages.approvals.approve')}
+            </Button>
+            <Button
+              onClick={() => setShowDenyFields(true)}
+              disabled={isLoading}
+              variant="danger"
+            >
+              <X className="h-4 w-4" /> {t('pages.approvals.deny')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              onClick={handleDeny}
+              disabled={isLoading}
+              variant="danger"
+            >
+              <X className="h-4 w-4" /> {t('pages.approvals.confirmDeny')}
+            </Button>
+            <Button
+              onClick={() => setShowDenyFields(false)}
+              disabled={isLoading}
+              variant="secondary"
+            >
+              {t('pages.approvals.cancel')}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   )
