@@ -1,5 +1,5 @@
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, useGetWorkspaceBuilderHistory, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
+import { useGetWorkspaces, useGetWorkspace, useCreateWorkspace, useDeleteWorkspace, useSaveClaudeMd, useSaveSettings, useGetSkill, useInstallSkill, useDeleteSkill, useGetAgent, useSaveAgent, useDeleteAgent, useRenameAgent, useGetWorkspaceEnvironments, useLinkEnvironment, useUnlinkEnvironment, useGetAgentTemplates, useGetNativeSkills, useInstallNativeSkill, useImportCustomSkill, useUpdateWorkspaceRole, useUpdateWorkspaceProject, useGetAgentModels, useUpdateWorkspaceModel, useImproveClaudeMd, useImprovementStatus, useGetNativeAgents, useInstallNativeAgent, useImportCustomAgent, useImproveAgent, useImproveSkill, useBuildWorkspace, useApplyWorkspaceBuilder, useGetWorkspaceBuilderHistory, useDeleteOrphanTeams, type Workspace, type WorkspaceRole, type AgentModel, type Plan } from '../api/teams'
 import { useGetProjects, useGetAllEnvironments, useGenerateAgent } from '../api/projects'
 import { useGetEnvironmentVariablesDefaults } from '../api/environmentVariables'
 import { apiClient } from '../api/client'
@@ -98,12 +98,23 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
   // Filter state
   const [filterProjectId, setFilterProjectId] = useState('')
 
+  // Delete orphan teams state
+  const [showDeleteOrphansConfirm, setShowDeleteOrphansConfirm] = useState(false)
+  const deleteOrphanTeams = useDeleteOrphanTeams()
+  const { showToast } = useToast()
+
   // Filter workspaces based on selected project
   const filteredWorkspaces = useMemo(() => {
     if (!workspaces) return []
     if (!filterProjectId) return workspaces
     return workspaces.filter((workspace: Workspace) => workspace.project_id === filterProjectId)
   }, [workspaces, filterProjectId])
+
+  // Count orphan teams (no project linked)
+  const orphanCount = useMemo(() => {
+    if (!workspaces) return 0
+    return workspaces.filter((ws: Workspace) => !ws.project_id).length
+  }, [workspaces])
 
   // Load environment variable defaults when form opens or env defaults change
   useEffect(() => {
@@ -230,6 +241,11 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
             <Button variant="primary" onClick={() => setShowNewForm(!showNewForm)} className="text-xs sm:text-sm">
               <Plus size={14} /> <span className="hidden sm:inline">{t('pages.agents.header.newAgent')}</span><span className="sm:hidden">{t('pages.agents.header.new')}</span>
             </Button>
+            {orphanCount > 0 && (
+              <Button variant="danger" onClick={() => setShowDeleteOrphansConfirm(true)} className="text-xs sm:text-sm">
+                <Trash2 size={14} /> <span className="hidden sm:inline">{t('pages.agents.deleteOrphans.button', { count: orphanCount })}</span><span className="sm:hidden">{t('pages.agents.deleteOrphans.buttonShort', { count: orphanCount })}</span>
+              </Button>
+            )}
           </div>
         }
       />
@@ -544,6 +560,28 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
           </Card>
         </div>
       )}
+
+      {/* Delete Orphan Teams Confirmation */}
+      <ConfirmDialog
+        open={showDeleteOrphansConfirm}
+        title={t('pages.agents.deleteOrphans.title')}
+        description={t('pages.agents.deleteOrphans.confirm', { count: orphanCount })}
+        variant="danger"
+        confirmLabel={t('pages.agents.deleteOrphans.confirmButton')}
+        onConfirm={() => {
+          deleteOrphanTeams.mutate(undefined, {
+            onSuccess: (data) => {
+              setShowDeleteOrphansConfirm(false)
+              showToast(t('pages.agents.deleteOrphans.success', { count: data.count }), 'success')
+            },
+            onError: () => {
+              showToast(t('pages.agents.deleteOrphans.error'), 'error')
+            },
+          })
+        }}
+        onCancel={() => setShowDeleteOrphansConfirm(false)}
+        loading={deleteOrphanTeams.isPending}
+      />
     </div>
   )
 }

@@ -12,19 +12,38 @@ PRESETS = {
 }
 
 
-def next_run_from_cron(cron_expr: str, after: datetime = None) -> datetime | None:
+def next_run_from_cron(cron_expr: str, after: datetime = None, schedule_time: str = None) -> datetime | None:
     """
     Calcula a próxima execução de uma cron expression.
     Suporta o formato padrão: minuto hora dia mês dia_semana
 
     Implementação simples sem dependências externas.
     Para uso em produção considera usar croniter ou APScheduler.
+
+    Args:
+        cron_expr: Cron expression or preset name (e.g., 'daily', 'weekly_monday')
+        after: Base datetime to calculate from (defaults to now)
+        schedule_time: Override time in HH:MM format (e.g., '14:30')
     """
     if not cron_expr or not cron_expr.strip():
         return None
 
     # Resolve presets
     cron_expr = PRESETS.get(cron_expr.strip(), cron_expr.strip())
+
+    # If schedule_time is provided, override the hour:minute in the cron expression
+    if schedule_time and schedule_time.strip():
+        parts = cron_expr.split()
+        if len(parts) == 5:
+            try:
+                time_parts = schedule_time.strip().split(':')
+                minute = int(time_parts[0])
+                hour = int(time_parts[1]) if len(time_parts) > 1 else 0
+                parts[0] = str(minute)
+                parts[1] = str(hour)
+                cron_expr = ' '.join(parts)
+            except (ValueError, IndexError):
+                pass  # Keep original cron if time parsing fails
 
     parts = cron_expr.split()
     if len(parts) != 5:

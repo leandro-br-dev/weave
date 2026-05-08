@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { useGetPlan, useExecutePlan, useDeletePlan, useResumePlan, useApprovePlan, useEditPlan, useCheckCompletion, useReworkPlan, useConvertPlanToChat } from '@/api/plans';
+import { useSavePlanAsTemplate } from '@/api/kanban';
 import { useSaveClaudeMd } from '@/api/teams';
 import { useLogStream } from '../hooks/useLogStream';
 import { cn } from '@/lib/utils';
-import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Trash2, Download, StopCircle, RotateCcw, CheckCircle, Pencil, RefreshCw, GitBranch, Paperclip, Layers, Zap, ZoomIn, MessageSquare, ArrowLeft, Bookmark, Loader2 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { StatusBadge } from '@/components/StatusBadge';
+import { ScheduleEditor, type RecurrenceValue } from '@/components/ScheduleEditor';
 import { ClaudeMdImprovementModal } from '@/components/ClaudeMdImprovementModal';
 import { useToast } from '@/contexts/ToastContext';
 import { useTranslation } from 'react-i18next';
@@ -218,6 +220,15 @@ export function PlanDetail() {
   const [reworkPrompt, setReworkPrompt] = useState('');
   const [reworkMode, setReworkMode] = useState<'full_workflow' | 'quick_action'>('full_workflow');
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Save as Template state
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [templateRecurrence, setTemplateRecurrence] = useState<RecurrenceValue>('');
+  const [templateScheduleTime, setTemplateScheduleTime] = useState('09:00');
+  const [templateIsPublic, setTemplateIsPublic] = useState(true);
+  const saveAsTemplate = useSavePlanAsTemplate();
 
   // Image lightbox state
   const [lightboxImage, setLightboxImage] = useState<{ src: string; fileName: string } | null>(null);
@@ -515,6 +526,26 @@ export function PlanDetail() {
               <Download className="h-4 w-4" />
               {t('planDetail.export')}
             </button>
+            {plan.status === 'template' && (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowEditModal(true)}
+                  title={t('planDetail.editPlan')}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t('planDetail.edit')}
+                </Button>
+                <button
+                  onClick={() => navigate('/templates')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border text-sm rounded hover:bg-gray-50"
+                  title={t('planDetail.backToTemplates')}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {t('planDetail.backToTemplates')}
+                </button>
+              </>
+            )}
             {plan.status === 'pending' && (
               <>
                 <Button
@@ -623,6 +654,24 @@ export function PlanDetail() {
                 >
                   <GitBranch className="h-4 w-4" />
                   {t('planDetail.rework')}
+                </button>
+                <button
+                  onClick={() => {
+                    setTemplateTitle(plan?.name || '');
+                    setTemplateDescription('');
+                    setTemplateRecurrence('');
+                    setTemplateScheduleTime('09:00');
+                    setTemplateIsPublic(true);
+                    setShowSaveTemplateModal(true);
+                  }}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 text-amber-600 text-sm rounded hover:bg-amber-50',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                  title={t('planDetail.saveAsTemplateTitle')}
+                >
+                  <Bookmark className="h-4 w-4" />
+                  {t('planDetail.saveAsTemplate')}
                 </button>
                 <button
                   onClick={handleConvertToChat}
@@ -1188,6 +1237,98 @@ export function PlanDetail() {
                 loading={reworkPlan.isPending}
               >
                 {reworkPlan.isPending ? t('planDetail.reworking') : t('planDetail.reworkSubmit')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save as Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowSaveTemplateModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 max-w-lg w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{t('planDetail.saveAsTemplateTitle')}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t('planDetail.saveAsTemplateDescription')}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('planDetail.templateName')}</label>
+                <input
+                  type="text"
+                  value={templateTitle}
+                  onChange={e => setTemplateTitle(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">{t('planDetail.templateDescription')}</label>
+                <textarea
+                  value={templateDescription}
+                  onChange={e => setTemplateDescription(e.target.value)}
+                  rows={2}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 resize-y focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+              <div>
+                <ScheduleEditor
+                  recurrence={templateRecurrence}
+                  scheduleTime={templateScheduleTime}
+                  onChange={(rec, time) => { setTemplateRecurrence(rec); setTemplateScheduleTime(time) }}
+                  styled={false}
+                  label={t('planDetail.templateRecurrence')}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="templateIsPublic"
+                  checked={templateIsPublic}
+                  onChange={e => setTemplateIsPublic(e.target.checked)}
+                  className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor="templateIsPublic" className="text-sm text-gray-700 dark:text-gray-300">{t('planDetail.templateIsPublic')}</label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+              <Button variant="secondary" size="sm" onClick={() => setShowSaveTemplateModal(false)}>
+                {t('planDetail.cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  if (!id) return;
+                  saveAsTemplate.mutate(
+                    {
+                      planId: id,
+                      title: templateTitle || undefined,
+                      description: templateDescription || undefined,
+                      recurrence: templateRecurrence || undefined,
+                      schedule_time: templateRecurrence && templateRecurrence !== 'hourly' ? templateScheduleTime : undefined,
+                      is_public: templateIsPublic,
+                    },
+                    {
+                      onSuccess: () => {
+                        showToast({ type: 'success', message: t('planDetail.saveTemplateSuccess') });
+                        setShowSaveTemplateModal(false);
+                        navigate('/templates');
+                      },
+                      onError: () => {
+                        showToast({ type: 'error', message: t('planDetail.saveTemplateError') });
+                      },
+                    },
+                  );
+                }}
+                disabled={!templateTitle.trim() || saveAsTemplate.isPending}
+              >
+                {saveAsTemplate.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> {t('planDetail.saving')}</>
+                ) : (
+                  <><Bookmark className="h-4 w-4" /> {t('planDetail.saveTemplate')}</>
+                )}
               </Button>
             </div>
           </div>

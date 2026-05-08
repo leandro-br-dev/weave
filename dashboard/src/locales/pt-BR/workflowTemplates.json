@@ -1,0 +1,74 @@
+{
+  "title": "Modelos de Workflow",
+  "description": "Modelos de workflow reutilizáveis salvos de execuções concluídas",
+  "table": {
+    "name": "Nome",
+    "project": "Projeto",
+    "tasks": "Tarefas",
+    "recurrence": "Agendamento",
+    "lastRun": "Última Execução",
+    "nextRun": "Próxima Execução",
+    "actions": "Ações"
+  },
+  "actions": {
+    "runNow": "Executar Agora",
+    "edit": "Editar Tarefas",
+    "schedule": "Agendar",
+    "delete": "Excluir",
+    "duplicate": "Duplicar"
+  },
+  "schedule": {
+    "manual": "Manual",
+    "time": "Horário",
+    "presets": {
+      "hourly": "A cada hora",
+      "daily": "Diariamente",
+      "weekly_monday": "Toda segunda-feira",
+      "weekly_friday": "Toda sexta-feira",
+      "monthly": "Mensalmente no dia 1°"
+    }
+  },
+  "empty": {
+    "title": "Nenhum modelo de workflow ainda",
+    "description": "Salve um workflow concluído como modelo para reexecutá-lo sem passar pelo planejamento."
+  },
+  "editModal": {
+    "title": "Editar Modelo",
+    "name": "Nome",
+    "description": "Descrição",
+    "recurrence": "Agendamento",
+    "tasks": "Tarefas",
+    "taskName": "Nome da Tarefa",
+    "taskPrompt": "Prompt",
+    "taskCwd": "Diretório de Trabalho",
+    "taskWorkspace": "Equipe",
+    "save": "Salvar Alterações",
+    "saving": "Salvando...",
+    "cancel": "Cancelar"
+  },
+  "scheduleModal": {
+    "title": "Agendar Modelo"
+  },
+  "runModal": {
+    "title": "Executar Modelo",
+    "description": "Selecione um projeto para executar este modelo.",
+    "selectProject": "Selecione um projeto",
+    "run": "Executar",
+    "running": "Executando...",
+    "cancel": "Cancelar"
+  },
+  "deleteConfirm": {
+    "title": "Excluir Modelo",
+    "message": "Tem certeza de que deseja excluir este modelo? Esta ação não pode ser desfeita.",
+    "confirm": "Excluir",
+    "cancel": "Cancelar"
+  },
+  "duplicateSuccess": "Modelo duplicado com sucesso",
+  "duplicateError": "Falha ao duplicar modelo",
+  "updateSuccess": "Modelo atualizado com sucesso",
+  "updateError": "Falha ao atualizar modelo",
+  "deleteSuccess": "Modelo excluído com sucesso",
+  "deleteError": "Falha ao excluir modelo",
+  "runSuccess": "Execução do modelo iniciada",
+  "runError": "Falha ao iniciar execução do modelo"
+}

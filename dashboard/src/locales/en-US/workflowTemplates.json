@@ -1,0 +1,74 @@
+{
+  "title": "Workflow Templates",
+  "description": "Reusable workflow templates saved from completed executions",
+  "table": {
+    "name": "Name",
+    "project": "Project",
+    "tasks": "Tasks",
+    "recurrence": "Schedule",
+    "lastRun": "Last Run",
+    "nextRun": "Next Run",
+    "actions": "Actions"
+  },
+  "actions": {
+    "runNow": "Run Now",
+    "edit": "Edit Tasks",
+    "schedule": "Schedule",
+    "delete": "Delete",
+    "duplicate": "Duplicate"
+  },
+  "schedule": {
+    "manual": "Manual",
+    "time": "Time",
+    "presets": {
+      "hourly": "Every hour",
+      "daily": "Daily",
+      "weekly_monday": "Every Monday",
+      "weekly_friday": "Every Friday",
+      "monthly": "Monthly on the 1st"
+    }
+  },
+  "empty": {
+    "title": "No workflow templates yet",
+    "description": "Save a completed workflow as a template to re-execute it without going through planning."
+  },
+  "editModal": {
+    "title": "Edit Template",
+    "name": "Name",
+    "description": "Description",
+    "recurrence": "Schedule",
+    "tasks": "Tasks",
+    "taskName": "Task Name",
+    "taskPrompt": "Prompt",
+    "taskCwd": "Working Directory",
+    "taskWorkspace": "Team",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "cancel": "Cancel"
+  },
+  "scheduleModal": {
+    "title": "Schedule Template"
+  },
+  "runModal": {
+    "title": "Run Template",
+    "description": "Select a project to run this template.",
+    "selectProject": "Select a project",
+    "run": "Run",
+    "running": "Running...",
+    "cancel": "Cancel"
+  },
+  "deleteConfirm": {
+    "title": "Delete Template",
+    "message": "Are you sure you want to delete this template? This action cannot be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "duplicateSuccess": "Template duplicated successfully",
+  "duplicateError": "Failed to duplicate template",
+  "updateSuccess": "Template updated successfully",
+  "updateError": "Failed to update template",
+  "deleteSuccess": "Template deleted successfully",
+  "deleteError": "Failed to delete template",
+  "runSuccess": "Template execution started",
+  "runError": "Failed to start template execution"
+}

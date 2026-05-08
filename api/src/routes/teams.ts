@@ -964,6 +964,75 @@ router.put('/:id/model', authenticateToken, (req, res) => {
   return res.json({ data: { model }, error: null })
 })
 
+// DELETE /api/teams/orphans — deletar equipes sem projetos vinculados
+router.delete('/orphans', authenticateToken, (_req, res) => {
+  try {
+    const allWorkspaces = listAllWorkspaces()
+    const orphanWorkspaces = allWorkspaces.filter(ws => !ws.project_id)
+
+    if (orphanWorkspaces.length === 0) {
+      return res.json({
+        data: { deleted: [], count: 0 },
+        error: null,
+      })
+    }
+
+    const deleted: Array<{ id: string; name: string; path: string }> = []
+
+    for (const workspace of orphanWorkspaces) {
+      const teamPath = workspace.path
+
+      // Remove from project_agents table
+      db.prepare('DELETE FROM project_agents WHERE workspace_path = ?').run(teamPath)
+
+      // Remove from team_roles table
+      try { db.prepare('DELETE FROM team_roles WHERE workspace_path = ?').run(teamPath) } catch {}
+
+      // Remove from team_models table
+      try { db.prepare('DELETE FROM team_models WHERE workspace_path = ?').run(teamPath) } catch {}
+
+      // Remove from agent_environments table
+      db.prepare('DELETE FROM agent_environments WHERE workspace_path = ?').run(teamPath)
+
+      // Remove from team_native_agents table
+      try { db.prepare('DELETE FROM team_native_agents WHERE team_workspace_path = ?').run(teamPath) } catch {}
+
+      // Clear environment references that point to this workspace
+      db.prepare('UPDATE environments SET default_team = NULL WHERE default_team = ?').run(teamPath)
+      db.prepare('UPDATE environments SET team_workspace = NULL WHERE team_workspace = ?').run(teamPath)
+
+      // Record as intentionally deleted to prevent auto-recreation
+      try {
+        db.prepare(
+          "INSERT OR IGNORE INTO deleted_teams (workspace_path, deleted_at) VALUES (?, datetime('now'))"
+        ).run(teamPath)
+      } catch {}
+
+      // Delete the workspace directory
+      try {
+        fs.rmSync(teamPath, { recursive: true, force: true })
+      } catch (err) {
+        console.error(`[teams/orphans] Failed to delete directory ${teamPath}:`, err)
+      }
+
+      deleted.push({ id: workspace.id, name: workspace.name, path: teamPath })
+    }
+
+    console.log(`[teams/orphans] Deleted ${deleted.length} orphan team(s): ${deleted.map(d => d.name).join(', ')}`)
+
+    return res.json({
+      data: { deleted, count: deleted.length },
+      error: null,
+    })
+  } catch (error) {
+    console.error('[teams/orphans] Error deleting orphan teams:', error)
+    return res.status(500).json({
+      data: null,
+      error: error instanceof Error ? error.message : 'Failed to delete orphan teams',
+    })
+  }
+})
+
 // DELETE /api/workspaces/:id — remover workspace
 router.delete('/:id', authenticateToken, (req, res) => {
   const id = getIdParam(req.params)

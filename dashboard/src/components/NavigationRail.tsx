@@ -5,7 +5,8 @@ import {
   Settings, Users, Workflow, AlertCircle, FolderOpen, Zap, MessageSquare,
   LayoutGrid, Package, LogOut, UserCircle, Sun, Moon, Monitor, Check,
   ChevronRight, X, MessageCircle, FolderGit2, Globe, Search,
-  Bot, ShieldCheck, Store, ChevronLeft, Palette, Plus, MessageCircleQuestion
+  Bot, ShieldCheck, Store, ChevronLeft, Palette, Plus, MessageCircleQuestion,
+  Bookmark
 } from 'lucide-react'
 import { useGetPendingApprovals } from '@/api/approvals'
 import { useGetPendingUserInputs } from '@/api/user_inputs'
@@ -236,6 +237,13 @@ export default function NavigationRail({ onQuickAction, onCollapsedChange }: Nav
             isActive={location.pathname === '/kanban'}
             onClick={() => handleNavClick('/kanban')}
             onInfoClick={() => handleInfoClick('kanban')}
+            collapsed={collapsed}
+          />
+          <SidebarButton
+            icon={<Bookmark size={20} />}
+            label={t('common.navigation.templates')}
+            isActive={location.pathname === '/templates'}
+            onClick={() => handleNavClick('/templates')}
             collapsed={collapsed}
           />
           <SidebarButton

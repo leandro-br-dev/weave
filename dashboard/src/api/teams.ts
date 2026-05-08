@@ -146,6 +146,18 @@ export function useDeleteTeam() {
   })
 }
 
+export function useDeleteOrphanTeams() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiClient.delete<{ deleted: Array<{ id: string; name: string; path: string }>; count: number }>('/api/teams/orphans'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: teamKeys.list() })
+      qc.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
 /** @deprecated Use useDeleteTeam instead */
 export const useDeleteWorkspace = useDeleteTeam
 

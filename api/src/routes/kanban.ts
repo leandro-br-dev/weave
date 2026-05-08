@@ -46,6 +46,9 @@ router.get('/scheduled', authenticateToken, (req: Request, res: Response) => {
         kt.is_public,
         kt.created_at,
         kt.updated_at,
+        kt.template_type,
+        kt.skip_planning,
+        kt.schedule_time,
         p.settings as project_settings
       FROM kanban_templates kt
       LEFT JOIN projects p ON p.id = kt.project_id

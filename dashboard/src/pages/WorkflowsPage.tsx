@@ -11,6 +11,7 @@ import {
   Pagination,
   ProjectIcon,
   ProjectSelectDropdown,
+  NewWorkflowModal,
 } from '@/components'
 import { useGetPlans, useGetMetrics, useCreatePlan } from '@/api/plans'
 import { useGetProjects } from '@/api/projects'
@@ -34,6 +35,7 @@ export default function WorkflowsPage() {
   const [sortColumn, setSortColumn] = useState<string>('created_at')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const importRef = useRef<HTMLInputElement>(null)
+  const [showNewWorkflow, setShowNewWorkflow] = useState(false)
 
   const { data: metrics } = useGetMetrics()
   const { data: allPlans = [], isLoading, error } = useGetPlans()
@@ -255,7 +257,7 @@ export default function WorkflowsPage() {
 
             <Button
               variant="primary"
-              onClick={() => (window.location.href = '/plans/new')}
+              onClick={() => setShowNewWorkflow(true)}
               className="text-xs sm:text-sm"
             >
               <Plus className="h-3.5 sm:h-4 w-3.5 sm:w-4" /> <span className="hidden sm:inline">{t('pages.workflows.header.newWorkflow')}</span><span className="sm:hidden">{t('pages.workflows.header.new')}</span>
@@ -583,6 +585,8 @@ export default function WorkflowsPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {showNewWorkflow && <NewWorkflowModal onClose={() => setShowNewWorkflow(false)} />}
     </div>
   )
 }

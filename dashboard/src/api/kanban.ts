@@ -41,8 +41,36 @@ export interface KanbanTask {
 }
 
 /**
+ * Serialized plan data stored in workflow templates.
+ * Contains the full plan structure needed to re-execute a workflow.
+ */
+export interface PlanData {
+  name: string;
+  summary?: string;
+  tasks: PlanTask[];
+}
+
+/**
+ * A single task within a PlanData object.
+ * Mirrors the plan task schema from the backend.
+ */
+export interface PlanTask {
+  id: string;
+  name: string;
+  prompt: string;
+  cwd: string;
+  workspace: string;
+  tools: string[];
+  permission_mode: string;
+  depends_on: string[];
+}
+
+/**
  * Template interface for the new kanban_templates table
- * Templates are now separate from tasks and can be reused across projects
+ * Templates are now separate from tasks and can be reused across projects.
+ *
+ * Workflow templates (template_type='workflow') store complete plan data
+ * and can be re-executed without going through the planning phase.
  */
 export interface KanbanTemplate {
   id: string;
@@ -56,6 +84,24 @@ export interface KanbanTemplate {
   last_run_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Template type: 'kanban' (default) or 'workflow' (stores full plan data) */
+  template_type?: 'kanban' | 'workflow';
+  /** JSON string or parsed PlanData object (only for workflow templates) */
+  plan_data?: PlanData | string | null;
+  /** When true, the daemon creates a plan directly without the planning agent */
+  skip_planning?: boolean;
+  /** Target environment for execution */
+  environment_id?: string | null;
+  /** Team workspace to execute with */
+  team_id?: string | null;
+  /** Reference to the original plan this template was created from */
+  source_plan_id?: string | null;
+  /** ID of the backing plan record (status='template') for editable workflows */
+  template_plan_id?: string | null;
+  /** Custom schedule time in HH:MM format (overrides preset defaults) */
+  schedule_time?: string | null;
+  /** User who created the template */
+  user_id?: string | null;
 }
 
 export const COLUMNS = [
@@ -324,6 +370,7 @@ export function useCreateTemplate() {
       apiClient.post<KanbanTemplate>(`/api/templates`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
     },
   });
 }
@@ -338,6 +385,7 @@ export function useUpdateTemplate() {
       apiClient.put<KanbanTemplate>(`/api/templates/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
     },
   });
 }
@@ -352,6 +400,7 @@ export function useDeleteTemplate() {
       apiClient.delete(`/api/templates/${templateId}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
     },
   });
 }
@@ -395,6 +444,89 @@ export function useUseTemplate() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['kanban'] });
       qc.invalidateQueries({ queryKey: ['templates'] });
+    },
+  });
+}
+
+// ============================================================================
+// WORKFLOW TEMPLATE HOOKS
+// ============================================================================
+
+/**
+ * Save a completed workflow plan as a reusable template.
+ * The plan must be in a terminal state ('success' or 'failed').
+ */
+export function useSavePlanAsTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      planId,
+      ...data
+    }: {
+      planId: string;
+      title?: string;
+      description?: string;
+      recurrence?: string;
+      schedule_time?: string;
+      is_public?: boolean;
+      project_id?: string;
+    }) =>
+      apiClient.post<KanbanTemplate>(`/api/templates/save-from-plan/${planId}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
+    },
+  });
+}
+
+/**
+ * Get all workflow templates (template_type = 'workflow' only)
+ */
+export function useGetWorkflowTemplates() {
+  return useQuery({
+    queryKey: ['workflow-templates'],
+    queryFn: () => apiClient.get<KanbanTemplate[]>(`/api/templates/workflow`),
+    refetchInterval: 30000,
+  });
+}
+
+/**
+ * Run a workflow template now (one-shot execution).
+ * Creates a kanban task in 'in_dev' with a pre-created plan.
+ */
+export function useRunWorkflowTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ templateId, projectId }: { templateId: string; projectId: string }) =>
+      apiClient.post<KanbanTask>(`/api/templates/${templateId}/use`, { projectId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['kanban'] });
+      qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
+    },
+  });
+}
+
+/**
+ * Update a template's recurrence schedule.
+ * Can reuse useUpdateTemplate, but this provides a typed convenience hook.
+ */
+export function useUpdateTemplateSchedule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      recurrence,
+      next_run_at,
+    }: {
+      id: string;
+      recurrence?: string;
+      next_run_at?: string | null;
+    }) =>
+      apiClient.put<KanbanTemplate>(`/api/templates/${id}`, { recurrence, next_run_at }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['templates'] });
+      qc.invalidateQueries({ queryKey: ['workflow-templates'] });
     },
   });
 }

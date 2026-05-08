@@ -88,6 +88,7 @@
       "defaultAgents": {
         "title": "Create Default Teams",
         "description": "You can create default teams to get started quickly. The planner team is essential for the pipeline workflow to function correctly.",
+        "note": "Note: When creating a project with default environments, the system auto-creates the matching team (Plan Team, Dev Team, or Staging Team) with the correct permissions and CLAUDE.md. This modal is only needed for manually-created environments.",
         "coder": {
           "label": "Coder Team",
           "description": "Implements features and fixes following project patterns"

@@ -23,6 +23,7 @@
     "denied": "Negado",
     "awaitingApproval": "Aguardando Aprovação",
     "awaiting_approval": "Aguardando Aprovação",
+    "template": "Modelo",
     "error": "Erro",
     "cancelled": "Cancelado"
   },
@@ -121,5 +122,34 @@
     "hint": "Deixe vazio para uma melhoria geral, ou descreva as mudanças específicas que deseja.",
     "cancel": "Cancelar",
     "confirm": "Melhorar"
+  },
+  "newWorkflow": {
+    "title": "Novo Fluxo",
+    "chooseDescription": "Como você deseja criar seu fluxo de trabalho?",
+    "manualTitle": "Criação Manual",
+    "manualDescription": "Defina manualmente cada tarefa, dependências, diretórios e equipes. Ideal para fluxos que você já conhece bem.",
+    "aiTitle": "Criação por IA",
+    "aiDescription": "Descreva o que precisa ser feito e a IA analisa o projeto, divide em tarefas e gera um fluxo completo automaticamente.",
+    "project": "Projeto",
+    "selectProject": "Selecione um projeto...",
+    "team": "Equipe",
+    "selectTeam": "Selecione uma equipe...",
+    "noTeams": "Nenhuma equipe disponível para este projeto. Crie uma equipe primeiro.",
+    "environment": "Ambiente",
+    "noEnvironment": "Nenhum ambiente específico",
+    "description": "O que você precisa?",
+    "descriptionPlaceholder": "Descreva o que deve ser realizado. Ex: \"Criar uma tela de login com autenticação via Google e validação de e-mail. Deve funcionar em mobile e desktop.\"",
+    "generate": "Gerar Fluxo",
+    "generating": "Gerando fluxo...",
+    "generatedTitle": "Fluxo Gerado",
+    "ready": "Pronto",
+    "requestLabel": "Solicitação",
+    "waitingForOutput": "A IA está analisando o projeto e gerando o fluxo...",
+    "planReadyInfo": "{{count}} tarefa(s) gerada(s) — {{name}}",
+    "tasksPreview": "Tarefas geradas",
+    "dependsOn": "{{count}} dependência(s)",
+    "createWorkflow": "Criar Fluxo de Trabalho",
+    "back": "Voltar",
+    "close": "Fechar"
   }
 }

@@ -117,5 +117,17 @@
   "convertToChatTitle": "Transform this workflow into a chat session, preserving the Claude Code session context",
   "converting": "Converting...",
   "convertedToChat": "Workflow converted to chat successfully",
-  "convertToChatError": "Failed to convert workflow to chat"
+  "convertToChatError": "Failed to convert workflow to chat",
+  "saveAsTemplate": "Save as Template",
+  "saveAsTemplateTitle": "Save Workflow as Template",
+  "saveAsTemplateDescription": "Save this completed workflow as a reusable template. You can re-execute it later without going through planning.",
+  "templateName": "Template Name",
+  "templateDescription": "Description",
+  "templateRecurrence": "Schedule",
+  "templateIsPublic": "Public template",
+  "saving": "Saving...",
+  "saveTemplate": "Save Template",
+  "saveTemplateSuccess": "Workflow saved as template successfully",
+  "saveTemplateError": "Failed to save workflow as template",
+  "backToTemplates": "Back to Templates"
 }

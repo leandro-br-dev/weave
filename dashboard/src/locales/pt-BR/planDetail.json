@@ -117,5 +117,17 @@
   "convertToChatTitle": "Transformar este workflow em uma sessão de chat, preservando o contexto da sessão do Claude Code",
   "converting": "Convertendo...",
   "convertedToChat": "Workflow convertido em chat com sucesso",
-  "convertToChatError": "Falha ao converter workflow em chat"
+  "convertToChatError": "Falha ao converter workflow em chat",
+  "saveAsTemplate": "Salvar como Modelo",
+  "saveAsTemplateTitle": "Salvar Workflow como Modelo",
+  "saveAsTemplateDescription": "Salve este workflow concluído como um modelo reutilizável. Você pode reexecutá-lo depois sem passar pelo planejamento.",
+  "templateName": "Nome do Modelo",
+  "templateDescription": "Descrição",
+  "templateRecurrence": "Agendamento",
+  "templateIsPublic": "Modelo público",
+  "saving": "Salvando...",
+  "saveTemplate": "Salvar Modelo",
+  "saveTemplateSuccess": "Workflow salvo como modelo com sucesso",
+  "saveTemplateError": "Falha ao salvar workflow como modelo",
+  "backToTemplates": "Voltar para Modelos"
 }

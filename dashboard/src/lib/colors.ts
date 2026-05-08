@@ -396,6 +396,15 @@ export const statusColors: Record<string, StatusColorScheme> = {
     solid: 'bg-gray-400',
     label: 'Unknown',
   },
+
+  /** Template plan — never executed, uses amber to indicate a reusable model */
+  template: {
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    solid: 'bg-amber-500',
+    label: 'Template',
+  },
 } as const
 
 // ============================================================================
@@ -1050,6 +1059,15 @@ export const darkModeStatusColors: Record<string, StatusColorScheme> = {
     border: 'dark:border-gray-700',
     solid: 'bg-gray-500',
     label: 'Unknown',
+  },
+
+  /** Template plan — dark amber theme */
+  template: {
+    bg: 'dark:bg-amber-950',
+    text: 'dark:text-amber-300',
+    border: 'dark:border-amber-900',
+    solid: 'bg-amber-500',
+    label: 'Template',
   },
 } as const
 

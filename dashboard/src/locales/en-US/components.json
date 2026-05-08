@@ -23,6 +23,7 @@
     "denied": "Denied",
     "awaitingApproval": "Awaiting Approval",
     "awaiting_approval": "Awaiting Approval",
+    "template": "Template",
     "error": "Error",
     "cancelled": "Cancelled"
   },
@@ -121,5 +122,34 @@
     "hint": "Leave empty for a general improvement, or describe specific changes you'd like.",
     "cancel": "Cancel",
     "confirm": "Improve"
+  },
+  "newWorkflow": {
+    "title": "New Workflow",
+    "chooseDescription": "How would you like to create your workflow?",
+    "manualTitle": "Manual Creation",
+    "manualDescription": "Manually define each task, dependencies, directories and teams. Ideal for workflows you already know well.",
+    "aiTitle": "AI Creation",
+    "aiDescription": "Describe what needs to be done and the AI will analyze the project, break it into tasks, and generate a complete workflow automatically.",
+    "project": "Project",
+    "selectProject": "Select a project...",
+    "team": "Team",
+    "selectTeam": "Select a team...",
+    "noTeams": "No teams available for this project. Create a team first.",
+    "environment": "Environment",
+    "noEnvironment": "No specific environment",
+    "description": "What do you need?",
+    "descriptionPlaceholder": "Describe what should be done. E.g.: \"Create a login screen with Google authentication and email validation. Must work on mobile and desktop.\"",
+    "generate": "Generate Workflow",
+    "generating": "Generating workflow...",
+    "generatedTitle": "Workflow Generated",
+    "ready": "Ready",
+    "requestLabel": "Request",
+    "waitingForOutput": "AI is analyzing the project and generating the workflow...",
+    "planReadyInfo": "{{count}} task(s) generated — {{name}}",
+    "tasksPreview": "Generated tasks",
+    "dependsOn": "{{count}} dependenc(ies)",
+    "createWorkflow": "Create Workflow",
+    "back": "Back",
+    "close": "Close"
   }
 }

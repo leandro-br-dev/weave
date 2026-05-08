@@ -89,7 +89,7 @@ export function DefaultAgentsModal({
           </p>
           <div className={`mb-4 p-3 rounded-lg ${withDarkMode('bg-blue-50 border border-blue-200', 'dark:bg-blue-900/20 dark:border-blue-800')}`}>
             <p className={`text-xs ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
-              <strong>Note:</strong> When creating a project with default environments, the system auto-creates the matching team (Plan Team, Dev Team, or Staging Team) with the correct permissions and CLAUDE.md. This modal is only needed for manually-created environments.
+              {t('pages.projects.defaultAgents.note')}
             </p>
           </div>
 

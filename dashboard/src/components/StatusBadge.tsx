@@ -14,6 +14,7 @@ const config: Record<string, { bg: string; text: string; dot: string; darkBg: st
   approved:          { bg: statusColors.approved.bg,      text: statusColors.approved.text,      dot: statusColors.approved.solid,      darkBg: darkModeStatusColors.approved.bg,      darkText: darkModeStatusColors.approved.text,      labelI18nKey: 'components.status.approved' },
   denied:            { bg: statusColors.denied.bg,        text: statusColors.denied.text,        dot: statusColors.denied.solid,        darkBg: darkModeStatusColors.denied.bg,        darkText: darkModeStatusColors.denied.text,        labelI18nKey: 'components.status.denied' },
   awaiting_approval: { bg: statusColors.timeout.bg,       text: statusColors.timeout.text,       dot: statusColors.timeout.solid,       darkBg: darkModeStatusColors.timeout.bg,       darkText: darkModeStatusColors.timeout.text,       labelI18nKey: 'components.status.awaitingApproval' },
+  template:          { bg: statusColors.template.bg,      text: statusColors.template.text,      dot: statusColors.template.solid,      darkBg: darkModeStatusColors.template.bg,      darkText: darkModeStatusColors.template.text,      labelI18nKey: 'components.status.template' },
 }
 
 const defaultConfig = {

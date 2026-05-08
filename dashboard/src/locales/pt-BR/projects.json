@@ -88,6 +88,7 @@
   "defaultAgents": {
     "title": "Criar Equipes Padrão",
     "description": "Você pode criar equipes padrão para começar rapidamente. A equipe planejadora é essencial para o funcionamento correto do pipeline.",
+    "note": "Nota: Ao criar um projeto com ambientes padrão, o sistema cria automaticamente a equipe correspondente (Equipe Plan, Equipe Dev ou Equipe Staging) com as permissões corretas e o CLAUDE.md. Este modal é necessário apenas para ambientes criados manualmente.",
     "coder": {
       "label": "Equipe Coder",
       "description": "Implementa funcionalidades e correções seguindo os padrões do projeto"

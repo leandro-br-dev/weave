@@ -662,4 +662,24 @@ export const migrations: Migration[] = [
       `ALTER TABLE kanban_tasks ADD COLUMN review_approval_id TEXT`,
     ],
   },
+  {
+    version: 49,
+    description: 'Kanban templates — add workflow template columns (template_type, plan_data, skip_planning, environment_id, team_id, source_plan_id)',
+    up: [
+      `ALTER TABLE kanban_templates ADD COLUMN template_type TEXT DEFAULT 'kanban'`,
+      `ALTER TABLE kanban_templates ADD COLUMN plan_data TEXT DEFAULT NULL`,
+      `ALTER TABLE kanban_templates ADD COLUMN skip_planning INTEGER DEFAULT 0`,
+      `ALTER TABLE kanban_templates ADD COLUMN environment_id TEXT DEFAULT NULL`,
+      `ALTER TABLE kanban_templates ADD COLUMN team_id TEXT DEFAULT NULL`,
+      `ALTER TABLE kanban_templates ADD COLUMN source_plan_id TEXT DEFAULT NULL`,
+    ],
+  },
+  {
+    version: 50,
+    description: 'Kanban templates — add template_plan_id (real plan backing) and schedule_time columns',
+    up: [
+      `ALTER TABLE kanban_templates ADD COLUMN template_plan_id TEXT DEFAULT NULL REFERENCES plans(id) ON DELETE SET NULL`,
+      `ALTER TABLE kanban_templates ADD COLUMN schedule_time TEXT DEFAULT NULL`,
+    ],
+  },
 ];

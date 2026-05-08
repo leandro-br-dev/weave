@@ -42,6 +42,15 @@
         "confirm": "Tem certeza de que deseja excluir a equipe \"{{name}}\"? Esta ação não pode ser desfeita.",
         "success": "Equipe excluída com sucesso"
       },
+      "deleteOrphans": {
+        "button": "Limpar Equipes Órfãs ({{count}})",
+        "buttonShort": "Limpar ({{count}})",
+        "title": "Deletar Equipes sem Projetos Vinculados",
+        "confirm": "Tem certeza de que deseja deletar {{count}} equipe(s) sem projetos vinculados? Isso removerá os diretórios de workspace e todos os dados do banco de dados. Esta ação não pode ser desfeita.",
+        "confirmButton": "Deletar Equipes Órfãs",
+        "success": "{{count}} equipe(s) órfã(s) removida(s) com sucesso.",
+        "error": "Erro ao deletar equipes órfãs."
+      },
       "configure": {
         "title": "Configurar Equipe",
         "general": "Configurações Gerais",

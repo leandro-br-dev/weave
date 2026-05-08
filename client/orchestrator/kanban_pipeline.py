@@ -34,8 +34,16 @@ from orchestrator.team_trigger import (
 async def process_scheduled_tasks(client) -> None:
     """
     Processa templates agendados cujo next_run_at chegou.
-    Cria uma task em 'planning' usando o endpoint /api/templates/:id/use
-    e calcula o próximo next_run_at.
+
+    For kanban templates: creates a task in 'planning' column using
+    /api/templates/:id/use, which triggers the planning agent.
+
+    For workflow templates (template_type='workflow', skip_planning=1):
+    the /api/templates/:id/use endpoint handles everything internally —
+    it creates a kanban task directly in 'in_dev' with a pre-created plan
+    (status='pending'). The daemon does NOT need special handling here;
+    the existing _process_in_dev_tasks() picks up the new task naturally
+    and triggers the Dev Team for execution.
     """
     try:
         scheduled = await client.get_scheduled_tasks()
@@ -50,6 +58,9 @@ async def process_scheduled_tasks(client) -> None:
             title = template.get('title', 'Scheduled Template')
             cron_expr = template.get('recurrence', '')
             is_public = template.get('is_public', False)
+            template_type = template.get('template_type', 'kanban')
+            skip_planning = template.get('skip_planning', False)
+            schedule_time = template.get('schedule_time')
 
             if not template_id or not cron_expr:
                 continue
@@ -61,9 +72,17 @@ async def process_scheduled_tasks(client) -> None:
                 logger.warning(f'[Scheduler] Skipping public template "{title}" (id={template_id}) - no target project specified')
                 continue
 
-            logger.info(f'[Scheduler] Triggering scheduled template: "{title}" ({cron_expr}) in project {template_project_id}')
+            # Template-type-aware logging
+            if template_type == 'workflow' and skip_planning:
+                logger.info(f'[Scheduler] Triggering scheduled workflow template: "{title}" (skip_planning) in project {template_project_id}')
+            else:
+                logger.info(f'[Scheduler] Triggering scheduled kanban template: "{title}" ({cron_expr}) in project {template_project_id}')
 
-            # Cria task a partir do template via novo endpoint
+            # Cria task a partir do template via endpoint
+            # For workflow templates with skip_planning, the API creates:
+            #   1. kanban task in 'in_dev' (not 'planning') with pipeline_status='idle'
+            #   2. A new plan with regenerated task IDs and status='pending'
+            # The daemon's _process_in_dev_tasks() will pick it up automatically.
             result = await client._post(
                 f'/api/templates/{template_id}/use',
                 {'projectId': template_project_id}
@@ -74,10 +93,12 @@ async def process_scheduled_tasks(client) -> None:
                 continue
 
             new_task = result.get('data') or result
-            logger.info(f'[Scheduler] Created task from template: {new_task.get("id", "?")} in planning')
+            # Log the column the task was created in (varies by template type)
+            new_column = new_task.get('column', 'planning')
+            logger.info(f'[Scheduler] Created task from template: {new_task.get("id", "?")} in {new_column}')
 
             # Calcula e salva o próximo next_run_at no template
-            next_run = next_run_from_cron(cron_expr)
+            next_run = next_run_from_cron(cron_expr, schedule_time=schedule_time)
             next_run_str = next_run.strftime('%Y-%m-%d %H:%M:%S') if next_run else None
 
             # Atualiza o template (não a task)

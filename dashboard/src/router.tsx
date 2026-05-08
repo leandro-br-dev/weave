@@ -17,6 +17,7 @@ import UsersPage from './pages/UsersPage'
 import ChatPage from './pages/ChatPage'
 import KanbanPage from './pages/KanbanPage'
 import MarketplacePage from './pages/MarketplacePage'
+import WorkflowTemplatesPage from './pages/WorkflowTemplatesPage'
 
 function ProtectedRoute() {
   const { isLoading, isAuthenticated, hasUsers } = useAuth()
@@ -127,6 +128,10 @@ export const router = [
       {
         path: 'kanban',
         element: <KanbanPage />,
+      },
+      {
+        path: 'templates',
+        element: <WorkflowTemplatesPage />,
       },
       {
         path: 'settings',

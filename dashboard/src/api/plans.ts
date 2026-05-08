@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
-export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'awaiting_approval';
+export type PlanStatus = 'pending' | 'running' | 'success' | 'failed' | 'awaiting_approval' | 'template';
 
 export interface Task {
   id: string;
@@ -304,6 +304,28 @@ export const useGetWorkflowFiles = (planId: string, enabled: boolean = true) => 
     refetchInterval: (query) => {
       const plan = query.state.data as Plan | undefined;
       return plan?.status === 'running' ? 5000 : false;
+    },
+  });
+};
+
+// ── AI Workflow Generation ───────────────────────────────────────────────────
+
+export interface AIGenerateRequest {
+  description: string;
+  project_id: string;
+  team_id: string;
+  environment_id?: string;
+  name?: string;
+}
+
+export const useAIGenerateWorkflow = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: AIGenerateRequest) =>
+      apiClient.post<Plan>('/api/plans/ai-generate', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
     },
   });
 };

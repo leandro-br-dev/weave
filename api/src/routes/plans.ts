@@ -1,9 +1,63 @@
 import { Router, Request, Response } from 'express'
 import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { db } from '../db/index.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { randomUUID } from 'crypto'
 import { ensureWorkflowDir, writePlanJson } from '../services/workflowDir.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+/**
+ * Resolve a team_id (base64url-encoded workspace path) to workspace info.
+ * Uses the same pattern as teams.ts: listAllWorkspaces().find(...)
+ * Returns { path, role, name } or null if not found.
+ */
+function resolveTeam(teamId: string): { path: string; role: string; name: string } | null {
+  // The team_id from the frontend is a base64url-encoded filesystem path.
+  // Decode it and verify it exists on disk.
+  try {
+    const decodedPath = Buffer.from(teamId, 'base64url').toString('utf-8')
+    if (!fs.existsSync(decodedPath)) return null
+
+    // Extract team name from path
+    const name = path.basename(decodedPath)
+
+    // Look up role from team_roles table
+    const roleRow = db.prepare(
+      'SELECT role FROM team_roles WHERE workspace_path = ? LIMIT 1'
+    ).get(decodedPath) as any
+    const dirRole = name.replace(/^team-|^agent-/, '')
+    const role = roleRow?.role || dirRole
+
+    return { path: decodedPath, role, name }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * List all teams for a given project_id.
+ * Uses project_agents + team_roles tables (same approach as teams.ts listAllWorkspaces).
+ */
+function listTeamsForProject(projectId: string): Array<{ workspace_path: string; role: string; name: string }> {
+  const rows = db.prepare(`
+    SELECT
+      pa.workspace_path,
+      COALESCE(tr.role, 'generic') as role
+    FROM project_agents pa
+    LEFT JOIN team_roles tr ON tr.workspace_path = pa.workspace_path
+    WHERE pa.project_id = ?
+  `).all(projectId) as any[]
+
+  return rows.map(row => ({
+    workspace_path: row.workspace_path,
+    role: row.role || 'generic',
+    name: path.basename(row.workspace_path),
+  }))
+}
 
 const router = Router()
 
@@ -43,6 +97,169 @@ router.post('/prepare-workflow', authenticateToken, (req: Request, res: Response
   } catch (error) {
     console.error('Error preparing workflow:', error)
     res.status(500).json({ data: null, error: 'Failed to prepare workflow' })
+  }
+})
+
+// ───────────────────────────────────────────────────────────
+// POST /api/plans/ai-generate
+// Creates a plan that uses the planning native skill to generate
+// a workflow from a user description. The plan runs a planning
+// agent that reads the codebase, breaks down the request into
+// tasks, and saves a plan.json to the workflow directory.
+// The final result is a workflow in 'pending' status ready for
+// review/edit/execute.
+// ───────────────────────────────────────────────────────────
+router.post('/ai-generate', authenticateToken, (req: Request, res: Response) => {
+  try {
+    const {
+      description,      // what the user wants — free-text description
+      project_id,       // which project
+      team_id,          // which team/workspace to use for planning
+      environment_id,   // optional environment (for cwd)
+      name,             // optional workflow name
+    } = req.body
+
+    if (!description || !project_id || !team_id) {
+      return res.status(400).json({
+        data: null,
+        error: 'description, project_id, and team_id are required'
+      })
+    }
+
+    // Resolve project
+    const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(project_id) as any
+    if (!project) {
+      return res.status(404).json({ data: null, error: 'Project not found' })
+    }
+
+    // Resolve team/workspace from team_id (base64url-encoded path)
+    const team = resolveTeam(team_id)
+    if (!team) {
+      return res.status(404).json({ data: null, error: 'Team not found' })
+    }
+
+    // Resolve cwd from environment or team workspace
+    let cwd = team.path || ''
+    let env_context = ''
+    if (environment_id) {
+      const env = db.prepare('SELECT * FROM environments WHERE id = ?').get(environment_id) as any
+      if (env) {
+        cwd = env.project_path ?? cwd
+        env_context = `${env.name} (${env.type})\nProject path: ${env.project_path}`
+      }
+    }
+
+    // Load planning native skill
+    const nativeSkillsPath = path.join(__dirname, '../../../native-skills')
+    const skillPath = path.join(nativeSkillsPath, 'planning', 'SKILL.md')
+    let skillContent = ''
+    if (fs.existsSync(skillPath)) {
+      skillContent = fs.readFileSync(skillPath, 'utf-8')
+    }
+
+    const planId = randomUUID()
+    const taskId = randomUUID()
+
+    // Create per-workflow directory
+    let workflowPath: string | null = null
+    try {
+      workflowPath = ensureWorkflowDir(project.name, planId)
+    } catch (dirError) {
+      console.error(`[ai-generate] Failed to create workflow directory for plan ${planId}:`, dirError)
+    }
+
+    // Substitute [WORKFLOW_DIR] placeholder
+    if (workflowPath && skillContent) {
+      skillContent = skillContent.replace(/\[WORKFLOW_DIR\]/g, workflowPath)
+    }
+
+    // Build the planning prompt with project context
+    let planningPrompt = ''
+    if (skillContent) {
+      planningPrompt = skillContent + '\n\n---\n\n'
+    }
+
+    // Add project and environment context
+    planningPrompt += `## Project Context\n\nName: ${project.name}\nDescription: ${project.description || 'No description'}\n\n`
+
+    // Add environments info
+    const environments = db.prepare('SELECT * FROM environments WHERE project_id = ?').all(project_id) as any[]
+    if (environments.length > 0) {
+      planningPrompt += '## Environments\n\n'
+      const targetEnv = environment_id ? environments.find(e => e.id === environment_id) : null
+      if (targetEnv) {
+        planningPrompt += `**Target environment**: ${targetEnv.name} (${targetEnv.type}) — \`${targetEnv.project_path}\`\n`
+        planningPrompt += 'Use the target environment\'s project_path as the cwd for all tasks.\n\n'
+      }
+      for (const env of environments) {
+        const isTarget = targetEnv && env.id === environment_id
+        const prefix = isTarget ? '🎯 **[TARGET]** ' : ''
+        planningPrompt += `${prefix}- **${env.name}** (${env.type})\n  project_path: \`${env.project_path}\`\n`
+      }
+      planningPrompt += '\n'
+    }
+
+    // Add teams info
+    const teams = listTeamsForProject(project_id)
+    if (teams.length > 0) {
+      planningPrompt += '## Available Teams\n\n'
+      for (const t of teams) {
+        planningPrompt += `- **${t.name}** (role: \`${t.role}\`)\n  workspace: \`${t.workspace_path}\`\n`
+      }
+      planningPrompt += '\nWhen creating tasks, use the exact `workspace` paths listed above.\n'
+      planningPrompt += 'Match task type to team role: planner for planning, coder for implementation, reviewer for validation.\n\n'
+    }
+
+    // Add cwd vs workspace instruction
+    planningPrompt += `## Important: cwd vs workspace\n\n- \`workspace\`: path to the team's workspace folder (where .claude/settings.local.json lives)\n- \`cwd\`: the project directory where the code lives (use environment project_path above)\n\n**⚠️ WARNING: NEVER use subdirectories of project_path as cwd.** Always use the exact project_path provided above.\n\n`
+
+    // Add the user's request
+    planningPrompt += `## User Request\n\n${description}\n`
+
+    // Add instruction to save the plan
+    if (workflowPath) {
+      planningPrompt += `\nAnalyze the request, read the relevant codebase using the project_path above, and generate a precise execution plan.\nSave the plan to \`${workflowPath}/plan.json\` and validate it with \`weave-validate plan ${workflowPath}/plan.json\`.`
+    }
+
+    // Create the planning task
+    const task = {
+      id: taskId,
+      name: name || 'AI Workflow Generation',
+      prompt: planningPrompt,
+      cwd,
+      workspace: team.path,
+      tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Agent'],
+      permission_mode: 'acceptEdits',
+      depends_on: [],
+      env_context: env_context || undefined,
+    }
+
+    // Generate a plan name
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const datetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+    const planName = name
+      ? `${name} — ${datetime}`
+      : `AI Workflow — ${project.name} — ${datetime}`
+
+    // Insert with status 'pending' so the daemon picks it up for execution
+    db.prepare(`
+      INSERT INTO plans (id, name, tasks, status, project_id, type, workflow_path, team_id)
+      VALUES (?, ?, ?, 'pending', ?, 'ai_generate', ?, ?)
+    `).run(planId, planName, JSON.stringify([task]), project_id, workflowPath, team_id)
+
+    // Write plan.json to workflow directory
+    if (workflowPath) {
+      writePlanJson(workflowPath, { name: planName, tasks: [task], id: planId, status: 'pending' })
+    }
+
+    const plan = db.prepare('SELECT * FROM plans WHERE id = ?').get(planId) as any
+    console.log(`[ai-generate] AI workflow plan created: id=${planId}, name="${planName}"`)
+
+    res.status(201).json({ data: parsePlan(plan), error: null })
+  } catch (error) {
+    console.error('Error creating AI-generated plan:', error)
+    res.status(500).json({ data: null, error: 'Failed to create AI-generated plan' })
   }
 })
 

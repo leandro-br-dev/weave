@@ -42,6 +42,15 @@
         "confirm": "Are you sure you want to delete team \"{{name}}\"? This action cannot be undone.",
         "success": "Team deleted successfully"
       },
+      "deleteOrphans": {
+        "button": "Clean Orphan Teams ({{count}})",
+        "buttonShort": "Clean ({{count}})",
+        "title": "Delete Teams Without Linked Projects",
+        "confirm": "Are you sure you want to delete {{count}} team(s) without linked projects? This will remove their workspace directories and all database records. This action cannot be undone.",
+        "confirmButton": "Delete Orphan Teams",
+        "success": "{{count}} orphan team(s) removed successfully.",
+        "error": "Error deleting orphan teams."
+      },
       "configure": {
         "title": "Configure Team",
         "general": "General Settings",

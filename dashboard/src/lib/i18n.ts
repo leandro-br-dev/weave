@@ -21,6 +21,7 @@ import enUSCreatePlan from '../locales/en-US/createPlan.json';
 import enUSPlanDetail from '../locales/en-US/planDetail.json';
 import enUSProjectSelectDemo from '../locales/en-US/projectSelectDemo.json';
 import enUSAuth from '../locales/en-US/auth.json';
+import enUSWorkflowTemplates from '../locales/en-US/workflowTemplates.json';
 
 import ptBRCommon from '../locales/pt-BR/common.json';
 import ptBRWorkflows from '../locales/pt-BR/workflows.json';
@@ -40,6 +41,7 @@ import ptBRCreatePlan from '../locales/pt-BR/createPlan.json';
 import ptBRPlanDetail from '../locales/pt-BR/planDetail.json';
 import ptBRProjectSelectDemo from '../locales/pt-BR/projectSelectDemo.json';
 import ptBRAuth from '../locales/pt-BR/auth.json';
+import ptBRWorkflowTemplates from '../locales/pt-BR/workflowTemplates.json';
 
 // Combine all translation files for each language
 const enUS = {
@@ -63,6 +65,7 @@ const enUS = {
   planDetail: enUSPlanDetail,
   projectSelectDemo: enUSProjectSelectDemo,
   auth: enUSAuth,
+  workflowTemplates: enUSWorkflowTemplates,
 };
 
 const ptBR = {
@@ -86,6 +89,7 @@ const ptBR = {
   planDetail: ptBRPlanDetail,
   projectSelectDemo: ptBRProjectSelectDemo,
   auth: ptBRAuth,
+  workflowTemplates: ptBRWorkflowTemplates,
 };
 
 // Configure i18next instance
