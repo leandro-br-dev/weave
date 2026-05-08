@@ -1312,12 +1312,12 @@ export function PlanDetail() {
                     },
                     {
                       onSuccess: () => {
-                        showToast({ type: 'success', message: t('planDetail.saveTemplateSuccess') });
+                        showToast('success', t('planDetail.saveTemplateSuccess'));
                         setShowSaveTemplateModal(false);
                         navigate('/templates');
                       },
                       onError: () => {
-                        showToast({ type: 'error', message: t('planDetail.saveTemplateError') });
+                        showToast('error', t('planDetail.saveTemplateError'));
                       },
                     },
                   );

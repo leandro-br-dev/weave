@@ -572,10 +572,10 @@ function WorkspaceList({ onSelectWorkspace }: { onSelectWorkspace: (id: string) 
           deleteOrphanTeams.mutate(undefined, {
             onSuccess: (data) => {
               setShowDeleteOrphansConfirm(false)
-              showToast(t('pages.agents.deleteOrphans.success', { count: data.count }), 'success')
+              showToast('success', t('pages.agents.deleteOrphans.success', { count: data.count }))
             },
             onError: () => {
-              showToast(t('pages.agents.deleteOrphans.error'), 'error')
+              showToast('error', t('pages.agents.deleteOrphans.error'))
             },
           })
         }}
