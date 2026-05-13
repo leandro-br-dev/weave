@@ -174,6 +174,39 @@ def _build_handoff_section(workflow_path: str | None) -> str | None:
     return content
 
 
+# Cache for the short-answers skill content (loaded once, reused for every task)
+_short_answers_cache: str | None = None
+
+
+def _load_short_answers_skill() -> str | None:
+    """
+    Load the short-answers skill from native-skills.
+
+    This is the built-in communication protocol injected into every task.
+    Unlike workflow-handoff (conditional), short-answers is always active.
+
+    Returns:
+        Skill content string, or None if the file is not found.
+    """
+    global _short_answers_cache
+
+    if _short_answers_cache is not None:
+        return _short_answers_cache
+
+    skill_path = Path(__file__).resolve().parent.parent.parent / 'native-skills' / 'short-answers' / 'SKILL.md'
+    if not skill_path.exists():
+        logger.warning(f'Short-answers skill not found at {skill_path}')
+        return None
+
+    try:
+        _short_answers_cache = skill_path.read_text(encoding='utf-8')
+        logger.info('[ShortAnswers] Skill loaded and cached')
+        return _short_answers_cache
+    except Exception as e:
+        logger.warning(f'Could not read short-answers skill: {e}')
+        return None
+
+
 def prepare_agent_docs_dir(workspace: str | None, plan_id: str, task_id: str) -> str:
     """
     Return the documentation directory path for agent documentation.
@@ -806,14 +839,15 @@ Your documentation directory for this workflow:
 def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | None = None, workflow_context: str = '', docs_dir: str | None = None, attachment_ids: list[str] | None = None, api_base_url: str | None = None, token: str | None = None, workflow_path: str | None = None) -> str:
     """
     Build the final prompt for a task, injecting:
-    0. Workflow handoff rules (if workflow_path provided)
-    1. Docs inventory (if docs_dir provided)
-    2. Project context (directory structure + git info) — if workflow_context provided
-    3. Environment context (if available from selected environment)
-    4. Working directory (so Claude doesn't create files in /tmp)
-    5. Context from upstream tasks (from saved notes if ctx_dir provided, otherwise from memory)
-    6. Attachment content (if attachment_ids provided with api_base_url and token)
-    7. The task prompt itself
+    0. Short-answers protocol (built-in, always injected)
+    1. Workflow handoff rules (if workflow_path provided)
+    2. Docs inventory (if docs_dir provided)
+    3. Project context (directory structure + git info) — if workflow_context provided
+    4. Environment context (if available from selected environment)
+    5. Working directory (so Claude doesn't create files in /tmp)
+    6. Context from upstream tasks (from saved notes if ctx_dir provided, otherwise from memory)
+    7. Attachment content (if attachment_ids provided with api_base_url and token)
+    8. The task prompt itself
 
     Skills and sub-agents are NOT injected here.
     They live natively in the project under:
@@ -840,7 +874,14 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
     """
     parts: list[str] = []
 
-    # 0. Inject workflow handoff rules (multi-agent communication protocol)
+    # 0. Inject short-answers protocol (built-in communication protocol — always active)
+    short_answers_section = _load_short_answers_skill()
+    if short_answers_section:
+        parts.append(short_answers_section)
+        parts.append('')
+        logger.debug(f"[{task.id}] Short-answers protocol injected")
+
+    # 1. Inject workflow handoff rules (multi-agent communication protocol)
     handoff_section = _build_handoff_section(workflow_path)
     if handoff_section:
         parts.append(handoff_section)

@@ -38,6 +38,8 @@ PHASE_LABEL_MAP: dict[str, str] = {
     'validation': 'Em Validação',
 }
 
+COLUMN_FLOW: list[str] = ['backlog', 'planning', 'in_dev', 'validation', 'done']
+
 
 async def find_team_workspace(
     project_id: str,
@@ -413,9 +415,6 @@ async def handle_team_completion(
         f'[TeamTrigger] Handling completion for task {task_id}: '
         f'column={current_column}, plan_status={plan_status}, result_status={result_status}'
     )
-
-    # Mapa de colunas e transições
-    COLUMN_FLOW = ['backlog', 'planning', 'in_dev', 'validation', 'done']
 
     if current_column not in COLUMN_FLOW:
         logger.warning(f'[TeamTrigger] Unknown column {current_column} for task {task_id}')

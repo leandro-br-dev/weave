@@ -17,6 +17,7 @@ import os
 from datetime import datetime, timezone
 
 from orchestrator import logger
+from orchestrator.runner import _load_short_answers_skill
 from orchestrator.cron_utils import next_run_from_cron
 from orchestrator.team_trigger import (
     find_team_workspace,
@@ -28,6 +29,7 @@ from orchestrator.team_trigger import (
     _handle_needs_rework,
     PHASE_ROLE_MAP,
     PHASE_LABEL_MAP,
+    COLUMN_FLOW,
 )
 
 
@@ -388,7 +390,14 @@ indicate that in the task's `prompt` text — do NOT change the `cwd`.
 
 '''
 
-    return f'''{skill_content}
+    # Load short-answers protocol (built-in communication — always injected)
+    short_answers = _load_short_answers_skill() or ''
+
+    return f'''{short_answers}
+
+---
+
+{skill_content}
 
 ---
 
@@ -838,7 +847,7 @@ async def sync_workflow_status(client) -> None:
 
             active_tasks = [
                 t for t in tasks
-                if t.get("pipeline_status") in ("running", "awaiting_approval")
+                if t.get("pipeline_status") in ("running", "awaiting_approval", "failed")
                 and t.get("workflow_id")
             ]
 
@@ -865,8 +874,57 @@ async def sync_workflow_status(client) -> None:
 
                     # ── Workflow completed successfully ──
                     if plan_status == "success":
-                        # Usa handle_team_completion para decidir transição com base nos gates
-                        await handle_team_completion(task, plan, project_settings, project_id, client)
+                        if task.get("pipeline_status") == "failed":
+                            # Workflow was re-executed (resume/retry) and succeeded.
+                            # The task was previously moved back by handle_team_completion on failure.
+                            # Restore it to the original column and advance normally.
+                            # Determine the target column: advance from the column after
+                            # the current one, since the task already "passed" the current phase
+                            # but was rolled back on failure.
+                            # The workflow represents the current phase, so advance from
+                            # current_column to the next logical column.
+                            try:
+                                current_idx = COLUMN_FLOW.index(current_column)
+                                if current_idx + 1 < len(COLUMN_FLOW):
+                                    next_column = COLUMN_FLOW[current_idx + 1]
+                                    if next_column == 'done':
+                                        new_pipeline = 'done'
+                                    elif next_column == 'validation':
+                                        new_pipeline = 'idle'
+                                    elif next_column == 'in_dev':
+                                        new_pipeline = 'running'
+                                    else:
+                                        new_pipeline = 'idle'
+
+                                    patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
+                                        "column": next_column,
+                                        "pipeline_status": new_pipeline,
+                                        "result_status": result_status or 'success',
+                                        "result_notes": plan.get("result_notes", ''),
+                                        "error_message": '',
+                                    })
+                                    logger.success(
+                                        f"[KanbanPipeline] Workflow {workflow_id[:8]} succeeded after retry, "
+                                        f"advanced task {task_id}: {current_column} → {next_column}"
+                                    )
+                                else:
+                                    # Already at last column — just update status
+                                    patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
+                                        "pipeline_status": 'done',
+                                        "result_status": result_status or 'success',
+                                        "result_notes": plan.get("result_notes", ''),
+                                        "error_message": '',
+                                    })
+                                    logger.success(
+                                        f"[KanbanPipeline] Workflow {workflow_id[:8]} succeeded after retry, "
+                                        f"task {task_id} already at last column, marked as done"
+                                    )
+                            except ValueError:
+                                # Unknown column — fall through to handle_team_completion
+                                await handle_team_completion(task, plan, project_settings, project_id, client)
+                        else:
+                            # Normal completion (not a retry) — use standard gate logic
+                            await handle_team_completion(task, plan, project_settings, project_id, client)
 
                     # ── Workflow failed ──
                     elif plan_status == "failed" and task.get("pipeline_status") != "failed":
@@ -889,6 +947,15 @@ async def sync_workflow_status(client) -> None:
                                 "pipeline_status": "running"
                             })
                             logger.debug(f"[KanbanPipeline] Fixed stale pipeline_status for {task_id}, patch={patch_resp}")
+
+                    # ── Workflow re-executed after failure (resume/retry) ──
+                    elif plan_status in ("pending", "running") and task.get("pipeline_status") == "failed":
+                        # Workflow was re-executed (resume/retry) — reset kanban task to running
+                        patch_resp = await client._put(f'/kanban/{project_id}/{task_id}', {
+                            "pipeline_status": "running",
+                            "error_message": "",
+                        })
+                        logger.info(f"[KanbanPipeline] Workflow {workflow_id[:8]} re-executed, reset task {task_id} to running: patch={patch_resp}")
 
                 except Exception as e:
                     logger.warning(f"Failed to sync workflow {workflow_id}: {e}")

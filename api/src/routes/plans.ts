@@ -1237,6 +1237,19 @@ router.post('/:id/execute', authenticateToken, (req: Request, res: Response) => 
       WHERE id = ?
     `).run(id)
 
+    // Update linked kanban task: reset pipeline_status to running
+    // so sync_workflow_status picks up the new execution result
+    db.prepare(`
+      UPDATE kanban_tasks
+      SET pipeline_status = 'running',
+          error_message = '',
+          result_status = NULL,
+          result_notes = NULL,
+          updated_at = datetime('now')
+      WHERE workflow_id = ?
+        AND pipeline_status = 'failed'
+    `).run(id)
+
     // Add log entry
     db.prepare(`
       INSERT INTO plan_logs (plan_id, task_id, level, message, created_at)
@@ -1324,6 +1337,19 @@ router.post('/:id/resume', authenticateToken, (req: Request, res: Response) => {
           completed_at = NULL,
           result = NULL
       WHERE id = ?
+    `).run(id)
+
+    // Update linked kanban task: reset pipeline_status to running
+    // so sync_workflow_status picks up the new execution result
+    db.prepare(`
+      UPDATE kanban_tasks
+      SET pipeline_status = 'running',
+          error_message = '',
+          result_status = NULL,
+          result_notes = NULL,
+          updated_at = datetime('now')
+      WHERE workflow_id = ?
+        AND pipeline_status = 'failed'
     `).run(id)
 
     // Add log indicating resume

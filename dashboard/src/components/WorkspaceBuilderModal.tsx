@@ -53,7 +53,7 @@ export function WorkspaceBuilderModal({
   onDiscard,
   isLoading = false,
 }: WorkspaceBuilderModalProps) {
-  const { t } = useTranslation('agents')
+  const { t } = useTranslation()
 
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set())
   const [expandedOps, setExpandedOps] = useState<Set<string>>(new Set())

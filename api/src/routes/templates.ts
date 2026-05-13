@@ -429,7 +429,7 @@ router.post('/:id/use', authenticateToken, (req: Request, res: Response) => {
 
     // Workflow template with skip_planning: create task in 'in_dev' with pre-created plan
     if (template.template_type === 'workflow' && template.skip_planning === 1) {
-      let planTasks: any[]
+      let planTasks: any[] | undefined
 
       // Prefer reading tasks from the backing template plan (status='template')
       if (template.template_plan_id) {
@@ -444,7 +444,7 @@ router.post('/:id/use', authenticateToken, (req: Request, res: Response) => {
       }
 
       // Fallback to plan_data if no backing plan or it was deleted
-      if (!planTasks) {
+      if (planTasks === undefined) {
         try {
           const planDataObj = typeof template.plan_data === 'string'
             ? JSON.parse(template.plan_data)
@@ -454,6 +454,9 @@ router.post('/:id/use', authenticateToken, (req: Request, res: Response) => {
           return res.status(400).json({ data: null, error: 'Failed to parse template plan_data' })
         }
       }
+
+      // Safety fallback: ensure planTasks is always assigned
+      if (planTasks === undefined) planTasks = []
 
       // Generate new plan ID and new task IDs for all tasks
       const newPlanId = randomUUID()

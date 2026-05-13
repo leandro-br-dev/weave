@@ -137,7 +137,12 @@
         "wait": "Isso pode levar 3-8 minutos. Aguarde.",
         "previous": "Conte\u00fado atual",
         "proposed": "Conte\u00fado proposto",
-        "content": "Conte\u00fado"
+        "content": "Conte\u00fado",
+        "historyTitle": "Hist\u00f3rico do Construtor de Equipe",
+        "historyDesc": "Selecione um plano gerado anteriormente para revisar e aplicar",
+        "noHistory": "Nenhum plano do construtor de equipe encontrado para esta equipe.",
+        "planFileMissing": "Arquivo de plano n\u00e3o encontrado",
+        "close": "Fechar"
       },
       "settingsTab": {
         "environmentVariables": "Variáveis de Ambiente",

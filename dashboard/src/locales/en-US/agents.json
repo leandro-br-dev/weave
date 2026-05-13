@@ -137,7 +137,12 @@
         "wait": "This may take 3-8 minutes. Please wait.",
         "previous": "Current content",
         "proposed": "Proposed content",
-        "content": "Content"
+        "content": "Content",
+        "historyTitle": "Workspace Builder History",
+        "historyDesc": "Select a previously generated plan to review and apply",
+        "noHistory": "No workspace builder plans found for this team.",
+        "planFileMissing": "Plan file not found",
+        "close": "Close"
       },
       "settingsTab": {
         "environmentVariables": "Environment Variables",

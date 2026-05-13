@@ -30,6 +30,7 @@ from orchestrator import logger
 from orchestrator.attachments import build_prompt_with_attachments
 from orchestrator.runner import (
     _apply_workspace_env,
+    _load_short_answers_skill,
     extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir,
     list_agent_docs,
 )
@@ -331,6 +332,11 @@ async def run_chat_turn(
     # Build the prompt with project context, environment info, and working directory
     full_prompt = message
     prompt_prefix_parts: list[str] = []
+
+    # Inject short-answers protocol (built-in communication — always active)
+    short_answers = _load_short_answers_skill()
+    if short_answers:
+        prompt_prefix_parts.append(short_answers)
 
     logger.info(f"[ChatTurn] Injecting context: cwd={cwd}, workspace_path={workspace_path}")
 

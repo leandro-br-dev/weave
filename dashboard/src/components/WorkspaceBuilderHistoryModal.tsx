@@ -48,7 +48,7 @@ export function WorkspaceBuilderHistoryModal({
   onSelect,
   onClose,
 }: Omit<WorkspaceBuilderHistoryModalProps, 'teamId'>) {
-  const { t } = useTranslation('agents')
+  const { t } = useTranslation()
 
   if (!isOpen) return null
 
@@ -81,10 +81,10 @@ export function WorkspaceBuilderHistoryModal({
             </div>
             <div>
               <h2 className={`text-xl font-semibold ${withDarkMode(modalColors.header, darkModeModalColors.header)}`}>
-                {t('pages.agents.workspaceBuilder.historyTitle', { defaultValue: 'Workspace Builder History' })}
+                {t('pages.agents.workspaceBuilder.historyTitle')}
               </h2>
               <p className={`text-sm ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`}>
-                {t('pages.agents.workspaceBuilder.historyDesc', { defaultValue: 'Select a previously generated plan to review and apply' })}
+                {t('pages.agents.workspaceBuilder.historyDesc')}
               </p>
             </div>
           </div>
@@ -101,7 +101,7 @@ export function WorkspaceBuilderHistoryModal({
           {entries.length === 0 ? (
             <div className={`text-center py-12 ${textColors.tertiary}`}>
               <History size={32} className="mx-auto mb-3 opacity-30" />
-              <p>{t('pages.agents.workspaceBuilder.noHistory', { defaultValue: 'No workspace builder plans found for this team.' })}</p>
+              <p>{t('pages.agents.workspaceBuilder.noHistory')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -152,7 +152,7 @@ export function WorkspaceBuilderHistoryModal({
                         )}
                         {!entry.hasPlanFile && entry.status === 'success' && (
                           <span className="text-orange-500">
-                            {t('pages.agents.workspaceBuilder.planFileMissing', { defaultValue: 'Plan file not found' })}
+                            {t('pages.agents.workspaceBuilder.planFileMissing')}
                           </span>
                         )}
                       </div>
@@ -172,7 +172,7 @@ export function WorkspaceBuilderHistoryModal({
         {/* Footer */}
         <div className={`flex items-center justify-end p-4 border-t ${withDarkMode(bgColors.tertiary, darkModeBgColors.tertiary)}`}>
           <Button onClick={onClose} variant="secondary" size="sm">
-            {t('pages.agents.workspaceBuilder.close', { defaultValue: 'Close' })}
+            {t('pages.agents.workspaceBuilder.close')}
           </Button>
         </div>
       </div>
