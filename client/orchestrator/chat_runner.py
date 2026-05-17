@@ -31,6 +31,7 @@ from orchestrator.attachments import build_prompt_with_attachments
 from orchestrator.runner import (
     _apply_workspace_env,
     _load_short_answers_skill,
+    _load_rtk_skill,
     extract_structured_output, STRUCTURED_PATTERNS, prepare_agent_docs_dir,
     list_agent_docs,
 )
@@ -337,6 +338,11 @@ async def run_chat_turn(
     short_answers = _load_short_answers_skill()
     if short_answers:
         prompt_prefix_parts.append(short_answers)
+
+    # Inject RTK token-optimization protocol (if installed on the system)
+    rtk_section = _load_rtk_skill()
+    if rtk_section:
+        prompt_prefix_parts.append(rtk_section)
 
     logger.info(f"[ChatTurn] Injecting context: cwd={cwd}, workspace_path={workspace_path}")
 

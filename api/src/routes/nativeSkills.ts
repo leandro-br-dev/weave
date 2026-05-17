@@ -11,7 +11,7 @@ const NATIVE_SKILLS_PATH = path.join(__dirname, '../../../native-skills')
 
 // Skills injected directly by the pipeline/runner — NOT user-installable.
 // Exposing them in the UI causes false dependencies.
-const PIPELINE_ONLY_SKILLS = new Set(['planning', 'workflow-handoff', 'short-answers'])
+const PIPELINE_ONLY_SKILLS = new Set(['planning', 'workflow-handoff', 'short-answers', 'rtk'])
 
 /** Parse YAML frontmatter from SKILL.md content. Returns { name?, description?, body } */
 function parseSkillMd(raw: string) {

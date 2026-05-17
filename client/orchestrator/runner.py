@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
@@ -204,6 +205,51 @@ def _load_short_answers_skill() -> str | None:
         return _short_answers_cache
     except Exception as e:
         logger.warning(f'Could not read short-answers skill: {e}')
+        return None
+
+
+# Cache for the RTK skill content (loaded once, reused for every task)
+_rtk_cache: str | None = None
+_rtk_available: bool | None = None  # None = not checked yet
+
+
+def _load_rtk_skill() -> str | None:
+    """
+    Load the RTK (Rust Token Killer) skill from native-skills.
+
+    Only injects when RTK is installed on the system (detected via shutil.which).
+    When not installed, returns None silently — no warnings, no errors.
+
+    Returns:
+        Skill content string, or None if RTK is not installed or file not found.
+    """
+    global _rtk_cache, _rtk_available
+
+    # Check RTK availability once (cached for the process lifetime)
+    if _rtk_available is None:
+        _rtk_available = shutil.which('rtk') is not None
+        if _rtk_available:
+            logger.info('[RTK] Detected rtk binary on system')
+        else:
+            logger.debug('[RTK] rtk not found on system — skipping injection')
+
+    if not _rtk_available:
+        return None
+
+    if _rtk_cache is not None:
+        return _rtk_cache
+
+    skill_path = Path(__file__).resolve().parent.parent.parent / 'native-skills' / 'rtk' / 'SKILL.md'
+    if not skill_path.exists():
+        logger.warning(f'[RTK] Skill file not found at {skill_path}')
+        return None
+
+    try:
+        _rtk_cache = skill_path.read_text(encoding='utf-8')
+        logger.info('[RTK] Skill loaded and cached')
+        return _rtk_cache
+    except Exception as e:
+        logger.warning(f'[RTK] Could not read skill file: {e}')
         return None
 
 
@@ -880,6 +926,13 @@ def build_prompt(task: Task, context: dict[str, TaskResult], ctx_dir: Path | Non
         parts.append(short_answers_section)
         parts.append('')
         logger.debug(f"[{task.id}] Short-answers protocol injected")
+
+    # 0.5 Inject RTK token-optimization protocol (if installed on the system)
+    rtk_section = _load_rtk_skill()
+    if rtk_section:
+        parts.append(rtk_section)
+        parts.append('')
+        logger.debug(f"[{task.id}] RTK protocol injected")
 
     # 1. Inject workflow handoff rules (multi-agent communication protocol)
     handoff_section = _build_handoff_section(workflow_path)

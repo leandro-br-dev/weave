@@ -17,7 +17,7 @@ import os
 from datetime import datetime, timezone
 
 from orchestrator import logger
-from orchestrator.runner import _load_short_answers_skill
+from orchestrator.runner import _load_short_answers_skill, _load_rtk_skill
 from orchestrator.cron_utils import next_run_from_cron
 from orchestrator.team_trigger import (
     find_team_workspace,
@@ -393,7 +393,12 @@ indicate that in the task's `prompt` text — do NOT change the `cwd`.
     # Load short-answers protocol (built-in communication — always injected)
     short_answers = _load_short_answers_skill() or ''
 
+    # Load RTK token-optimization protocol (if installed)
+    rtk_section = _load_rtk_skill() or ''
+
     return f'''{short_answers}
+
+{rtk_section}
 
 ---
 

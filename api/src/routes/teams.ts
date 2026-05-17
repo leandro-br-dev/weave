@@ -1385,7 +1385,7 @@ router.post('/:id/native-skills/:skillId', authenticateToken, (req, res) => {
   const skillId = Array.isArray(req.params.skillId) ? req.params.skillId[0] : req.params.skillId
 
   // Pipeline-only skills are injected by the orchestrator, not manually installed.
-  const PIPELINE_ONLY = new Set(['planning', 'workflow-handoff'])
+  const PIPELINE_ONLY = new Set(['planning', 'workflow-handoff', 'rtk'])
   if (PIPELINE_ONLY.has(skillId)) {
     return res.status(400).json({
       data: null,
