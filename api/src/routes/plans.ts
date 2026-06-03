@@ -614,36 +614,9 @@ router.get('/metrics', authenticateToken, (req: Request, res: Response) => {
   }
 })
 
-// GET /api/plans/approaching-timeout - Get plans nearing timeout
+// GET /api/plans/approaching-timeout - DEPRECATED: workflows have no time limit
 router.get('/approaching-timeout', authenticateToken, (req: Request, res: Response) => {
-  try {
-    const timeoutMinutes = Number(process.env.PLAN_TIMEOUT_MINUTES ?? 120)
-    const warningThreshold = timeoutMinutes * 0.8 // 80% of timeout
-    const warningCutoff = new Date(Date.now() - warningThreshold * 60 * 1000).toISOString()
-
-    const plans = db.prepare(`
-      SELECT id, name, status, started_at, last_heartbeat_at,
-             (julianday('now') - julianday(started_at)) * 1440 as minutes_running
-      FROM plans
-      WHERE status = 'running'
-      AND started_at < ?
-      ORDER BY started_at ASC
-    `).all(warningCutoff) as any[]
-
-    res.json({
-      data: {
-        count: plans.length,
-        plans: plans.map(p => ({
-          ...p,
-          timeout_in_minutes: Math.round(timeoutMinutes - p.minutes_running)
-        }))
-      },
-      error: null
-    })
-  } catch (error) {
-    console.error('Error fetching approaching timeout plans:', error)
-    res.status(500).json({ data: null, error: 'Failed to fetch plans' })
-  }
+  res.json({ data: { count: 0, plans: [] }, error: null })
 })
 
 // POST /api/plans/reconcile - Reconcile orphaned plans on daemon startup
@@ -1762,11 +1735,11 @@ router.get('/:id/logs/stream', authenticateToken, (req: Request, res: Response) 
   })
 })
 
-// Recover stuck plans on startup (running → failed if older than timeout)
-// IMPORTANT: This timeout MUST match the client's PLAN_TIMEOUT_SECONDS to avoid
-// marking long-running plans as failed before they actually complete.
+// Recover stuck plans on startup (running → failed if no heartbeat for 24 hours)
+// This is a safety net for daemon crashes only — workflows have no time limit.
+// Plans with recent heartbeats are never marked as failed.
 export function recoverStuckPlans(db: any) {
-  const timeoutMinutes = Number(process.env.PLAN_TIMEOUT_MINUTES ?? 120)  // Default: 2 hours
+  const timeoutMinutes = Number(process.env.PLAN_TIMEOUT_MINUTES ?? 1440)  // Default: 24 hours (crash recovery only)
   const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000).toISOString()
 
   // Get plans before updating for logging

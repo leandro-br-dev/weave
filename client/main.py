@@ -28,8 +28,9 @@ from orchestrator.runner import run_plan
 # Persistência de planos em andamento para recuperação após restart
 PENDING_PLANS_FILE = '/tmp/weave-pending-plans.json'
 
-# Timeout para execução de planos (padrão: 2 horas)
-PLAN_TIMEOUT_SECONDS = int(os.environ.get('PLAN_TIMEOUT_SECONDS', '7200'))  # 2 horas
+# Plan execution has no time limit — workflows run indefinitely until completion or failure.
+# PLAN_TIMEOUT_SECONDS is kept for API coordination but no longer enforced on the client side.
+PLAN_TIMEOUT_SECONDS = int(os.environ.get('PLAN_TIMEOUT_SECONDS', '7200'))  # 2 horas (API side only)
 
 
 def save_pending_plans(running_plans: set, running_plans_started: dict) -> None:
@@ -623,16 +624,15 @@ async def _run_plan(plan_data: dict, client: object, running_plans: set[str], ru
         ]
         plan = Plan(id=plan_id, name=plan_name, tasks=tasks, workflow_path=plan_data.get("workflow_path"))
 
-        # Execute the plan with log collection
+        # Execute the plan with log collection (no timeout — workflows run indefinitely)
         try:
-            success, error_msg, review = await asyncio.wait_for(
-                run_plan_with_logging(client, plan_id, plan, sdk_session_id=sdk_session_id),
-                timeout=PLAN_TIMEOUT_SECONDS
+            success, error_msg, review = await run_plan_with_logging(
+                client, plan_id, plan, sdk_session_id=sdk_session_id
             )
-        except asyncio.TimeoutError:
+        except Exception as e:
             success = False
-            error_msg = f'Plan timed out after {PLAN_TIMEOUT_SECONDS}s'
-            logger.error(f'Plan {plan_id} timed out')
+            error_msg = str(e)
+            logger.error(f'Plan {plan_id} failed: {e}')
             review = None
 
         # Notify API of completion
@@ -719,18 +719,7 @@ async def run_daemon(server_url: str, token: str) -> None:
 
     # Log timeout configuration
     timeout_minutes = PLAN_TIMEOUT_SECONDS / 60
-    logger.info(f"[Timeout] Plan execution timeout: {PLAN_TIMEOUT_SECONDS}s ({timeout_minutes:.0f} minutes)")
-
-    # Validate timeout configuration
-    expected_timeout_seconds = 7200  # 2 hours in seconds
-    if PLAN_TIMEOUT_SECONDS != expected_timeout_seconds:
-        logger.warning(
-            f"[Timeout] Non-standard timeout configured: {PLAN_TIMEOUT_SECONDS}s "
-            f"(expected {expected_timeout_seconds}s = 120 minutes). "
-            f"Ensure API's PLAN_TIMEOUT_MINUTES is set to {timeout_minutes:.0f} to avoid mismatch."
-        )
-    else:
-        logger.info(f"[Timeout] Timeout configuration matches expected default ({expected_timeout_seconds}s)")
+    logger.info(f"[Timeout] Plan execution has no client-side time limit (API recovery threshold: {PLAN_TIMEOUT_SECONDS}s / {timeout_minutes:.0f} minutes)")
 
     from orchestrator.daemon_client import DaemonClient
 
@@ -1118,9 +1107,9 @@ async def process_chat_session(session: dict, client: object) -> None:
     logger.info(f"[Session] environment_id={session.get('environment_id')} env_project_path={session.get('env_project_path')}")
     logger.info(f"[Session] cwd resolved={cwd}")
 
-    # Chat timeout configuration (default 1 hour)
+    # Chat timeout configuration (default 2 hours)
     import os as _os
-    chat_timeout = int(_os.environ.get('CHAT_TIMEOUT_SECONDS', '3600'))
+    chat_timeout = int(_os.environ.get('CHAT_TIMEOUT_SECONDS', '7200'))
 
     try:
         new_sdk_session_id = await asyncio.wait_for(

@@ -331,7 +331,7 @@ class TestApproachingTimeout:
         assert data['data']['plans'] == []
 
     def test_approaching_timeout_detects_old_plans(self, api_client, cleanup_plans):
-        """Test that approaching-timeout detects plans that have been running for a while."""
+        """Test that approaching-timeout returns empty (workflows have no time limit)."""
         plan_data = {
             'name': 'Old Running Plan',
             'tasks': [
@@ -354,7 +354,7 @@ class TestApproachingTimeout:
         api_client.start_plan_async(plan_id)
         time.sleep(0.5)
 
-        # Manually set started_at to simulate an old plan (96 minutes ago for 120 min timeout)
+        # Manually set started_at to simulate an old plan
         ninety_six_minutes_ago = (datetime.now() - timedelta(minutes=96)).isoformat()
         requests.patch(
             f"{API_URL}/api/plans/{plan_id}",
@@ -362,7 +362,7 @@ class TestApproachingTimeout:
             json={'started_at': ninety_six_minutes_ago}
         )
 
-        # Get approaching timeout plans
+        # Get approaching timeout plans — should always be empty (no time limit)
         response = requests.get(
             f"{API_URL}/api/plans/approaching-timeout",
             headers={"Authorization": f"Bearer {API_TOKEN}"}
@@ -371,16 +371,8 @@ class TestApproachingTimeout:
         assert response.status_code == 200
         data = response.json()
         assert data['error'] is None
-        assert data['data']['count'] >= 1
-
-        # Find our plan in the list
-        matching_plans = [p for p in data['data']['plans'] if p['id'] == plan_id]
-        assert len(matching_plans) == 1
-
-        plan_info = matching_plans[0]
-        assert plan_info['name'] == 'Old Running Plan'
-        assert plan_info['minutes_running'] > 95
-        assert plan_info['timeout_in_minutes'] <= 25
+        assert data['data']['count'] == 0
+        assert data['data']['plans'] == []
 
     def test_approaching_timeout_excludes_completed_plans(self, api_client, cleanup_plans):
         """Test that approaching-timeout excludes completed plans."""
@@ -460,12 +452,12 @@ class TestRecoveryScenarios:
         api_client.start_plan_async(plan_id)
         time.sleep(0.5)
 
-        # Set started_at to be old (130 minutes ago)
-        hundred_thirty_minutes_ago = (datetime.now() - timedelta(minutes=130)).isoformat()
+        # Set started_at to be old (25 hours ago)
+        twenty_five_hours_ago = (datetime.now() - timedelta(hours=25)).isoformat()
         requests.patch(
             f"{API_URL}/api/plans/{plan_id}",
             headers={"Authorization": f"Bearer {API_TOKEN}"},
-            json={'started_at': hundred_thirty_minutes_ago}
+            json={'started_at': twenty_five_hours_ago}
         )
 
         # Set last_heartbeat_at to be recent (5 minutes ago)

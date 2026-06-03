@@ -1199,55 +1199,7 @@ describe('Plans API', () => {
   })
 
   describe('GET /api/plans/approaching-timeout', () => {
-    it('should return plans approaching timeout (80% threshold)', async () => {
-      // Create and start a plan
-      const createResponse = await request(app)
-        .post('/api/plans')
-        .send({ name: 'Long Running Plan', tasks: [{ id: 'task-1', name: 'Task 1' }] })
-
-      const planId = createResponse.body.data.id
-
-      await request(app)
-        .post(`/api/plans/${planId}/start`)
-        .send({ client_id: 'test-daemon' })
-        .expect(200)
-
-      // Manually set started_at to simulate an old plan (96 minutes ago for 120 min timeout)
-      const ninetySixMinutesAgo = new Date(Date.now() - 96 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(ninetySixMinutesAgo, planId)
-
-      // Get approaching timeout plans
-      const response = await request(app)
-        .get('/api/plans/approaching-timeout')
-        .expect(200)
-
-      expect(response.body.error).toBeNull()
-      expect(response.body.data).toHaveProperty('count')
-      expect(response.body.data).toHaveProperty('plans')
-      expect(response.body.data.count).toBeGreaterThanOrEqual(1)
-
-      // Verify the plan is in the list
-      const plan = response.body.data.plans.find((p: any) => p.id === planId)
-      expect(plan).toBeDefined()
-      expect(plan.name).toBe('Long Running Plan')
-      expect(plan.minutes_running).toBeGreaterThan(95)
-      expect(plan.timeout_in_minutes).toBeLessThanOrEqual(25)
-    })
-
-    it('should not return plans that are not approaching timeout', async () => {
-      // Create and start a plan
-      const createResponse = await request(app)
-        .post('/api/plans')
-        .send({ name: 'Fresh Plan', tasks: [{ id: 'task-1', name: 'Task 1' }] })
-
-      const planId = createResponse.body.data.id
-
-      await request(app)
-        .post(`/api/plans/${planId}/start`)
-        .send({ client_id: 'test-daemon' })
-        .expect(200)
-
-      // Get approaching timeout plans
+    it('should return empty result (workflows have no time limit)', async () => {
       const response = await request(app)
         .get('/api/plans/approaching-timeout')
         .expect(200)
@@ -1255,85 +1207,11 @@ describe('Plans API', () => {
       expect(response.body.error).toBeNull()
       expect(response.body.data.count).toBe(0)
       expect(response.body.data.plans).toEqual([])
-    })
-
-    it('should only include running plans', async () => {
-      // Create and start a plan
-      const createResponse = await request(app)
-        .post('/api/plans')
-        .send({ name: 'Old Running Plan', tasks: [{ id: 'task-1', name: 'Task 1' }] })
-
-      const planId = createResponse.body.data.id
-
-      await request(app)
-        .post(`/api/plans/${planId}/start`)
-        .send({ client_id: 'test-daemon' })
-        .expect(200)
-
-      // Complete the plan
-      await request(app)
-        .post(`/api/plans/${planId}/complete`)
-        .send({ status: 'success', result: 'Completed' })
-
-      // Manually set started_at to simulate an old plan
-      const ninetySixMinutesAgo = new Date(Date.now() - 96 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(ninetySixMinutesAgo, planId)
-
-      // Get approaching timeout plans
-      const response = await request(app)
-        .get('/api/plans/approaching-timeout')
-        .expect(200)
-
-      expect(response.body.error).toBeNull()
-      expect(response.body.data.count).toBe(0)
-      expect(response.body.data.plans).toEqual([])
-    })
-
-    it('should order plans by started_at (oldest first)', async () => {
-      // Create multiple plans with different start times
-      const plan1Response = await request(app)
-        .post('/api/plans')
-        .send({ name: 'Oldest Plan', tasks: [{ id: 'task-1', name: 'Task 1' }] })
-
-      const plan2Response = await request(app)
-        .post('/api/plans')
-        .send({ name: 'Newest Plan', tasks: [{ id: 'task-1', name: 'Task 1' }] })
-
-      const plan1Id = plan1Response.body.data.id
-      const plan2Id = plan2Response.body.data.id
-
-      // Start both plans
-      await request(app)
-        .post(`/api/plans/${plan1Id}/start`)
-        .send({ client_id: 'test-daemon' })
-
-      await request(app)
-        .post(`/api/plans/${plan2Id}/start`)
-        .send({ client_id: 'test-daemon' })
-
-      // Set different start times (plan1 older than plan2)
-      const hundredMinutesAgo = new Date(Date.now() - 100 * 60 * 1000).toISOString()
-      const ninetySixMinutesAgo = new Date(Date.now() - 96 * 60 * 1000).toISOString()
-
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(hundredMinutesAgo, plan1Id)
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(ninetySixMinutesAgo, plan2Id)
-
-      // Get approaching timeout plans
-      const response = await request(app)
-        .get('/api/plans/approaching-timeout')
-        .expect(200)
-
-      expect(response.body.error).toBeNull()
-      expect(response.body.data.plans).toHaveLength(2)
-
-      // Verify ordering (oldest first)
-      expect(response.body.data.plans[0].id).toBe(plan1Id)
-      expect(response.body.data.plans[1].id).toBe(plan2Id)
     })
   })
 
   describe('recoverStuckPlans function', () => {
-    it('should recover plans without heartbeats that exceed timeout', async () => {
+    it('should recover plans without heartbeats that exceed 24h threshold', async () => {
       // Create and start a plan
       const createResponse = await request(app)
         .post('/api/plans')
@@ -1346,9 +1224,9 @@ describe('Plans API', () => {
         .send({ client_id: 'test-daemon' })
         .expect(200)
 
-      // Set started_at to exceed timeout (130 minutes ago for 120 min timeout)
-      const hundredThirtyMinutesAgo = new Date(Date.now() - 130 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(hundredThirtyMinutesAgo, planId)
+      // Set started_at to exceed 24h threshold (25 hours ago)
+      const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(twentyFiveHoursAgo, planId)
 
       // Import and run recoverStuckPlans
       const { recoverStuckPlans } = await import('../../src/routes/plans.js')
@@ -1358,7 +1236,7 @@ describe('Plans API', () => {
       expect(result.plans).toHaveLength(1)
       expect(result.plans[0].id).toBe(planId)
       expect(result.plans[0].name).toBe('Stuck Plan')
-      expect(result.plans[0].minutes_running).toBeGreaterThan(129)
+      expect(result.plans[0].minutes_running).toBeGreaterThan(1499)
 
       // Verify plan was marked as failed
       const planResponse = await request(app)
@@ -1386,9 +1264,9 @@ describe('Plans API', () => {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
       db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(fiveMinutesAgo, planId)
 
-      // Set last_heartbeat_at to be old (130 minutes ago)
-      const hundredThirtyMinutesAgo = new Date(Date.now() - 130 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET last_heartbeat_at = ? WHERE id = ?').run(hundredThirtyMinutesAgo, planId)
+      // Set last_heartbeat_at to be old (25 hours ago)
+      const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+      db.prepare('UPDATE plans SET last_heartbeat_at = ? WHERE id = ?').run(twentyFiveHoursAgo, planId)
 
       // Import and run recoverStuckPlans
       const { recoverStuckPlans } = await import('../../src/routes/plans.js')
@@ -1413,9 +1291,9 @@ describe('Plans API', () => {
         .send({ client_id: 'test-daemon' })
         .expect(200)
 
-      // Set started_at to be old (130 minutes ago)
-      const hundredThirtyMinutesAgo = new Date(Date.now() - 130 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(hundredThirtyMinutesAgo, planId)
+      // Set started_at to be old (25 hours ago)
+      const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(twentyFiveHoursAgo, planId)
 
       // Set last_heartbeat_at to be recent (5 minutes ago)
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
@@ -1437,7 +1315,7 @@ describe('Plans API', () => {
       expect(planResponse.body.data.status).toBe('running')
     })
 
-    it('should not recover plans that have not exceeded timeout', async () => {
+    it('should not recover plans that have not exceeded 24h threshold', async () => {
       // Create and start a plan
       const createResponse = await request(app)
         .post('/api/plans')
@@ -1450,9 +1328,9 @@ describe('Plans API', () => {
         .send({ client_id: 'test-daemon' })
         .expect(200)
 
-      // Set started_at to be recent (60 minutes ago, less than 120 min timeout)
-      const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(sixtyMinutesAgo, planId)
+      // Set started_at to be recent (5 hours ago, well under 24h threshold)
+      const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
+      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(fiveHoursAgo, planId)
 
       // Import and run recoverStuckPlans
       const { recoverStuckPlans } = await import('../../src/routes/plans.js')
@@ -1492,10 +1370,10 @@ describe('Plans API', () => {
         .post(`/api/plans/${plan2Id}/start`)
         .send({ client_id: 'test-daemon' })
 
-      // Set both plans to be stuck
-      const hundredThirtyMinutesAgo = new Date(Date.now() - 130 * 60 * 1000).toISOString()
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(hundredThirtyMinutesAgo, plan1Id)
-      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(hundredThirtyMinutesAgo, plan2Id)
+      // Set both plans to be stuck (25 hours ago, exceeding 24h threshold)
+      const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString()
+      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(twentyFiveHoursAgo, plan1Id)
+      db.prepare('UPDATE plans SET started_at = ? WHERE id = ?').run(twentyFiveHoursAgo, plan2Id)
 
       // Import and run recoverStuckPlans
       const { recoverStuckPlans } = await import('../../src/routes/plans.js')
@@ -1509,7 +1387,7 @@ describe('Plans API', () => {
       expect(result.plans[0]).toHaveProperty('name')
       expect(result.plans[0]).toHaveProperty('started_at')
       expect(result.plans[0]).toHaveProperty('minutes_running')
-      expect(result.plans[0].minutes_running).toBeGreaterThan(129)
+      expect(result.plans[0].minutes_running).toBeGreaterThan(1499)
     })
   })
 })
