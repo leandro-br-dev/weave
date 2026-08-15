@@ -2,13 +2,18 @@
 Attachment handler for converting file attachments into prompt content.
 
 Fetches files from the Weave API and formats them for inclusion in
-Claude Agent SDK prompts. Since the SDK's query() function accepts
-``str | AsyncIterable[dict]``, attachments are rendered as formatted
-text blocks prepended to the user's prompt string.
+Claude Agent SDK prompts. The SDK's query() function accepts
+``str | AsyncIterable[dict]``; for text-only flows attachments are
+rendered as formatted text sections prepended to the user's prompt
+string (:func:`build_prompt_with_attachments`).  When images are
+present, :func:`build_content_with_attachments` returns a list of SDK
+content blocks so images are delivered as real image blocks the model
+can actually see, instead of a text note telling it to re-read a file.
 
 Supported file types:
-- Images (png, jpeg, gif, webp, svg): the absolute file path is included
-  in the prompt so the agent can use the Read tool to view the image.
+- Images (png, jpeg, gif, webp): delivered as base64 image content
+  blocks (size-guarded); the absolute file path is also mentioned as a
+  fallback so the agent can use the Read tool.
 - Text-based files (.txt, .md, .py, .ts, .js, .json, .yaml, .csv, .html, .css, .xml):
   contents are inlined with a filename header.
 - PDF and other binary files: noted with filename and size.
@@ -55,6 +60,11 @@ _IMAGE_MIME_PREFIXES: tuple[str, ...] = (
     "image/",
 )
 
+# Maximum base64 payload size (bytes) for an inline image content block.
+# Anthropic models reject images larger than ~5 MB; keep a safety margin
+# below that and fall back to the Read-tool text path for larger files.
+_MAX_INLINE_IMAGE_BYTES: int = 3_500_000
+
 
 def _is_text_file(file_name: str, media_type: str) -> bool:
     """Return True if the file is likely text-based."""
@@ -78,6 +88,42 @@ def _human_size(size_bytes: int) -> str:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.1f} GB"
+
+
+def _image_block_payload(info: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Build an SDK image content block from an image attachment descriptor.
+
+    Returns:
+        A ``{"type": "image", "source": {...}}`` block dict, or ``None`` when
+        the image cannot be inlined (no base64 payload, decode failure, or
+        payload exceeding ``_MAX_INLINE_IMAGE_BYTES``).  Callers fall back to
+        the text rendering path in that case.
+    """
+    data = info.get("data")
+    if not data:
+        return None
+
+    try:
+        if len(data.encode("ascii")) > _MAX_INLINE_IMAGE_BYTES:
+            data_size = _human_size(len(data))
+            logger.warning(
+                f"[Attachments] Image {info.get('file_name', 'unknown')} exceeds "
+                f"inline size limit ({data_size}) — falling back to Read tool"
+            )
+            return None
+    except UnicodeEncodeError:
+        logger.warning(f"[Attachments] Invalid base64 payload for {info.get('file_name')}")
+        return None
+
+    return {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": info["media_type"],
+            "data": data,
+        },
+    }
 
 
 # ── API helpers ────────────────────────────────────────────────────────────
@@ -195,6 +241,7 @@ def load_attachment(
         - ``"file_name"`` — original file name
         - ``"media_type"`` — MIME type
         - ``"file_size"`` — size in bytes
+        - ``"data"`` — base64-encoded payload (only for ``kind="image"``)
         - ``"absolute_path"`` — absolute path on disk (only for ``kind="image"``)
         - ``"text"`` — decoded text content (only for ``kind="text"``)
     """
@@ -213,6 +260,12 @@ def load_attachment(
 
     if _is_image_file(media_type):
         info["kind"] = "image"
+        # Inline base64 payload so the model sees the image directly as an
+        # image content block; kept alongside absolute_path (Read-tool fallback).
+        try:
+            info["data"] = base64.b64encode(content_bytes).decode("ascii")
+        except Exception as exc:
+            logger.warning(f"[Attachments] Failed to encode image {filename}: {exc}")
         # Fetch absolute file path so the agent can use Read tool
         metadata = _resolve_attachment_metadata(attachment_id, api_base_url, token)
         if metadata and "absolute_path" in metadata:
@@ -295,6 +348,91 @@ def _extension_from_name(file_name: str) -> str:
     import os
     _, ext = os.path.splitext(file_name)
     return ext.lstrip(".")
+
+
+def _render_inline_image_note(info: dict[str, Any]) -> str:
+    """
+    Render the text mention accompanying an inlined image content block.
+
+    Keeps the name/type/size context visible to the model while pointing at
+    the image block delivered alongside this text.
+    """
+    absolute_path = info.get("absolute_path", "")
+    block = (
+        f"## Attached Image: {info['file_name']}\n"
+        f"- Type: {info['media_type']}\n"
+        f"- Size: {_human_size(info['file_size'])}\n"
+        f"- The image is attached as an image content block in this message.\n"
+    )
+    if absolute_path:
+        block += f"- File path (for follow-up reads): {absolute_path}\n"
+    return block
+
+
+def build_content_with_attachments(
+    text_prompt: str,
+    attachment_ids: list[str],
+    api_base_url: str,
+    token: str,
+) -> list[dict[str, Any]]:
+    """
+    Build SDK user-message content blocks combining text and attachments.
+
+    Images that can be inlined become ``{"type": "image", "source": {...}}``
+    blocks (base64) so the model actually sees them; everything else — text
+    file contents, binary notes, and the text prompt itself — is rendered
+    into a single leading text block.  Images that fail to inline fall back
+    to the Read-tool text rendering.
+
+    Args:
+        text_prompt: The user's text prompt.
+        attachment_ids: List of attachment UUIDs to include.
+        api_base_url: Base URL of the API.
+        token: Bearer token for authentication.
+
+    Returns:
+        A list of content block dicts.  The first block is always the text
+        block (prompt plus text/binary attachments); image blocks follow in
+        attachment order.  If no attachments resolve successfully, returns a
+        single-block list with the original prompt.
+    """
+    if not attachment_ids:
+        return [{"type": "text", "text": text_prompt}]
+
+    text_blocks: list[str] = []
+    image_blocks: list[dict[str, Any]] = []
+
+    for aid in attachment_ids:
+        info = load_attachment(aid, api_base_url, token)
+        if info is None:
+            logger.warning(f"[Attachments] Skipping failed attachment: {aid}")
+            continue
+
+        if info["kind"] == "image":
+            image_block = _image_block_payload(info)
+            if image_block is not None:
+                image_blocks.append(image_block)
+                text_blocks.append(_render_inline_image_note(info))
+            else:
+                # Inline delivery unavailable — keep the Read-tool fallback.
+                text_blocks.append(_render_attachment(info))
+        elif info["kind"] == "text":
+            text_blocks.append(_render_attachment(info))
+        else:
+            text_blocks.append(_render_attachment(info))
+
+    if not text_blocks:
+        return [{"type": "text", "text": text_prompt}]
+
+    parts: list[str] = ["# Attachments\n"]
+    for block in text_blocks:
+        parts.append(block)
+        parts.append("")
+    parts.append(text_prompt)
+
+    blocks: list[dict[str, Any]] = [{"type": "text", "text": "\n".join(parts)}]
+    blocks.extend(image_blocks)
+    return blocks
 
 
 def build_prompt_with_attachments(

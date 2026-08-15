@@ -95,6 +95,7 @@ export default function ChatPage() {
   const [showSwitchEnv, setShowSwitchEnv] = useState(false)
   const [attachments, setAttachments] = useState<FileAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const addFilesRef = useRef<((files: File[]) => void) | null>(null)
   const location = useLocation()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -221,6 +222,23 @@ export default function ChatPage() {
     }
   }
 
+  // Paste images from the clipboard straight into the attachment list
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items)
+    const images = items
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null)
+
+    if (images.length === 0) return
+
+    const hasText = e.clipboardData.getData('text').length > 0
+    if (!hasText) {
+      e.preventDefault()
+    }
+    addFilesRef.current?.(images)
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Chat area */}
@@ -235,7 +253,7 @@ export default function ChatPage() {
       ) : (
         <div className="flex-1 flex flex-col min-h-0">
           {/* Chat header */}
-          <div className="flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
+          <div className="shrink-0 flex items-center justify-between px-3 sm:px-5 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-500 flex-shrink-0" />
               <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{session?.name}</span>
@@ -435,7 +453,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
+          <div className="shrink-0 px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800">
             {pendingPlan && (
               <div className="mb-3 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 <div>
@@ -448,14 +466,18 @@ export default function ChatPage() {
               </div>
             )}
             <div className="flex gap-2 items-end">
-              <FileAttachmentInput
-                attachments={attachments}
-                onAttachmentsChange={setAttachments}
-                compact
-              />
+              <div className="flex flex-col self-stretch">
+                <FileAttachmentInput
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  compact
+                  registerAddFiles={(fn) => { addFilesRef.current = fn }}
+                />
+              </div>
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                onPaste={handlePaste}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -465,7 +487,7 @@ export default function ChatPage() {
                 placeholder={isRunning ? t('pages.chat.agentThinking') : t('pages.chat.typeMessage')}
                 disabled={isRunning}
                 rows={2}
-                className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-500"
+                className="flex-1 max-h-40 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-500"
               />
               <Button
                 variant="primary"

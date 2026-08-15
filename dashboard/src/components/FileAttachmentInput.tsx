@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Paperclip,
@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
+import { convertImageToWebP } from '@/lib/imageUtils'
 import {
   bgColors,
   darkModeBgColors,
@@ -47,6 +48,8 @@ export interface FileAttachmentInputProps {
   maxSize?: number
   acceptedTypes?: string
   compact?: boolean
+  /** Exposes the internal async addFiles so parents (e.g. chat paste) can inject files */
+  registerAddFiles?: (fn: (files: File[]) => void) => void
 }
 
 function generateId(): string {
@@ -109,54 +112,86 @@ export function FileAttachmentInput({
   maxSize = 10 * 1024 * 1024,
   acceptedTypes = 'image/*,.pdf,.txt,.md,.json,.py,.ts,.js,.tsx,.jsx,.yaml,.yml,.csv',
   compact = false,
+  registerAddFiles,
 }: FileAttachmentInputProps) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const addFiles = useCallback(
-    (files: FileList | File[]) => {
+    async (files: FileList | File[]) => {
       const fileArray = Array.from(files)
       const newAttachments: FileAttachment[] = []
-
+      let needsConversion = false
       for (const file of fileArray) {
-        if (attachments.length + newAttachments.length >= maxFiles) break
-
-        // Validate type
-        const acceptedPatterns = acceptedTypes.split(',').map((s) => s.trim())
-        const isAccepted = acceptedPatterns.some((pattern) => {
-          if (pattern.startsWith('*')) {
-            return file.type.startsWith(pattern.replace('*', ''))
-          }
-          if (pattern.endsWith('/*')) {
-            return file.type.startsWith(pattern.slice(0, -1))
-          }
-          if (pattern.startsWith('.')) {
-            return file.name.toLowerCase().endsWith(pattern.toLowerCase())
-          }
-          return file.type === pattern
-        })
-        if (!isAccepted) continue
-
-        // Validate size
-        if (file.size > maxSize) continue
-
-        const category = getFileCategory(file)
-        const attachment: FileAttachment = {
-          id: generateId(),
-          file,
-          preview: category === 'image' ? URL.createObjectURL(file) : undefined,
-          status: 'pending',
+        if (file.type.startsWith('image/') && file.type !== 'image/svg+xml' && file.type !== 'image/gif') {
+          needsConversion = true
+          break
         }
-        newAttachments.push(attachment)
       }
 
-      if (newAttachments.length > 0) {
-        onAttachmentsChange([...attachments, ...newAttachments])
+      if (needsConversion) setIsProcessing(true)
+      try {
+        for (const original of fileArray) {
+          if (attachments.length + newAttachments.length >= maxFiles) break
+
+          // Raster images are converted to WebP before validation/preview
+          let file = original
+          if (
+            original.type.startsWith('image/') &&
+            original.type !== 'image/svg+xml' &&
+            original.type !== 'image/gif'
+          ) {
+            file = await convertImageToWebP(original)
+          }
+
+          // Validate type
+          const acceptedPatterns = acceptedTypes.split(',').map((s) => s.trim())
+          const isAccepted = acceptedPatterns.some((pattern) => {
+            if (pattern.startsWith('*')) {
+              return file.type.startsWith(pattern.replace('*', ''))
+            }
+            if (pattern.endsWith('/*')) {
+              return file.type.startsWith(pattern.slice(0, -1))
+            }
+            if (pattern.startsWith('.')) {
+              return file.name.toLowerCase().endsWith(pattern.toLowerCase())
+            }
+            return file.type === pattern
+          })
+          if (!isAccepted) continue
+
+          // Validate size (against the converted size)
+          if (file.size > maxSize) continue
+
+          const category = getFileCategory(file)
+          const attachment: FileAttachment = {
+            id: generateId(),
+            file,
+            preview: category === 'image' ? URL.createObjectURL(file) : undefined,
+            status: 'pending',
+          }
+          newAttachments.push(attachment)
+        }
+
+        if (newAttachments.length > 0) {
+          onAttachmentsChange([...attachments, ...newAttachments])
+        }
+      } finally {
+        if (needsConversion) setIsProcessing(false)
       }
     },
     [attachments, acceptedTypes, maxFiles, maxSize, onAttachmentsChange]
   )
+
+  // Expose addFiles to the parent (fire-and-forget wrapper for paste handling)
+  useEffect(() => {
+    if (!registerAddFiles) return
+    registerAddFiles((files: File[]) => {
+      void addFiles(files)
+    })
+  }, [registerAddFiles, addFiles])
 
   const removeAttachment = useCallback(
     (id: string) => {
@@ -175,7 +210,7 @@ export function FileAttachmentInput({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      addFiles(e.target.files)
+      void addFiles(e.target.files)
       e.target.value = ''
     }
   }
@@ -197,7 +232,7 @@ export function FileAttachmentInput({
     e.stopPropagation()
     setIsDragOver(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      addFiles(e.dataTransfer.files)
+      void addFiles(e.dataTransfer.files)
     }
   }
 
@@ -206,31 +241,83 @@ export function FileAttachmentInput({
   // --- Compact mode ---
   if (compact) {
     return (
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={maxFilesReached}
-          title={maxFilesReached ? t('components.fileAttachment.maxFilesReached') : t('components.fileAttachment.addFiles')}
-          className={`relative inline-flex items-center justify-center p-1.5 rounded-md ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${interactiveStates.hoverBg} ${darkModeInteractiveStates.hoverBg} transition-colors ${interactiveStates.disabled}`}
-        >
-          <Paperclip className="h-4 w-4" />
-          {attachments.length > 0 && (
-            <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full ${withDarkMode(bgColors.inverted, bgColors.secondary)} ${withDarkMode(textColors.inverted, darkModeTextColors.inverted)} text-[10px] font-medium leading-none`}>
-              {attachments.length}
-            </span>
-          )}
-        </button>
+      <>
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {attachments.map((attachment) => {
+              const category = getFileCategory(attachment.file)
 
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={acceptedTypes}
-          onChange={handleFileChange}
-          className="hidden"
-        />
-      </div>
+              return (
+                <div
+                  key={attachment.id}
+                  className={`group relative flex items-center justify-center h-7 w-7 rounded ${withDarkMode(bgColors.primary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}
+                  title={attachment.file.name}
+                >
+                  {attachment.preview ? (
+                    <img
+                      src={attachment.preview}
+                      alt={attachment.file.name}
+                      className="h-7 w-7 rounded object-cover"
+                    />
+                  ) : (
+                    <div className={`h-7 w-7 rounded flex items-center justify-center ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`}>
+                      <FileIcon category={category} className="h-3.5 w-3.5" />
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeAttachment(attachment.id)
+                    }}
+                    title={t('components.fileAttachment.remove')}
+                    className={`absolute -top-1.5 -right-1.5 flex items-center justify-center h-4 w-4 rounded-full ${withDarkMode(bgColors.inverted, bgColors.secondary)} ${withDarkMode(textColors.inverted, darkModeTextColors.inverted)} ${errorColors.text} ${darkModeErrorColors.text} transition-opacity opacity-0 group-hover:opacity-100`}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+
+                  {attachment.status === 'uploading' && (
+                    <span className={`absolute inset-0 flex items-center justify-center rounded ${withDarkMode('bg-white/70', 'dark:bg-gray-900/70')}`}>
+                      <Loader2 className={`h-3.5 w-3.5 animate-spin ${withDarkMode(textColors.secondary, darkModeTextColors.secondary)}`} />
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+            {isProcessing && (
+              <div className={`flex items-center justify-center h-7 w-7 rounded ${withDarkMode(bgColors.primary, darkModeBgColors.secondary)} border ${withDarkMode(borderColors.default, darkModeBorderColors.default)}`}>
+                <Loader2 className={`h-3.5 w-3.5 animate-spin ${withDarkMode(textColors.muted, darkModeTextColors.muted)}`} />
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={maxFilesReached}
+            title={maxFilesReached ? t('components.fileAttachment.maxFilesReached') : t('components.fileAttachment.addFiles')}
+            className={`relative inline-flex items-center justify-center p-1.5 rounded-md ${withDarkMode(textColors.tertiary, darkModeTextColors.tertiary)} ${interactiveStates.hoverBg} ${darkModeInteractiveStates.hoverBg} transition-colors ${interactiveStates.disabled}`}
+          >
+            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            {attachments.length > 0 && (
+              <span className={`absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full ${withDarkMode(bgColors.inverted, bgColors.secondary)} ${withDarkMode(textColors.inverted, darkModeTextColors.inverted)} text-[10px] font-medium leading-none`}>
+                {attachments.length}
+              </span>
+            )}
+          </button>
+
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept={acceptedTypes}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+      </>
     )
   }
 

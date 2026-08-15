@@ -27,7 +27,10 @@ from claude_agent_sdk import (
 from claude_agent_sdk._errors import ProcessError
 
 from orchestrator import logger
-from orchestrator.attachments import build_prompt_with_attachments
+from orchestrator.attachments import (
+    build_content_with_attachments,
+    build_prompt_with_attachments,
+)
 from orchestrator.runner import (
     _apply_workspace_env,
     _load_short_answers_skill,
@@ -48,6 +51,21 @@ async def _string_to_async_iterable(text: str):
         "type": "user",
         "session_id": "",
         "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+    }
+
+
+async def _content_to_async_iterable(content: list[dict]):
+    """
+    Convert a list of content blocks to an AsyncIterable of SDK message dicts.
+
+    Same shape as :func:`_string_to_async_iterable` but with ``content`` as a
+    list of blocks (text + image), which is how the CLI accepts inline images.
+    """
+    yield {
+        "type": "user",
+        "session_id": "",
+        "message": {"role": "user", "content": content},
         "parent_tool_use_id": None,
     }
 
@@ -386,20 +404,7 @@ async def run_chat_turn(
             logger.warning(f"[ChatTurn] Failed to fetch message attachments: {e}")
             attachment_ids = None
 
-    # Build prompt with attachments if present
-    if attachment_ids and api_base_url and token:
-        try:
-            full_prompt = build_prompt_with_attachments(
-                text_prompt=full_prompt,
-                attachment_ids=attachment_ids,
-                api_base_url=api_base_url,
-                token=token,
-            )
-            logger.info(f"[ChatTurn] Built prompt with {len(attachment_ids)} attachment(s)")
-        except Exception as e:
-            logger.warning(f"[ChatTurn] Failed to build prompt with attachments: {e}")
-
-    # Create agent docs directory for this session and inject docs context
+    # Create agent docs directory for this session and inject docs context.
     docs_dir = prepare_agent_docs_dir(workspace_path, session_id, 'chat')
     if docs_dir:
         logger.info(f"[ChatTurn] Agent docs dir: {docs_dir}")
@@ -413,8 +418,48 @@ async def run_chat_turn(
         docs_guidelines = f"""\n\n## Documentation Workflow\nYour docs directory: `{docs_dir}/`\n- Use 3-digit numeric prefix for files: `001-`, `002-`, etc.\n- Read the last numbered doc before starting\n- Write a completion doc when done\n"""
         full_prompt += docs_guidelines
 
+    # Build prompt with attachments if present — AFTER docs injection so the
+    # attachment sections land in the final text (never overwritten).
+    #
+    # Images are delivered as real image content blocks so the model sees
+    # them; text/binary attachments stay inline in the text prompt.  When no
+    # image block is produced we keep the plain-string prompt flow.
+    prompt_content_blocks: list[dict] | None = None
+    if attachment_ids and api_base_url and token:
+        try:
+            content_blocks = build_content_with_attachments(
+                text_prompt=full_prompt,
+                attachment_ids=attachment_ids,
+                api_base_url=api_base_url,
+                token=token,
+            )
+            has_image_blocks = any(block["type"] == "image" for block in content_blocks)
+            if has_image_blocks:
+                prompt_content_blocks = content_blocks
+                logger.info(
+                    f"[ChatTurn] Built content blocks with {len(attachment_ids)} "
+                    f"attachment(s), {sum(1 for b in content_blocks if b['type'] == 'image')} image(s)"
+                )
+            else:
+                # No inlined images — collapse back to the plain text prompt.
+                full_prompt = build_prompt_with_attachments(
+                    text_prompt=full_prompt,
+                    attachment_ids=attachment_ids,
+                    api_base_url=api_base_url,
+                    token=token,
+                )
+                logger.info(f"[ChatTurn] Built prompt with {len(attachment_ids)} attachment(s)")
+        except Exception as e:
+            logger.warning(f"[ChatTurn] Failed to build prompt with attachments: {e}")
+
+    prompt_iterable = (
+        _content_to_async_iterable(prompt_content_blocks)
+        if prompt_content_blocks is not None
+        else _string_to_async_iterable(full_prompt)
+    )
+
     try:
-        async for message_obj in query(prompt=_string_to_async_iterable(full_prompt), options=options):
+        async for message_obj in query(prompt=prompt_iterable, options=options):
             msg_type = getattr(message_obj, 'type', None) or type(message_obj).__name__
 
             if msg_type in ('assistant', 'AssistantMessage') or hasattr(message_obj, 'content'):
