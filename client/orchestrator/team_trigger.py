@@ -459,6 +459,21 @@ async def handle_team_completion(
             await _handle_needs_rework(task, plan, project_id, client)
             return
 
+        # Terminal column: reconcile and stop reprocessing. A task can land here
+        # with a stale pipeline_status (e.g. manually moved via dashboard) — close it.
+        if current_column == COLUMN_FLOW[-1]:
+            await client._put(f'/kanban/{project_id}/{task_id}', {
+                'pipeline_status': 'done',
+                'result_status': result_status or 'success',
+                'result_notes': plan.get('result_notes', '') or result_notes,
+                'error_message': '',
+            })
+            logger.info(
+                f'[TeamTrigger] Task {task_id} already at terminal column '
+                f'{current_column} — pipeline_status reconciled'
+            )
+            return
+
         # Determina qual gate verificar baseado na coluna atual
         gate_map = {
             'planning': 'auto_advance_plan_to_dev',
