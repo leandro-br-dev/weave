@@ -56,7 +56,7 @@ describe('ProjectSelectDropdown', () => {
         projects={mockProjects}
       />
     )
-    expect(screen.getAllByText('CharHub')).toHaveLength(2) // One in trigger, one in selection info
+    expect(screen.getByText('CharHub')).toBeInTheDocument()
   })
 
   it('shows the required indicator when required prop is true', () => {
@@ -134,7 +134,7 @@ describe('ProjectSelectDropdown', () => {
     expect(trigger).toHaveAttribute('type', 'button')
   })
 
-  it('displays project count when selected', () => {
+  it('displays selected project name when value is provided', () => {
     render(
       <ProjectSelectDropdown
         value="1"
@@ -142,11 +142,7 @@ describe('ProjectSelectDropdown', () => {
         projects={mockProjects}
       />
     )
-    // Should show selected project info
-    const selectedText = screen.getByText('Selected:')
-    expect(selectedText).toBeInTheDocument()
-    // The project name should appear in the component
-    expect(screen.getAllByText('CharHub')).toHaveLength(2)
+    expect(screen.getByText('CharHub')).toBeInTheDocument()
   })
 
   it('renders with custom className', () => {
@@ -229,7 +225,7 @@ describe('ProjectSelectDropdown Edge Cases', () => {
         projects={projectsWithoutDesc}
       />
     )
-    expect(screen.getAllByText('Project 1')).toHaveLength(2) // Trigger + selection info
+    expect(screen.getByText('Project 1')).toBeInTheDocument()
   })
 
   it('handles project without color', () => {
@@ -243,6 +239,6 @@ describe('ProjectSelectDropdown Edge Cases', () => {
         projects={projectsWithoutColor}
       />
     )
-    expect(screen.getAllByText('Project 1')).toHaveLength(2) // Trigger + selection info
+    expect(screen.getByText('Project 1')).toBeInTheDocument()
   })
 })

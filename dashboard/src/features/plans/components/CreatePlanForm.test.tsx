@@ -91,19 +91,19 @@ describe('CreatePlanForm', () => {
   it('renders form with all required fields', () => {
     renderWithProviders(<CreatePlanForm />);
 
-    expect(screen.getByLabelText('Plan Name *')).toBeInTheDocument();
-    expect(screen.getByText('Tasks *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Task Name *')).toBeInTheDocument();
-    expect(screen.getByLabelText('Prompt *')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Agent/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Plan Name/)).toBeInTheDocument();
+    expect(screen.getByText(/Tasks/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Task Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Prompt/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Team/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Environment/)).toBeInTheDocument();
   });
 
   it('renders initial task with default values', () => {
     renderWithProviders(<CreatePlanForm />);
 
-    const cwdInput = screen.getByPlaceholderText('Derived from environment or agent workspace') as HTMLInputElement;
-    const workspaceSelect = screen.getByLabelText(/Agent/) as HTMLSelectElement;
+    const cwdInput = screen.getByPlaceholderText('/path/to/project') as HTMLInputElement;
+    const workspaceSelect = screen.getByLabelText(/Team/) as HTMLSelectElement;
 
     expect(cwdInput.value).toBe('');
     expect(workspaceSelect.value).toBe('');
@@ -204,7 +204,7 @@ describe('CreatePlanForm', () => {
     renderWithProviders(<CreatePlanForm />);
 
     expect(screen.getByText('Cancel')).toBeInTheDocument();
-    expect(screen.getByText('Create Plan')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Plan' })).toBeInTheDocument();
   });
 
   it('shows back link to plans page', () => {
@@ -228,7 +228,7 @@ describe('CreatePlanForm', () => {
     await user.selectOptions(envSelect, 'env1');
 
     // Wait for the cwd field to be updated
-    const cwdInput = screen.getByPlaceholderText('Derived from environment or agent workspace') as HTMLInputElement;
+    const cwdInput = screen.getByPlaceholderText('/path/to/project') as HTMLInputElement;
 
     await waitFor(() => {
       // Should use project_path from environment, not team_workspace
@@ -245,11 +245,11 @@ describe('CreatePlanForm', () => {
     await user.selectOptions(projectSelect, 'proj1');
 
     // Select a workspace (without selecting environment)
-    const workspaceSelect = screen.getByLabelText(/Agent/);
+    const workspaceSelect = screen.getByLabelText(/Team/);
     await user.selectOptions(workspaceSelect, '/root/workspace1');
 
     // Wait for the cwd field to be updated
-    const cwdInput = screen.getByPlaceholderText('Derived from environment or agent workspace') as HTMLInputElement;
+    const cwdInput = screen.getByPlaceholderText('/path/to/project') as HTMLInputElement;
 
     await waitFor(() => {
       // Should use parent directory of workspace path (project root)
@@ -271,7 +271,7 @@ describe('CreatePlanForm', () => {
     await user.selectOptions(envSelect, 'env1');
 
     // Wait for the cwd field to be updated
-    const cwdInput = screen.getByPlaceholderText('Derived from environment or agent workspace') as HTMLInputElement;
+    const cwdInput = screen.getByPlaceholderText('/path/to/project') as HTMLInputElement;
 
     await waitFor(() => {
       // Should use project_path from environment

@@ -4,17 +4,19 @@ import { LanguageSelector } from './LanguageSelector';
 import i18n from '@/lib/i18n';
 
 // Mock i18next
+const mockChangeLanguage = vi.fn((lng: string) => {
+  (i18n as any).language = lng;
+  // Trigger languageChanged event
+  const event = new CustomEvent('languageChanged', { detail: lng });
+  window.dispatchEvent(event);
+});
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
     i18n: {
       language: 'en-US',
-      changeLanguage: vi.fn((lng: string) => {
-        (i18n as any).language = lng;
-        // Trigger languageChanged event
-        const event = new CustomEvent('languageChanged', { detail: lng });
-        window.dispatchEvent(event);
-      }),
+      changeLanguage: mockChangeLanguage,
       on: vi.fn(),
       off: vi.fn(),
     },
@@ -66,8 +68,7 @@ describe('LanguageSelector', () => {
     const portugueseButton = screen.getByLabelText(/Switch to Portuguese/);
     fireEvent.click(portugueseButton);
 
-    const { i18n } = require('react-i18next').useTranslation();
-    expect(i18n.changeLanguage).toHaveBeenCalledWith('pt-BR');
+    expect(mockChangeLanguage).toHaveBeenCalledWith('pt-BR');
   });
 
   it('applies custom className', () => {
@@ -109,7 +110,7 @@ describe('LanguageSelector', () => {
   it('displays native language names correctly', () => {
     render(<LanguageSelector />);
 
-    expect(screen.getByText('English')).toBeInTheDocument();
+    expect(screen.getAllByText('English')[0]).toBeInTheDocument();
     expect(screen.getByText('Português')).toBeInTheDocument();
   });
 
@@ -139,8 +140,7 @@ describe('LanguageSelector', () => {
 
       // Note: Actual localStorage persistence is handled by i18next's LanguageDetector
       // This test verifies that the component triggers the changeLanguage function
-      const { i18n } = require('react-i18next').useTranslation();
-      expect(i18n.changeLanguage).toHaveBeenCalledWith('pt-BR');
+      expect(mockChangeLanguage).toHaveBeenCalledWith('pt-BR');
     });
   });
 

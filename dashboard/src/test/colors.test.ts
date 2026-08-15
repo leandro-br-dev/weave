@@ -151,6 +151,7 @@ describe('Status Colors', () => {
       'approved',
       'denied',
       'unknown',
+      'template',
     ]
 
     requiredStatuses.forEach((status) => {

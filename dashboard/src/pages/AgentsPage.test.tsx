@@ -23,6 +23,7 @@ vi.mock('../api/teams', () => ({
   }),
   useCreateWorkspace: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteWorkspace: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteOrphanTeams: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSaveClaudeMd: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSaveSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useGetSkill: () => ({ data: null, isLoading: false }),
@@ -45,6 +46,10 @@ vi.mock('../api/teams', () => ({
   useUpdateWorkspaceModel: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useImproveClaudeMd: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useImprovementStatus: () => mockUseImprovementStatus(),
+  useBuildWorkspace: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useApplyWorkspaceBuilder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useGetWorkspaceBuilderHistory: () => ({ data: [], isLoading: false }),
+  useGetWorkspaceBuilderPlan: () => ({ data: null, isLoading: false }),
 }))
 
 vi.mock('../api/projects', () => ({
